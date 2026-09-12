@@ -1,6 +1,19 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.13.0": {
+        "note": "SEPTEMBER 13",
+        "added": [
+            "Added model management flags to `/model`: `--save` (`-sv`), `--remove` (`-rm`), `--rename` (`-rn`, `-mv`), and `--default` (`-df`) to customize, persist, and manage models per provider directly.",
+            "Added custom thinking level mapping support: `/thinking <Level> --map <target>` maps standardized thinking levels (`Low`, `Medium`, `High`, `xHigh`) to custom provider/model targets. Use if default FluxFlow mapping fails on unconventional thinking levels. Effects the current selected model on current selected provider only.",
+            "Added new provider: TokenHabor."
+        ],
+        "changed": [
+            "Redesigned the input console bar to a modern, minimalist design.",
+            "Modernized command & file suggestions."
+        ],
+        "fixes": []
+    },
     "4.12.0": {
         "note": "SEPTEMBER 12",
         "added": [

@@ -1,4 +1,5 @@
 import { fetchWithBackoff } from './_shared.js';
+import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getNineRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
@@ -40,12 +41,16 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
         });
     }
 
+    const customEffort = getMappedThinkingLevel('9router', model, thinkingLevel) || getMappedThinkingLevel('9Router', model, thinkingLevel);
     const reasoningEffortMap = {
         'Fast': 'none',
         'Low': 'low',
         'Medium': 'medium',
-        'High': 'high'
+        'Standard': 'medium',
+        'High': 'high',
+        'xHigh': 'high'
     };
+    const effort = customEffort !== null ? customEffort : reasoningEffortMap[thinkingLevel];
 
     const requestPayload = {
         model: model,
@@ -55,8 +60,8 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
         temperature: temperature
     };
 
-    if (reasoningEffortMap[thinkingLevel]) {
-        requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel];
+    if (effort) {
+        requestPayload.reasoning_effort = effort;
     }
 
     const baseUrl = process.env['9ROUTER_URL'] || process.env.NINEROUTER_URL || 'http://127.0.0.1:20128/v1/chat/completions';

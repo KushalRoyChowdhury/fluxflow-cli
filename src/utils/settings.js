@@ -27,7 +27,8 @@ const DEFAULT_SETTINGS = {
             InferX: 'Free',
             SenseNova: 'Free',
             Poolside: 'Free',
-            ExpLabs: 'Free'
+            ExpLabs: 'Free',
+            TokenHarbor: 'Free'
         }
     },
     systemSettings: {

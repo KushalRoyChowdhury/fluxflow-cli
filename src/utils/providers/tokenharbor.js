@@ -1,8 +1,7 @@
 import { fetchWithBackoff } from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
-import fs from 'fs';
 
-export const getExpLabsStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
+export const getTokenHarborStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -42,7 +41,7 @@ export const getExpLabsStream = async function* (apiKey, model, contents, system
         });
     }
 
-    const customEffort = getMappedThinkingLevel('ExpLabs', model, thinkingLevel);
+    const customEffort = getMappedThinkingLevel('TokenHarbor', model, thinkingLevel);
     const reasoningEffortMap = {
         'Fast': 'low',
         'Low': 'low',
@@ -65,13 +64,16 @@ export const getExpLabsStream = async function* (apiKey, model, contents, system
         requestPayload.reasoning_effort = effort;
     }
 
-    const baseUrl = process.env.EXPLABS_URL || process.env.EXPERIENTIALLABS_URL || 'https://api.experientiallabs.ai/v1/chat/completions';
+    const baseUrl = process.env.TOKENHARBOR_URL || process.env.TOKEN_HARBOR_URL || 'https://tokenharbor.ai/v1/chat/completions';
 
     const headers = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-Title': 'Flux-Flow',
+        'User-Agent': 'Flux-Flow',
+        'HTTP-Referer': 'https://fluxflow-cli.onrender.com/'
     };
 
-    const effectiveKey = apiKey || process.env.EXPLABS_API_KEY || process.env.EXPERIENTIALLABS_API_KEY || '';
+    const effectiveKey = apiKey || process.env.TOKENHARBOR_API_KEY || process.env.TOKEN_HARBOR_API_KEY || '';
     headers['Authorization'] = `Bearer ${effectiveKey}`;
 
     const response = await fetchWithBackoff(baseUrl, {
@@ -83,7 +85,7 @@ export const getExpLabsStream = async function* (apiKey, model, contents, system
 
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(`Experiential Labs Error (${response.status}): ${errData.error?.message || errData.message || response.statusText}`);
+        throw new Error(`Token Harbor Error (${response.status}): ${errData.error?.message || errData.message || response.statusText}`);
     }
 
     const reader = response.body.getReader();
@@ -110,8 +112,6 @@ export const getExpLabsStream = async function* (apiKey, model, contents, system
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop();
-
-        // fs.appendFileSync("./debug.log", JSON.stringify(lines) + "\n\n");
 
         for (const line of lines) {
             const cleanLine = line.trim();

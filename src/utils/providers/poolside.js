@@ -1,4 +1,5 @@
 import { fetchWithBackoff } from './_shared.js';
+import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getPoolsideStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
@@ -40,7 +41,8 @@ export const getPoolsideStream = async function* (apiKey, model, contents, syste
         });
     }
 
-    const isThinkingDisabled = thinkingLevel === 'Fast';
+    const customThinking = getMappedThinkingLevel('Poolside', model, thinkingLevel);
+    const isThinkingDisabled = customThinking !== null ? (customThinking === false || customThinking === 'false' || customThinking === 'none' || customThinking === 'Fast') : (thinkingLevel === 'Fast');
 
     const requestPayload = {
         model: model,
@@ -52,6 +54,10 @@ export const getPoolsideStream = async function* (apiKey, model, contents, syste
 
     if (isThinkingDisabled) {
         requestPayload.chat_template_kwargs = { enable_thinking: false };
+    } else if (customThinking !== null && typeof customThinking === 'object') {
+        requestPayload.chat_template_kwargs = customThinking;
+    } else {
+        requestPayload.chat_template_kwargs = { enable_thinking: true };
     }
 
     const response = await fetchWithBackoff('https://inference.poolside.ai/v1/chat/completions', {

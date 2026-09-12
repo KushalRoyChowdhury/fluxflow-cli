@@ -100,7 +100,7 @@ export default function SettingsMenu({
 
     useEffect(() => {
         const checkKeys = async () => {
-            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs'];
+            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor'];
             const keyMap = {};
             for (const p of providers) {
                 try {
@@ -114,7 +114,7 @@ export default function SettingsMenu({
     }, []);
 
     const allSubAgentItems = React.useMemo(() => {
-        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs'];
+        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor'];
         const hasEnv = !!(process.env.SUBAGENT_MODEL && process.env.SUBAGENT_MODEL.trim());
         const envLabel = hasEnv ? `ENV (${process.env.SUBAGENT_MODEL.trim()})` : 'ENV';
 
@@ -263,16 +263,16 @@ export default function SettingsMenu({
             case 'providers': {
                 const items = [
                     { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
-                    ...(
-                        aiProvider.toLowerCase() === 'google' ||
-                            aiProvider.toLowerCase() === 'openrouter'
-                            ? [{
-                                label: 'Show Paid Models?',
-                                value: 'apiTier',
-                                status: apiTier === 'Free' ? 'No' : 'Yes'
-                            }]
-                            : []
-                    )
+                    // ...(
+                    //     aiProvider.toLowerCase() === 'google' ||
+                    //         aiProvider.toLowerCase() === 'openrouter'
+                    //         ? [{
+                    //             label: 'Show Paid Models?',
+                    //             value: 'apiTier',
+                    //             status: apiTier === 'Free' ? 'No' : 'Yes'
+                    //         }]
+                    //         : []
+                    // )
                 ];
                 if (aiProvider === 'Ollama') {
                     items.push({

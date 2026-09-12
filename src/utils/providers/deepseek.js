@@ -1,4 +1,5 @@
 import { fetchWithBackoff } from './_shared.js';
+import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
@@ -50,15 +51,18 @@ export const getDeepSeekStream = async function* (apiKey, model, contents, syste
     };
 
     // DeepSeek Specific Reasoning
-    if (thinkingLevel !== 'Fast') {
-        const reasoningEffortMap = {
-            'Low': 'high',
-            'Medium': 'high',
-            'Standard': 'high',
-            'High': 'max',
-            'xHigh': 'max'
-        };
-        requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel] || 'high';
+    const customEffort = getMappedThinkingLevel('DeepSeek', model, thinkingLevel);
+    const reasoningEffortMap = {
+        'Low': 'high',
+        'Medium': 'high',
+        'Standard': 'high',
+        'High': 'max',
+        'xHigh': 'max'
+    };
+    const effort = customEffort !== null ? customEffort : (thinkingLevel !== 'Fast' ? (reasoningEffortMap[thinkingLevel] || 'high') : null);
+
+    if (effort && effort !== 'disabled' && effort !== 'none' && effort !== 'false' && effort !== false) {
+        requestPayload.reasoning_effort = effort;
         requestPayload.extra_body = { thinking: { type: "enabled" } };
     } else {
         requestPayload.extra_body = { thinking: { type: "disabled" } };

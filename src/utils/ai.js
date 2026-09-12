@@ -20,6 +20,7 @@ import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from './text.
 import { loadSettings } from './settings.js';
 import { subagentProgress } from './subagent_state.js';
 import { isModelMultimodal, getFallbackValue, hasModelReasoning } from '../data/model_config.js';
+import { getMappedThinkingLevel } from '../data/thinking_config.js';
 import { getProviderAPIKey } from './secrets.js';
 
 import { RevertManager } from './revert.js';
@@ -44,6 +45,7 @@ import { getAIHubMixStream } from './providers/aihubmix.js';
 import { getPoolsideStream } from './providers/poolside.js';
 import { getNineRouterStream } from './providers/9router.js';
 import { getExpLabsStream } from './providers/explabs.js';
+import { getTokenHarborStream } from './providers/tokenharbor.js';
 
 
 // ─── Stutter Detection – pre-compiled regexes (module scope, compiled once) ───
@@ -1325,6 +1327,8 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
                 stream = getNineRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
                 stream = getExpLabsStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') {
+                stream = getTokenHarborStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else {
                 const googleClient = getGoogleClient(apiKey);
                 const genStream = await googleClient.models.generateContentStream({
@@ -1596,6 +1600,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
         if (aiProvider === 'Poolside') targetModel = getFallbackValue('poolside_fallback');
         if (aiProvider === '9router' || aiProvider === '9Router') targetModel = getFallbackValue('9router_fallback');
         if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') targetModel = getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813';
+        if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') targetModel = getFallbackValue('tokenharbor_fallback') || 'deepseek-v4.1-flash:free';
 
         let attempts = 0;
         let success = false;
@@ -1678,7 +1683,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
     // }
 
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'CrofAI' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'CrofAI' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -1831,6 +1836,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const day = String(now.getDate()).padStart(2, '0');
         const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
         const dateTimeStr = `${year}-${month}-${day}, ${timeStr}`;
+        const dateTimeStrExclude = `${timeStr}`;
 
         const COLLAPSED_DIRS_GLOBAL = [
             // --- The OG Clutter ---
@@ -2311,7 +2317,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (shouldCheckExclude && !hasMovingParts) {
             firstUserMsg = cleanPromptForModel.trim();
         } else {
-            firstUserMsg = `[System Metadata]\nTime: ${dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}[system] exact tool string [tool:functions.ToolName(arg="value")] in chat [/system]\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+            firstUserMsg = `[System Metadata]\nTime: ${shouldCheckExclude ? dateTimeStrExclude : dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}[system] exact tool string [tool:functions.ToolName(arg="value")] in chat [/system]\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
         }
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
@@ -2334,8 +2340,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
         let lastUsage = null;
-        let MAX_LOOPS = mode === 'Flux' ? 100 : 10;
-        MAX_LOOPS = mode.toLowerCase().includes('cu') ? 250 : MAX_LOOPS;
+        let MAX_LOOPS = mode === 'Flux' ? 200 : 15;
+        MAX_LOOPS = mode.toLowerCase().includes('cu') ? 300 : MAX_LOOPS;
         const MAX_RETRIES = 16;
         yield { type: 'status', content: 'Connecting' };
 
@@ -2704,7 +2710,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     */
 
                     // [SYSTEM INSTRUCTION CACHING]
-                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}|${!!systemSettings?.keepReasoningContext}`;
+                    // const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}|${!!systemSettings?.keepReasoningContext}`;
+
+                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}`;
                     let isCacheHit = systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
                     const userHasWAYYTOOMuchMoney_GoodLuck = process.env.I_HAVE_TOO_MUCH_MONEY === "true" || process.env.I_HAVE_TOO_MUCH_MONEY === true || false;
                     if (userHasWAYYTOOMuchMoney_GoodLuck) {
@@ -2950,6 +2958,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             abortController.signal,
                             1.0
                         );
+                    } else if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') {
+                        stream = getTokenHarborStream(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0
+                        );
                     } else {
                         const googleClient = getGoogleClient(settings?.apiKey);
                         const apiCallPromise = googleClient.models.generateContentStream({
@@ -2966,6 +2986,30 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 ],
                                 temperature: 1.05,
                                 thinkingConfig: (() => {
+                                    const customThinking = getMappedThinkingLevel('Google', targetModel || 'gemini-3-flash-preview', thinkingLevel);
+                                    if (customThinking !== null) {
+                                        if (typeof customThinking === 'object') {
+                                            return customThinking;
+                                        }
+                                        if (customThinking === false || customThinking === 'false' || customThinking === 'none' || customThinking === 0 || customThinking === '0') {
+                                            return { includeThoughts: false };
+                                        }
+                                        if (typeof customThinking === 'number') {
+                                            return { includeThoughts: true, thinkingBudget: customThinking };
+                                        }
+                                        if (typeof customThinking === 'string') {
+                                            const lower = customThinking.toLowerCase();
+                                            if (lower === 'minimal') return { includeThoughts: true, thinkingLevel: ThinkingLevel.MINIMAL };
+                                            if (lower === 'low') return { includeThoughts: true, thinkingLevel: ThinkingLevel.LOW };
+                                            if (lower === 'medium') return { includeThoughts: true, thinkingLevel: ThinkingLevel.MEDIUM };
+                                            if (lower === 'high') return { includeThoughts: true, thinkingLevel: ThinkingLevel.HIGH };
+                                            const num = Number(customThinking);
+                                            if (!isNaN(num)) {
+                                                return { includeThoughts: true, thinkingBudget: num };
+                                            }
+                                        }
+                                    }
+
                                     const modelLower = (targetModel || "").toLowerCase();
                                     const isGemma4 = modelLower.includes('gemma-4') || modelLower.startsWith('gemma');
                                     const isGemini3 = modelLower.includes('gemini-3');
@@ -5149,6 +5193,8 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'poolside') return 'Poolside';
         if (lower === '9router' || lower === '9Router') return '9router';
         if (lower === 'aihubmix' || lower === 'aihub') return 'AIHubMix';
+        if (lower === 'explabs' || lower === 'experientiallabs' || lower === 'experimentallabs') return 'ExpLabs';
+        if (lower === 'tokenharbor' || lower === 'token harbor' || lower === 'token_harbor' || lower === 'thk') return 'TokenHarbor';
         return null;
     };
 
@@ -5241,7 +5287,7 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 - CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find definitions, logic, relevant code, standard junk auto-excluded
 - ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
 - ReadFile(path=string, startLine?=int, endLine?=int)
-- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Ranges: ^LINE:...$ syntax, must for large blocks/escape sequences
+- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchors: ^LINE:...$ syntax, must for large blocks/escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
 - Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user`.trim();
 

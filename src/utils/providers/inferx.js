@@ -1,4 +1,5 @@
 import { fetchWithBackoff } from './_shared.js';
+import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getInferXStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
@@ -26,6 +27,7 @@ export const getInferXStream = async function* (apiKey, model, contents, systemI
         });
     }
 
+    const customEffort = getMappedThinkingLevel('InferX', model, thinkingLevel);
     const reasoningEffortMap = {
         'Fast': 'low',
         'Low': 'low',
@@ -34,8 +36,9 @@ export const getInferXStream = async function* (apiKey, model, contents, systemI
         'High': 'high',
         'xHigh': 'high'
     };
+    const effort = customEffort !== null ? customEffort : reasoningEffortMap[thinkingLevel];
 
-    const isSkipReasoningModel = model && model.toLowerCase().includes('qwen3.8-27b');
+    const isSkipReasoningModel = model && model.toLowerCase().includes('qwen3.8-27b') && customEffort === null;
     const addThink = model && (model.toLowerCase().includes('qwen3.8-27b') || model.toLowerCase().includes('qwen3.6-35b-a3b-fp8'));
 
     const requestPayload = {
@@ -46,11 +49,9 @@ export const getInferXStream = async function* (apiKey, model, contents, systemI
         temperature: temperature
     };
 
-    if (!isSkipReasoningModel) {
+    if (!isSkipReasoningModel && effort) {
         requestPayload.stream_options = { include_usage: true };
-        if (reasoningEffortMap[thinkingLevel]) {
-            requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel];
-        }
+        requestPayload.reasoning_effort = effort;
     }
 
     const response = await fetchWithBackoff('https://model.inferx.net/endpoints/v1/chat/completions', {

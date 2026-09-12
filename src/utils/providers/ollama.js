@@ -1,4 +1,5 @@
 import { Ollama } from 'ollama';
+import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getOllamaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0, endpointType = 'Cloud') {
     const messages = [];
@@ -49,6 +50,7 @@ export const getOllamaStream = async function* (apiKey, model, contents, systemI
     let lastFlushTime = Date.now();
     let hasNewData = false;
 
+    const customThink = getMappedThinkingLevel('Ollama', model, thinkingLevel);
     const thinkMap = {
         'Fast': false,
         'Low': 'medium',
@@ -57,7 +59,7 @@ export const getOllamaStream = async function* (apiKey, model, contents, systemI
         'High': 'high',
         'xHigh': 'high'
     };
-    const thinkParam = thinkMap[thinkingLevel] !== undefined ? thinkMap[thinkingLevel] : true;
+    const thinkParam = customThink !== null ? (customThink === 'false' || customThink === false ? false : customThink === 'true' || customThink === true ? true : customThink) : (thinkMap[thinkingLevel] !== undefined ? thinkMap[thinkingLevel] : true);
 
     const chatParams = {
         model: model,

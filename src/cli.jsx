@@ -182,8 +182,8 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /image setup key <default|custom>        Configure image API key strategy
   /budget                                  Set or View budget limits
   /mode <flux|flow>                        Toggle Flux/Flow modes
-  /thinking <Fast|Low|Medium|High|xHigh>   Set AI reasoning depth
-  /model <model_name>                      Switch Model for Agent
+  /thinking <level> [--map <target>]       Set AI reasoning depth or map thinking levels
+  /model <model_id> [-sv|-rm|-rn|-df]      Switch or manage models for active provider
   /wildcard-tooling                        Use if the model lacks Tooling Capability
   /provider                                Select AI Provider
   /settings                                Configure system preferences

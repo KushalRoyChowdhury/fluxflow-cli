@@ -32,7 +32,8 @@ import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession } from './utils/usage.js';
-import { loadRemoteModelConfig, getModels, getDefaultModel, getFallbackValue, setCustomMultimodal, setOllamaMultimodal, isModelMultimodal } from './data/model_config.js';
+import { getModels, getDefaultModel, getFallbackValue, setCustomMultimodal, setOllamaMultimodal, isModelMultimodal, saveModelToProvider, removeModelFromProvider, renameModelInProvider, setDefaultModelForProvider, setModelMultimodalInProvider } from './data/model_config.js';
+import { setThinkingLevelMapping, getMappedThinkingLevel, removeThinkingLevelMapping } from './data/thinking_config.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { readEncryptedJson } from './utils/crypto.js';
@@ -797,7 +798,7 @@ export default function App({ args = [] }) {
                 const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
                 const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 
-                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs'];
+                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor'];
                 const normalizeProvider = (pStr) => {
                     if (!pStr) return null;
                     const lower = pStr.toLowerCase();
@@ -814,6 +815,7 @@ export default function App({ args = [] }) {
                     if (lower === '9router') return '9router';
                     if (lower === 'aihubmix' || lower === 'aihub') return 'AIHubMix';
                     if (lower === 'explabs' || lower === 'experientiallabs' || lower === 'experimentallabs' || lower === 'experiential labs' || lower === 'experimental labs' || lower === 'experiential' || lower === 'experimental') return 'ExpLabs';
+                    if (lower === 'tokenharbor' || lower === 'token harbor' || lower === 'token_harbor' || lower === 'thk') return 'TokenHarbor';
                     return null;
                 };
 
@@ -920,7 +922,7 @@ export default function App({ args = [] }) {
                     const parts = val.split('@');
                     const keyPart = parts[0];
                     const provPart = parts[1].toLowerCase();
-                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r'].includes(provPart)) {
+                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r', 'explabs', 'tokenharbor', 'token_harbor', 'thk'].includes(provPart)) {
                         let mapped = 'Google';
                         if (provPart === 'google') mapped = 'Google';
                         else if (provPart === 'deepseek') mapped = 'DeepSeek';
@@ -934,6 +936,8 @@ export default function App({ args = [] }) {
                         else if (provPart === 'poolside' || provPart === 'pool') mapped = 'Poolside';
                         else if (provPart === '9router' || provPart === '9r') mapped = '9router';
                         else if (provPart === 'aihubmix' || provPart === 'aihub') mapped = 'AIHubMix';
+                        else if (provPart === 'explabs') mapped = 'ExpLabs';
+                        else if (provPart === 'tokenharbor' || provPart === 'token_harbor' || provPart === 'thk') mapped = 'TokenHarbor';
                         parsed.key = keyPart;
                         parsed.provider = mapped;
                     }
@@ -1005,7 +1009,7 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
                 const val = args[i + 1].toLowerCase();
-                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r'].includes(val)) {
+                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r', 'explabs', 'tokenharbor', 'token_harbor', 'thk'].includes(val)) {
                     let mapped = 'Google';
                     if (val === 'google') mapped = 'Google';
                     else if (val === 'deepseek') mapped = 'DeepSeek';
@@ -1019,6 +1023,8 @@ export default function App({ args = [] }) {
                     else if (val === 'poolside' || val === 'pool') mapped = 'Poolside';
                     else if (val === '9router' || val === '9r') mapped = '9router';
                     else if (val === 'aihubmix' || val === 'aihub') mapped = 'AIHubMix';
+                    else if (val === 'explabs') mapped = 'ExpLabs';
+                    else if (val === 'tokenharbor' || val === 'token_harbor' || val === 'thk') mapped = 'TokenHarbor';
                     parsed.provider = mapped;
                 }
                 i++;
@@ -1285,15 +1291,11 @@ export default function App({ args = [] }) {
         if (prevProviderRef.current !== aiProvider) {
             prevProviderRef.current = aiProvider;
             if (aiProvider === 'Mistral') {
-                setThinkingLevel('Fast');
+                setThinkingLevel('Low');
+            } else if (aiProvider === 'SenseNova' || aiProvider === 'Poolside') {
+                setThinkingLevel('High');
             } else {
-                if (aiProvider === 'SenseNova' || aiProvider === 'Poolside') {
-                    setThinkingLevel('High');
-                    return;
-                }
-                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'Ollama' || aiProvider === 'CroAI' || aiProvider === 'OpenRouter' || aiProvider === 'ExpLabs';
-                setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
-
+                setThinkingLevel('Medium');
             }
         } else {
             if (aiProvider === 'Google' && thinkingLevel === 'xHigh') {
@@ -2189,10 +2191,7 @@ export default function App({ args = [] }) {
                 });
             }
 
-            // 1. Load remote model config
-            await loadRemoteModelConfig();
-
-            // 2. Load persisted settings
+            // 1. Load persisted settings
             const saved = await loadSettings();
             originalAllowExternalAccessRef.current = saved.systemSettings?.allowExternalAccess ?? false;
             originalMemoryRef.current = saved.systemSettings?.memory ?? true;
@@ -2517,6 +2516,10 @@ export default function App({ args = [] }) {
                 prefix: 'xpl_',
                 minLength: 0,
             },
+            TokenHarbor: {
+                prefix: 'thk_',
+                minLength: 0,
+            },
         };
 
         const { prefix, minLength } = validators[aiProvider] ?? {
@@ -2541,7 +2544,7 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-ai/deepseek-v4-flash';
             } else if (aiProvider === 'Ollama' || aiProvider === '9router') {
                 defaultModel = activeModel || '';
-            } else if (aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === 'ExpLabs') {
+            } else if (aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor') {
                 defaultModel = getDefaultModel(aiProvider, apiTier) || '';
             }
             setActiveModel(defaultModel);
@@ -2551,13 +2554,13 @@ export default function App({ args = [] }) {
                 newSys = { ...newSys, ollamaEndpoint: 'Local' };
                 setSystemSettings(newSys);
             }
-            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs') {
+            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor') {
                 newSys = { ...newSys, memory: false };
                 setSystemSettings(newSys);
             }
             saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
 
-            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape && aiProvider === 'Ollama' ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape && aiProvider === 'Ollama' ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
@@ -2635,57 +2638,12 @@ export default function App({ args = [] }) {
         { cmd: '/chats', desc: 'List all chat sessions' },
         { cmd: '/btw', desc: 'Ask a question without intefering with ongoing tasks' },
         {
-            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: aiProvider === 'Ollama' || aiProvider === 'DeepSeek' || aiProvider === 'ExpLabs'
-                ? [
-                    { cmd: 'Fast', desc: 'Reasoning Disabled' },
-                    { cmd: 'Standard', desc: 'Standard Reasoning' },
-                    { cmd: 'High', desc: 'Extended Reasoning' }
-                ]
-                : aiProvider === 'NVIDIA'
-                    ? [
-                        { cmd: 'Fast', desc: 'Reasoning Disabled' },
-                        { cmd: 'Standard', desc: 'Balanced Reasoning' },
-                        { cmd: 'High', desc: 'Extended Reasoning' }
-                    ]
-                    : aiProvider === 'OpenRouter'
-                        ? [
-                            { cmd: 'Fast', desc: 'Fastest' },
-                            { cmd: 'Low', desc: 'Quick Reasoning' },
-                            { cmd: 'Standard', desc: 'Balanced Reasoning' },
-                            { cmd: 'High', desc: 'Deep Reasoning' },
-                            { cmd: 'xHigh', desc: 'Extended Reasoning' }
-                        ]
-                        : aiProvider === 'Mistral'
-                            ? [
-                                { cmd: 'Fast', desc: 'Reasoning Disabled' },
-                                { cmd: 'xHigh', desc: 'Deep Reasoning' }
-                            ]
-                            : aiProvider === 'Poolside'
-                                ? [
-                                    { cmd: 'Fast', desc: 'Reasoning Disabled' },
-                                    { cmd: 'High', desc: 'Extended Reasoning' }
-                                ]
-                                : (aiProvider === '9router' || aiProvider === '9Router')
-                                    ? [
-                                        { cmd: 'Fast', desc: 'None (Reasoning Disabled)' },
-                                        { cmd: 'Low', desc: 'Low Reasoning' },
-                                        { cmd: 'Medium', desc: 'Medium Reasoning' },
-                                        { cmd: 'High', desc: 'High Reasoning' }
-                                    ]
-                                    : activeModel && (activeModel.toLowerCase().startsWith('gemini-3') || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova')
-                                        ? [
-                                            { cmd: 'Fast', desc: 'Fastest' },
-                                            { cmd: 'Low', desc: 'Quick Reasoning' },
-                                            { cmd: 'Standard', desc: 'Balanced Reasoning' },
-                                            { cmd: 'High', desc: 'Deep Reasoning' }
-                                        ]
-                                        : [ // Google General / Gemma
-                                            { cmd: 'Fast', desc: 'Fastest' },
-                                            { cmd: 'Low', desc: 'Quick Reasoning' },
-                                            { cmd: 'Medium', desc: 'Balanced Reasoning' },
-                                            { cmd: 'High', desc: 'Deep Reasoning' },
-                                            { cmd: 'xHigh', desc: 'Extended Reasoning' }
-                                        ]
+            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
+                { cmd: 'Low', display: getMappedThinkingLevel(aiProvider, activeModel, 'Low') !== null ? `Low (${getMappedThinkingLevel(aiProvider, activeModel, 'Low')})` : 'Low', desc: 'Quick Reasoning' },
+                { cmd: 'Medium', display: getMappedThinkingLevel(aiProvider, activeModel, 'Medium') !== null ? `Medium (${getMappedThinkingLevel(aiProvider, activeModel, 'Medium')})` : 'Medium', desc: 'Balanced Reasoning' },
+                { cmd: 'High', display: getMappedThinkingLevel(aiProvider, activeModel, 'High') !== null ? `High (${getMappedThinkingLevel(aiProvider, activeModel, 'High')})` : 'High', desc: 'Deep Reasoning' },
+                { cmd: 'xHigh', display: getMappedThinkingLevel(aiProvider, activeModel, 'xHigh') !== null ? `xHigh (${getMappedThinkingLevel(aiProvider, activeModel, 'xHigh')})` : 'xHigh', desc: 'Extended Reasoning' }
+            ]
         },
         {
             cmd: '/model',
@@ -3236,9 +3194,79 @@ export default function App({ args = [] }) {
                 case '/thinking': {
                     let formattedLevel;
                     if (parts[1]) {
-                        let val = parts[1].toLowerCase();
-                        const isBypass = parts.includes('--bypass');
-                        const isForce = parts.includes('--force');
+                        const rawArgs = parts.slice(1);
+                        const isBypass = rawArgs.includes('--bypass');
+                        const isForce = rawArgs.includes('--force');
+
+                        // Check for --map flag (e.g. /thinking Standard --map high or /thinking Standard --map 8192)
+                        const mapIdx = rawArgs.findIndex(a => a === '--map' || a === '-m');
+                        if (mapIdx !== -1) {
+                            const levelArg = rawArgs.slice(0, mapIdx).join(' ').trim();
+                            const targetArg = rawArgs.slice(mapIdx + 1).join(' ').trim();
+
+                            const validLevels = ['fast', 'low', 'medium', 'standard', 'high', 'xhigh', 'max'];
+                            if (!levelArg || !targetArg) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Usage: /thinking <level> --map <target_value>. Example: /thinking Standard --map high`, isMeta: true }];
+                                });
+                            } else if (!validLevels.includes(levelArg.toLowerCase())) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, {
+                                        id: Date.now(),
+                                        role: 'system',
+                                        text: `\x1b[31m[Error]\x1b[0m Unknown level "\x1b[33m${levelArg}\x1b[0m" to map. Available standard levels: \x1b[36mLow, Medium, High, xHigh\x1b[0m.`,
+                                        isMeta: true
+                                    }];
+                                });
+                            } else if (targetArg.toLowerCase() === 'rm' || targetArg.toLowerCase() === '--remove' || targetArg.toLowerCase() === '-rm') {
+                                const res = removeThinkingLevelMapping(aiProvider, activeModel, levelArg);
+                                if (res.success) {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `✦ Thinking Level Mapping Removed:\n⠀⠀\x1b[2m└─\x1b[22m Target: \x1b[36m${aiProvider}::${activeModel}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Removed mapping for: \x1b[33m${levelArg}\x1b[0m\n⠀`, isMeta: true }];
+                                    });
+                                } else {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Failed to remove thinking mapping: ${res.reason}`, isMeta: true }];
+                                    });
+                                }
+                            } else {
+                                const targetVal = isNaN(Number(targetArg)) ? targetArg : Number(targetArg);
+                                const res = setThinkingLevelMapping(aiProvider, activeModel, levelArg, targetVal);
+                                if (res.success) {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `✦ Thinking Level Mapped:\n⠀⠀\x1b[2m└─\x1b[22m Target: \x1b[36m${aiProvider}::${activeModel}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Mapping: \x1b[33m${levelArg}\x1b[0m ➔ \x1b[32m${targetArg}\x1b[0m\n⠀`, isMeta: true }];
+                                    });
+                                } else {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Failed to save thinking mapping: ${res.reason}`, isMeta: true }];
+                                    });
+                                }
+                            }
+                            break;
+                        }
+
+                        let val = rawArgs[0].toLowerCase();
+                        const validThinkingLevels = ['fast', 'low', 'medium', 'standard', 'high', 'xhigh', 'max'];
+                        if (!validThinkingLevels.includes(val)) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: Date.now(),
+                                    role: 'system',
+                                    text: `\x1b[31m[Error]\x1b[0m Unknown thinking level "\x1b[33m${rawArgs[0]}\x1b[0m". Available levels: \x1b[36mLow, Medium, High, xHigh\x1b[0m (or use \x1b[36m/thinking\x1b[0m for interactive picker).`,
+                                    isMeta: true
+                                }];
+                            });
+                            break;
+                        }
+                        if (val === 'standard') val = 'medium';
+                        if (val === 'max') val = 'xhigh';
                         formattedLevel = val.charAt(0).toUpperCase() + val.slice(1);
                         if (val === 'xhigh') {
                             formattedLevel = 'xHigh';
@@ -3273,22 +3301,117 @@ export default function App({ args = [] }) {
                 case '/model': {
                     if (parts[1]) {
                         const rawArgs = parts.slice(1);
-                        let isMultimodalFlag = false;
 
-                        const filteredParts = [];
-                        for (const arg of rawArgs) {
-                            if (arg === '--multimodal' || arg === '-m') {
-                                isMultimodalFlag = true;
-                            } else {
-                                filteredParts.push(arg);
+                        // Check for multimodal flag
+                        const isMultimodalFlag = rawArgs.some(a => a === '--multimodal' || a === '-m');
+
+                        // Check for save / remove / rename / default flags
+                        const isSave = rawArgs.some(a => a === '--save' || a === '-sv' || a === '--add');
+                        const isRemove = rawArgs.some(a => a === '--remove' || a === '-rm');
+                        const isRename = rawArgs.some(a => a === '--rename' || a === '-rn' || a === '-mv');
+                        const isDefault = rawArgs.some(a => a === '--default' || a === '-df');
+
+                        if (isSave || isRemove || isRename || isDefault) {
+                            const nonFlagArgs = rawArgs.filter(a => !['--save', '-sv', '--add', '--remove', '-rm', '--rename', '-rn', '-mv', '--default', '-df', '--multimodal', '-m'].includes(a));
+
+                            if (isDefault) {
+                                const modelToDefault = nonFlagArgs.join(' ').trim();
+                                if (!modelToDefault) {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide a model ID to set as default. Example: /model my-model --default`, isMeta: true }];
+                                    });
+                                } else {
+                                    const res = setDefaultModelForProvider(aiProvider, modelToDefault, isMultimodalFlag);
+                                    if (res.success) {
+                                        setMessages(prev => {
+                                            setCompletedIndex(prev.length + 1);
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Default Model Set:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m Default Model: \x1b[32m${modelToDefault}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}\n⠀`, isMeta: true }];
+                                        });
+                                    } else {
+                                        setMessages(prev => {
+                                            setCompletedIndex(prev.length + 1);
+                                            return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Failed to set default model: ${res.reason}`, isMeta: true }];
+                                        });
+                                    }
+                                }
+                            } else if (isSave) {
+                                const modelToSave = nonFlagArgs.join(' ').trim();
+                                if (!modelToSave) {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide a model ID to save. Example: /model my-custom-model --save`, isMeta: true }];
+                                    });
+                                } else {
+                                    const res = saveModelToProvider(aiProvider, modelToSave, isMultimodalFlag);
+                                    if (res.success) {
+                                        setMessages(prev => {
+                                            setCompletedIndex(prev.length + 1);
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Saved:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m Model: \x1b[32m${modelToSave}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}\n⠀`, isMeta: true }];
+                                        });
+                                    } else {
+                                        setMessages(prev => {
+                                            setCompletedIndex(prev.length + 1);
+                                            return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Failed to save model: ${res.reason}`, isMeta: true }];
+                                        });
+                                    }
+                                }
+                            } else if (isRemove) {
+                                const modelToRemove = nonFlagArgs.join(' ').trim();
+                                if (!modelToRemove) {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide a model ID to remove. Example: /model my-custom-model --remove`, isMeta: true }];
+                                    });
+                                } else {
+                                    const res = removeModelFromProvider(aiProvider, modelToRemove);
+                                    if (res.success) {
+                                        setMessages(prev => {
+                                            setCompletedIndex(prev.length + 1);
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Removed:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m Model: \x1b[31m${modelToRemove}\x1b[0m\n⠀`, isMeta: true }];
+                                        });
+                                    } else {
+                                        setMessages(prev => {
+                                            setCompletedIndex(prev.length + 1);
+                                            return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Failed to remove model: ${res.reason}`, isMeta: true }];
+                                        });
+                                    }
+                                }
+                            } else if (isRename) {
+                                if (nonFlagArgs.length < 2) {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide both old and new model IDs. Example: /model old-model-id new-model-id --rename`, isMeta: true }];
+                                    });
+                                } else {
+                                    const oldModelId = nonFlagArgs[0].trim();
+                                    const newModelId = nonFlagArgs.slice(1).join(' ').trim();
+                                    const res = renameModelInProvider(aiProvider, oldModelId, newModelId);
+                                    if (res.success) {
+                                        setMessages(prev => {
+                                            setCompletedIndex(prev.length + 1);
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Renamed:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m Old Model: \x1b[31m${oldModelId}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m New Model: \x1b[32m${newModelId}\x1b[0m\n⠀`, isMeta: true }];
+                                        });
+                                    } else {
+                                        setMessages(prev => {
+                                            setCompletedIndex(prev.length + 1);
+                                            return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Failed to rename model: ${res.reason}`, isMeta: true }];
+                                        });
+                                    }
+                                }
                             }
+                            break;
                         }
 
-                        const mod = filteredParts.join(' ');
+                        const filteredParts = rawArgs.filter(arg => arg !== '--multimodal' && arg !== '-m');
+                        const mod = filteredParts.join(' ').trim();
 
                         setCustomMultimodal(isMultimodalFlag);
 
                         if (mod) {
+                            if (isMultimodalFlag) {
+                                setModelMultimodalInProvider(aiProvider, mod, true);
+                            }
                             const freeDefault = getDefaultModel('Google', 'Free');
                             const paidDefault = getDefaultModel('Google', 'Paid');
                             if (mod === freeDefault && apiTier !== 'Free' && aiProvider === 'Google' && false) {
@@ -3635,7 +3758,8 @@ export default function App({ args = [] }) {
                                 SenseNova: 'Free',
                                 AIHubMix: 'Free',
                                 Poolside: 'Free',
-                                ExpLabs: 'Free'
+                                ExpLabs: 'Free',
+                                TokenHarbor: 'Free'
                             }
                         };
                         setQuotas(defaultQuotas);
@@ -5033,6 +5157,7 @@ export default function App({ args = [] }) {
                             { label: 'CrofAI', value: 'CrofAI' },
                             { label: 'Poolside', value: 'Poolside' },
                             { label: 'Experiential Labs', value: 'ExpLabs' },
+                            { label: 'Token Harbor', value: 'TokenHarbor' },
                             ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router', value: '9router' }] : []),
                             { label: 'Ollama', value: 'Ollama' },
                             { label: 'AIHubMix       [EXPERIMENTAL]', value: 'AIHubMix' },
@@ -5058,7 +5183,7 @@ export default function App({ args = [] }) {
                                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                                 setActiveModel(defaultModel);
                                 setApiTier(targetTier);
-                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs') {
+                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor') {
                                     setSystemSettings(s => ({ ...s, memory: false }));
                                     saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
                                 } else {
@@ -5068,7 +5193,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}\n⠀`,
+                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -5231,7 +5356,7 @@ export default function App({ args = [] }) {
                 );
 
             case 'providerBudgetSelect': {
-                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs'];
+                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor'];
                 const anySelected = PROVIDERS_LIST.some(p => pbsSelected[p]);
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
@@ -5439,7 +5564,7 @@ export default function App({ args = [] }) {
                 const isFreeTier = apiTier !== 'Paid';
                 const usingProviderBudgets = !!(quotas.providerBudgets?.__useProvider);
                 const providerBudgetsMap = quotas.providerBudgets || {};
-                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs'].filter(
+                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor'].filter(
                     p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
                 );
                 const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
@@ -5685,14 +5810,14 @@ export default function App({ args = [] }) {
                                         newSettings.activeModel = defaultModel;
                                         newSettings.apiTier = targetTier;
 
-                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' || prov === 'ExpLabs') {
+                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' || prov === 'ExpLabs' || prov === 'TokenHarbor') {
                                             setSystemSettings(s => ({ ...s, memory: false }));
                                             newSettings.systemSettings = { ...systemSettings, memory: false };
                                         }
 
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀\x1b[2m└─\x1b[22m Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' || prov === 'ExpLabs' ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀\x1b[2m└─\x1b[22m Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' || prov === 'ExpLabs' || prov === 'TokenHarbor' ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
                                         });
                                     }
 
@@ -6888,10 +7013,9 @@ export default function App({ args = [] }) {
                         {/* 🌊 MAIN COMMAND CONSOLE */}
                         <Box flexDirection="column" width="100%">
                             <Box width="100%" height={1} overflow="hidden">
-                                <Text color={colors.inputBorder}>{'▄'.repeat(Math.max(1, terminalSize.columns))}</Text>
+                                <Text color={colors.inputBorder}>{'─'.repeat(Math.max(1, terminalSize.columns))}</Text>
                             </Box>
                             <Box
-                                backgroundColor={colors.inputBg}
                                 paddingX={1}
                                 paddingY={0}
                                 width="100%"
@@ -6946,7 +7070,7 @@ export default function App({ args = [] }) {
                                 </Box>
                             </Box>
                             <Box width="100%" height={1} overflow="hidden">
-                                <Text color={colors.inputBorder}>{'▀'.repeat(Math.max(1, terminalSize.columns))}</Text>
+                                <Text color={colors.inputBorder}>{'─'.repeat(Math.max(1, terminalSize.columns))}</Text>
                             </Box>
                         </Box>
                     </Box>
@@ -7023,6 +7147,8 @@ export default function App({ args = [] }) {
                                                         { label: 'SenseNova', value: 'SenseNova' },
                                                         { label: 'CrofAI', value: 'CrofAI' },
                                                         { label: 'Poolside', value: 'Poolside' },
+                                                        { label: 'Experiential Labs', value: 'ExpLabs' },
+                                                        { label: 'Token Harbor', value: 'TokenHarbor' },
                                                         ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router', value: '9router' }] : []),
                                                         { label: 'Ollama', value: 'Ollama' },
                                                         { label: 'AIHubMix     [EXPERIMENTAL]', value: 'AIHubMix' },
@@ -7086,8 +7212,8 @@ export default function App({ args = [] }) {
                             let firstSelectableIndex = 0;
                             while (firstSelectableIndex < suggestions.length) {
                                 const sug = suggestions[firstSelectableIndex];
-                                const cmdName = sug?.cmd || sug || '';
-                                if (typeof cmdName === 'string' && cmdName.trimStart().startsWith('---')) {
+                                const cmdName = sug?.cmd || sug || "";
+                                if (typeof cmdName === "string" && cmdName.trimStart().startsWith("---")) {
                                     firstSelectableIndex++;
                                 } else {
                                     break;
@@ -7109,97 +7235,139 @@ export default function App({ args = [] }) {
 
                             const visible = suggestions.slice(startIdx, startIdx + windowSize);
                             const remaining = suggestions.length - (startIdx + visible.length);
+                            const isFileSug = suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@");
+                            const isModelSug = input.startsWith("/model");
+                            const isThinkingSug = input.startsWith("/thinking");
+                            const totalCount = suggestions.length;
+                            const currentPos = Math.min(totalCount, selectedIndex + 1);
 
                             return (
                                 <Box
                                     flexDirection="column"
                                     width="100%"
                                     marginBottom={1}
+                                    marginTop={0}
                                 >
+                                    {/* Header Row */}
                                     <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
-                                        <Text color={colors.text} bold>
-                                            {suggestions[0]?.cmd?.startsWith('@') || suggestions[0]?.cmd?.startsWith('\\@') ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"}
-                                        </Text>
-                                        {suggestions[0]?.cmd?.startsWith('@') || suggestions[0]?.cmd?.startsWith('\\@') ? (
-                                            <Text color={colors.textMuted} italic>
-                                                (Use #Lstart-Lend to specify line numbers)
+                                        <Box flexDirection="row">
+                                            <Text color={colors.primary || colors.text} bold>
+                                                {isFileSug ? "FILES" : isModelSug ? "SAVED MODELS" : isThinkingSug ? "THINKING LEVELS" : "COMMANDS"}
                                             </Text>
-                                        ) : (input.startsWith('/model') && apiTier === 'Free') ? (() => {
-                                            let url = "https://aistudio.google.com/billing";
-                                            let label = "billing";
-                                            if (aiProvider === 'DeepSeek') {
-                                                url = "https://platform.deepseek.com/usage";
-                                                label = "billing";
-                                            } else if (aiProvider === 'OpenRouter') {
-                                                url = "https://openrouter.ai/settings/profile";
-                                                label = "profile";
-                                            } else if (aiProvider === 'NVIDIA') {
-                                                url = "https://build.nvidia.com/settings/api-keys";
-                                                label = "billing";
-                                            } else if (aiProvider === 'CrofAI') {
-                                                url = "https://crof.ai";
-                                                label = "account";
-                                            } else if (aiProvider === 'Poolside') {
-                                                url = "https://inference.poolside.ai";
-                                                label = "account";
-                                            }
-                                            // return (
-                                            //     <Text color={colors.textMuted} italic>
-                                            //         Paid API Strategy has more models. Configure <Text color={colors.secondary} underline>{`\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`}</Text> & /settings
-                                            //     </Text>
-                                            // );
-                                        })() : null}
+                                            <Text color={colors.textMuted}> ({totalCount})</Text>
+                                        </Box>
+                                        <Box flexDirection="row">
+                                            {isFileSug ? (
+                                                <Text color={colors.textMuted} italic>
+                                                    Use #Lstart-Lend for line range • Tab to select
+                                                </Text>
+                                            ) : (
+                                                <Text color={colors.textMuted} italic>
+                                                    ↑/↓ navigate • Tab / Enter select • Esc dismiss
+                                                </Text>
+                                            )}
+                                        </Box>
                                     </Box>
 
+                                    {/* Divider */}
+                                    <Box width="100%" height={1} overflow="hidden">
+                                        <Text color={colors.borderDim || colors.inputBorder || colors.textDim}>{"─".repeat(Math.max(1, terminalSize.columns))}</Text>
+                                    </Box>
+
+                                    {/* Suggestions List */}
                                     {visible.slice(0, suggestionVisibleCount).map((s, i) => {
                                         const actualIdx = startIdx + i;
                                         const isActive = actualIdx === selectedIndex;
-                                        const isDivider = typeof s.cmd === 'string' && s.cmd.trimStart().startsWith('---');
-                                        const isGemmaDisabled = s.cmd === getDefaultModel('Google', 'Free') && apiTier !== 'Free';
+                                        const isDivider = typeof s.cmd === "string" && s.cmd.trimStart().startsWith("---");
+                                        const isGemmaDisabled = s.cmd === getDefaultModel("Google", "Free") && apiTier !== "Free";
+
+                                        const label = s.display || (s.cmd && (s.cmd.startsWith("@[") || s.cmd.startsWith("\\@[")) && s.cmd.endsWith("]") ? (() => {
+                                            const pathPart = s.cmd.startsWith("\\@[") ? s.cmd.slice(3, -1) : s.cmd.slice(2, -1);
+                                            const parts = pathPart.split(/[\/\\]/);
+                                            return parts[parts.length - 1];
+                                        })() : (s.cmd && s.cmd.includes("/") ? s.cmd.split("/").pop() : s.cmd));
+
+                                        if (isModelSug) {
+                                            const isMulti = s.multimodal === true || isModelMultimodal(s.cmd || s);
+                                            const badgeText = isMulti ? "Multimodal" : "Text Only";
+                                            return (
+                                                <Box
+                                                    key={s.cmd || i}
+                                                    flexDirection="row"
+                                                    backgroundColor={isActive ? colors.highlightBg : undefined}
+                                                    paddingX={1}
+                                                    height={1}
+                                                    alignItems="center"
+                                                    justifyContent="space-between"
+                                                >
+                                                    <Box flexDirection="row" alignItems="center" flexGrow={1} overflow="hidden">
+                                                        <Box width={3} flexShrink={0}>
+                                                            <Text color={isActive ? (colors.primary || colors.text) : colors.textMuted} bold={isActive}>
+                                                                {isActive ? "❯ " : "  "}
+                                                            </Text>
+                                                        </Box>
+                                                        <Text
+                                                            color={isDivider ? colors.textDim : (isGemmaDisabled ? colors.textMuted : (isActive ? (colors.inputText || colors.text) : colors.text))}
+                                                            bold={isActive}
+                                                        >
+                                                            {label}
+                                                        </Text>
+                                                    </Box>
+                                                    <Box flexShrink={0} marginLeft={2}>
+                                                        <Text color={isActive ? colors.text : colors.textMuted} italic={!isActive}>
+                                                            {badgeText}
+                                                        </Text>
+                                                    </Box>
+                                                </Box>
+                                            );
+                                        }
 
                                         return (
                                             <Box
-                                                key={s.cmd}
+                                                key={s.cmd || i}
                                                 flexDirection="row"
                                                 backgroundColor={isActive ? colors.highlightBg : undefined}
                                                 paddingX={1}
+                                                height={1}
+                                                alignItems="center"
                                             >
-                                                <Box width={3}>
-                                                    <Text color={isActive ? colors.text : colors.textMuted} bold={isActive}>{isActive ? " ❯" : "  "}</Text>
-                                                </Box>
-                                                <Box width={55}>
-                                                    <Text
-                                                        color={isDivider ? colors.textDim : (isGemmaDisabled ? colors.textMuted : (isActive ? colors.text : colors.textDim))}
-                                                        bold={false}
-                                                    >
-                                                        {s.display || (s.cmd && (s.cmd.startsWith('@[') || s.cmd.startsWith('\\@[')) && s.cmd.endsWith(']') ? (() => {
-                                                            // Handle both @[...] and \@[...]
-                                                            const pathPart = s.cmd.startsWith('\\@[') ? s.cmd.slice(3, -1) : s.cmd.slice(2, -1);
-                                                            const parts = pathPart.split(/[/\\]/);
-                                                            return parts[parts.length - 1];
-                                                        })() : (s.cmd && s.cmd.includes('/') ? s.cmd.split('/').pop() : s.cmd))}
+                                                <Box width={3} flexShrink={0}>
+                                                    <Text color={isActive ? (colors.primary || colors.text) : colors.textMuted} bold={isActive}>
+                                                        {isActive ? "❯ " : "  "}
                                                     </Text>
                                                 </Box>
-                                                <Box flexGrow={1}>
-                                                    <Text color={!isActive ? colors.textMuted : colors.text} italic>{s.desc}</Text>
+                                                <Box width={26} flexShrink={0}>
+                                                    <Text
+                                                        color={isDivider ? colors.textDim : (isGemmaDisabled ? colors.textMuted : (isActive ? (colors.inputText || colors.text) : colors.text))}
+                                                        bold={isActive}
+                                                    >
+                                                        {label}
+                                                    </Text>
+                                                </Box>
+                                                <Box flexGrow={1} overflow="hidden">
+                                                    <Text color={isActive ? colors.text : colors.textMuted} italic={!isActive}>
+                                                        {s.desc}
+                                                    </Text>
                                                 </Box>
                                             </Box>
                                         );
                                     })}
 
-                                    {/* ⚓ Height Anchor: More indicators for long lists */}
+                                    {/* Footer line with counter if more than windowSize */}
                                     {suggestions.length > 5 && (
-                                        <Box paddingX={1} height={1}>
-                                            {remaining > 0 ? (
-                                                <Text color={colors.textMuted} dimColor italic>   ... ({remaining} more commands available)</Text>
-                                            ) : (
-                                                <Text color={colors.textMuted} dimColor italic>   (End of list)</Text>
-                                            )}
+                                        <Box paddingX={1} height={1} justifyContent="space-between" width="100%">
+                                            <Text color={colors.textMuted} dimColor italic>
+                                                {remaining > 0 ? `... ${remaining} more available` : `(End of list)`}
+                                            </Text>
+                                            <Text color={colors.textMuted} dimColor>
+                                                {`${currentPos}/${totalCount}`}
+                                            </Text>
                                         </Box>
                                     )}
                                 </Box>
                             );
                         })()}
+
 
                         <Box flexShrink={0} width="100%">
                             <StatusBar
@@ -7209,7 +7377,7 @@ export default function App({ args = [] }) {
                                 tokensTotal={chatTokens}
                                 cachedTokens={chatCachedTokens}
                                 promptTokens={chatPromptTokens}
-                                ther chatId={chatId}
+                                chatId={chatId}
                                 isMemoryEnabled={systemSettings.memory}
                                 apiTier={apiTier}
                                 aiProvider={aiProvider}

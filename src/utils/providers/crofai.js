@@ -1,4 +1,5 @@
 import { fetchWithBackoff } from './_shared.js';
+import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getCrofAIStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
@@ -40,6 +41,7 @@ export const getCrofAIStream = async function* (apiKey, model, contents, systemI
         });
     }
 
+    const customEffort = getMappedThinkingLevel('CrofAI', model, thinkingLevel);
     const reasoningEffortMap = {
         'Fast': 'none',
         'Low': 'low',
@@ -48,6 +50,7 @@ export const getCrofAIStream = async function* (apiKey, model, contents, systemI
         'High': 'high',
         'xHigh': 'high'
     };
+    const effort = customEffort !== null ? customEffort : reasoningEffortMap[thinkingLevel];
 
     const requestPayload = {
         model: model,
@@ -58,8 +61,8 @@ export const getCrofAIStream = async function* (apiKey, model, contents, systemI
         max_completion_tokens: 32768,
     };
 
-    if (reasoningEffortMap[thinkingLevel]) {
-        requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel];
+    if (effort) {
+        requestPayload.reasoning_effort = effort;
     }
 
     const response = await fetchWithBackoff('https://crof.ai/v1/chat/completions', {

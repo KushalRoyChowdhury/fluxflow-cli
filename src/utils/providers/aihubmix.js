@@ -1,4 +1,5 @@
 import { fetchWithBackoff } from './_shared.js';
+import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getAIHubMixStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
@@ -40,6 +41,7 @@ export const getAIHubMixStream = async function* (apiKey, model, contents, syste
         });
     }
 
+    const customEffort = getMappedThinkingLevel('AIHubMix', model, thinkingLevel);
     const reasoningEffortMap = {
         'Fast': 'minimal',
         'Low': 'low',
@@ -48,6 +50,7 @@ export const getAIHubMixStream = async function* (apiKey, model, contents, syste
         'High': 'high',
         'xHigh': 'high'
     };
+    const effort = customEffort !== null ? customEffort : reasoningEffortMap[thinkingLevel];
 
     const requestPayload = {
         model: model,
@@ -57,8 +60,8 @@ export const getAIHubMixStream = async function* (apiKey, model, contents, syste
         temperature: temperature,
     };
 
-    if (reasoningEffortMap[thinkingLevel]) {
-        requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel];
+    if (effort) {
+        requestPayload.reasoning_effort = effort;
     }
 
     const response = await fetchWithBackoff('https://aihubmix.com/v1/chat/completions', {

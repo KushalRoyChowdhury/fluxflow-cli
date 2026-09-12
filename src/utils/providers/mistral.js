@@ -1,5 +1,6 @@
 import { fetchWithBackoff, hash, convertChannelThinkTags } from './_shared.js';
 import { hasModelReasoning } from '../../data/model_config.js';
+import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getMistralStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0, chatId = null) {
     const messages = [];
@@ -61,7 +62,12 @@ export const getMistralStream = async function* (apiKey, model, contents, system
         prompt_cache_key: promptCacheKey
     };
 
-    if (thinkingLevel && thinkingLevel !== 'Fast' && hasModelReasoning(model)) {
+    const customEffort = getMappedThinkingLevel('Mistral', model, thinkingLevel);
+    if (customEffort !== null) {
+        if (customEffort && customEffort !== 'none' && customEffort !== 'disabled' && customEffort !== false) {
+            requestPayload.reasoning_effort = customEffort;
+        }
+    } else if (thinkingLevel && thinkingLevel !== 'Fast' && hasModelReasoning(model)) {
         requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel] || 'high';
     }
     // console.log(hasModelReasoning(model));

@@ -1,5 +1,6 @@
 import { fetchWithBackoff } from './_shared.js';
 import { isModelMultimodal } from '../../data/model_config.js';
+import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 1.0) {
     const messages = [];
@@ -38,6 +39,7 @@ export const getNVIDIAStream = async function* (apiKey, model, contents, systemI
         });
     });
 
+    const customLevel = getMappedThinkingLevel('NVIDIA', model, thinkingLevel);
     const thinkingLevelMap = {
         'Fast': 'Fast',
         'Low': 'Fast',
@@ -46,8 +48,8 @@ export const getNVIDIAStream = async function* (apiKey, model, contents, systemI
         'High': 'High',
         'xHigh': 'High'
     };
-    const apiLevel = thinkingLevelMap[thinkingLevel] || 'High';
-    const isThinking = apiLevel !== 'Fast';
+    const apiLevel = customLevel !== null ? customLevel : (thinkingLevelMap[thinkingLevel] || 'High');
+    const isThinking = apiLevel !== 'Fast' && apiLevel !== 'none' && apiLevel !== 'disabled' && apiLevel !== false;
 
     const isKimi = model.includes('kimi');
     const isGemma = model.includes('gemma');

@@ -1,5 +1,6 @@
 import { fetchWithBackoff, hash } from './_shared.js';
 import fs from 'fs';
+import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0, chatId = null) {
     const messages = [];
@@ -104,8 +105,9 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
         requestPayload.provider = providerConfig;
     }
 
-    const effort = reasoningEffortMap[thinkingLevel];
-    if (effort && thinkingLevel !== 'Fast') {
+    const customEffort = getMappedThinkingLevel('OpenRouter', model, thinkingLevel);
+    const effort = customEffort !== null ? customEffort : reasoningEffortMap[thinkingLevel];
+    if (effort && effort !== 'none' && (customEffort !== null || thinkingLevel !== 'Fast')) {
         requestPayload.reasoning_effort = effort;
     }
 

@@ -459,6 +459,14 @@ export const applyPatches = (content, patches, options = {}) => {
         }
     }
 
+    const noMatchFailures = results.filter(r => !r.success && r.error && r.error.includes("Could not find match"));
+    if (noMatchFailures.length === 1) {
+        noMatchFailures[0].error += " (Use Line Anchor or Run tool safely if search string fails)";
+    } else if (noMatchFailures.length > 1) {
+        const lastNoMatch = noMatchFailures[noMatchFailures.length - 1];
+        lastNoMatch.error += "\n  (Tip: Use Line Anchor or Run tool safely if search string fails)";
+    }
+
     return { content: finalContent, results };
 };
 
