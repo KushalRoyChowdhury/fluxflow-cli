@@ -4,9 +4,8 @@ export const changelogData = {
     "4.14.0": {
         "note": "SEPTEMBER 14",
         "added": [
-            "Added new command `/target` to inspect the active `provider::model-id` identifier.",
-            "Added conditional model and provider scoping syntax in `AGENTS.md` and `FLUXFLOW.md` with XML tags: `‹start_model_provider::model-id›`, `‹start_model_model-id›`, and `‹start_provider_providerName›` (with nested model grouping support).",
             "Added a new / command: `/target`. Returns the unique model identifier for fluxflow in `provider::model` format.",
+            "Added conditional model and provider scoping syntax in `AGENTS.md` and `FLUXFLOW.md` with XML tags: `‹start_model_provider::model-id›`, `‹start_model_model-id›`, and `‹start_provider_providerName›` (with nested model grouping support).",
             "Added new provider: APInex."
         ],
         "changed": [],
