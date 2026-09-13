@@ -5,7 +5,7 @@ export const changelogData = {
         "note": "SEPTEMBER 14",
         "added": [
             "Added new command `/target` to inspect the active `provider::model-id` identifier.",
-            "Added conditional model and provider scoping syntax in `AGENTS.md` and `FLUXFLOW.md` with XML tags: `<start_model_provider::model-id>`, `<start_model_model-id>`, and `<start_provider_providerName>` (with nested model grouping support).",
+            "Added conditional model and provider scoping syntax in `AGENTS.md` and `FLUXFLOW.md` with XML tags: `‹start_model_provider::model-id›`, `‹start_model_model-id›`, and `‹start_provider_providerName›` (with nested model grouping support).",
             "Added a new / command: `/target`. Returns the unique model identifier for fluxflow in `provider::model` format.",
             "Added new provider: APInex."
         ],
@@ -18,7 +18,7 @@ export const changelogData = {
         "note": "SEPTEMBER 13",
         "added": [
             "Added model management flags to `/model`: `--save` (`-sv`), `--remove` (`-rm`), `--rename` (`-rn`, `-mv`), and `--default` (`-df`) to customize, persist, and manage models per provider directly.",
-            "Added custom thinking level mapping support: `/thinking <Level> --map <target>` maps standardized thinking levels (`Low`, `Medium`, `High`, `xHigh`) to custom effort targets (eg `/thinking xHigh --map max`). Use if default FluxFlow mapping fails on unconventional thinking levels. Effects the current selected model on current selected provider only.",
+            "Added custom thinking level mapping support: `/thinking ‹Level› --map ‹target›` maps standardized thinking levels (`Low`, `Medium`, `High`, `xHigh`) to custom effort targets (eg `/thinking xHigh --map max`). Use if default FluxFlow mapping fails on unconventional thinking levels. Effects the current selected model on current selected provider only.",
             "Added new provider: TokenHarbor."
         ],
         "changed": [
@@ -128,7 +128,7 @@ export const changelogData = {
     "4.6.0": {
         "note": "AUGUST 26",
         "added": [
-            "Introduced New Hierarchical Skill & Project Instruction System:\n• Global Instructions (`~/.fluxflow/fluxflow.md` or `agent.md`) and Local Instructions (`./fluxflow.md` or `agent.md`) are automatically detected and merged under `--- Additional Instructions ---`.\n• Global & Local Skill Discovery: Discovers skills from `~/.fluxflow/skills/∗∗/skill.md`, `~/.fluxflow/.skills/∗∗/skill.md`, `./skills/∗∗/skill.md`, and `./.skills/∗∗/skill.md` (case-insensitive).\n• Skill Manifest Format: Skills use standard YAML frontmatter (`name` and `description`) followed by markdown workflows.\n• Modular References Support: Skills can bundle deep guides or API docs in a `references/` directory, accessed on-demand via `#skills/{global|local}/‹skillName>/reference/‹file›.md`. Reference files should be linked in the parent `skill.md` (e.g. `[references/file.md](references/file.md)`) so the agent discovers them.\n• Token & Context Optimization: Descriptions are automatically stripped on load to save tokens, and loaded skills are protected from `/truncate` and `autoTruncateResults\n\nFor details about the internal working, refer 👉 [FluxFlow Docs](https://fluxflow-cli.onrender.com/architecture) 👈`."
+            "Introduced New Hierarchical Skill & Project Instruction System:\n• Global Instructions (`~/.fluxflow/fluxflow.md` or `agent.md`) and Local Instructions (`./fluxflow.md` or `agent.md`) are automatically detected and merged under `--- Additional Instructions ---`.\n• Global & Local Skill Discovery: Discovers skills from `~/.fluxflow/skills/∗∗/skill.md`, `~/.fluxflow/.skills/∗∗/skill.md`, `./skills/∗∗/skill.md`, and `./.skills/∗∗/skill.md` (case-insensitive).\n• Skill Manifest Format: Skills use standard YAML frontmatter (`name` and `description`) followed by markdown workflows.\n• Modular References Support: Skills can bundle deep guides or API docs in a `references/` directory, accessed on-demand via `#skills/{global|local}/‹skillName›/reference/‹file›.md`. Reference files should be linked in the parent `skill.md` (e.g. `[references/file.md](references/file.md)`) so the agent discovers them.\n• Token & Context Optimization: Descriptions are automatically stripped on load to save tokens, and loaded skills are protected from `/truncate` and `autoTruncateResults\n\nFor details about the internal working, refer 👉 [FluxFlow Docs](https://fluxflow-cli.onrender.com/architecture) 👈`."
         ],
         "changed": [],
         "fixes": [
@@ -312,7 +312,7 @@ export const changelogData = {
     "3.19.0": {
         "note": "AUGUST 6.",
         "added": [
-            "**Native Ollama Integration**\n• Use ANY model available in Ollama Cloud or downloaded on-device models via Ollama.\n• Select a model using `/model <model-id>`.\n• To use local models, enter `LOCAL` when FluxFlow prompts for an API key during setup.\n• Enable multimodality on demand with any supported model using the flag `-m` or `--multimodal` during selection. E.g., `/model gemma3-4b-it -m`. If used `-m` on non-multomodal models, FluxFlow wont stop you, but the model might enter existantial crisis.",
+            "**Native Ollama Integration**\n• Use ANY model available in Ollama Cloud or downloaded on-device models via Ollama.\n• Select a model using `/model ‹model-id›`.\n• To use local models, enter `LOCAL` when FluxFlow prompts for an API key during setup.\n• Enable multimodality on demand with any supported model using the flag `-m` or `--multimodal` during selection. E.g., `/model gemma3-4b-it -m`. If used `-m` on non-multomodal models, FluxFlow wont stop you, but the model might enter existantial crisis.",
             "Improved environment for non-agentic models in FluxFlow with tool calling:\n• Many models are trained for chat/reasoning and may have weak tool-calling reliability. Use the new command `/wildcard-tooling` to use those models in agentic workflows with better tool-calling reliability."
         ],
         "changed": [
@@ -378,7 +378,7 @@ export const changelogData = {
     "3.15.2": {
         "note": "JULY 31.",
         "added": [
-            "Directory Tree Design\nAdded a **Directory Tree Design** setting under Settings > Others to switch between **Modern** (indentation-based) and **Classic** (box-drawing) tree representations.\n\n- **Modern**: Indentation based grouping. Reduces directory context prompt tokens by **~58%** while retaining 100% of files and depth.\n- **Classic (Deprecated)**: The legacy box-drawing tree structure, for models that prefer explicit tree characters (Uses relatively more tokens). Might get removed in future versions based on further testing!"
+            "Directory Tree Design\nAdded a **Directory Tree Design** setting under Settings › Others to switch between **Modern** (indentation-based) and **Classic** (box-drawing) tree representations.\n\n- **Modern**: Indentation based grouping. Reduces directory context prompt tokens by **~58%** while retaining 100% of files and depth.\n- **Classic (Deprecated)**: The legacy box-drawing tree structure, for models that prefer explicit tree characters (Uses relatively more tokens). Might get removed in future versions based on further testing!"
         ],
         "changed": [],
         "fixes": []
@@ -407,7 +407,7 @@ export const changelogData = {
     "3.13.5": {
         "note": "JULY 29.",
         "added": [
-            "Added --force flag with `/thinking <effort> --force` to force reasoning on local models with no native reasoning support.",
+            "Added --force flag with `/thinking ‹effort› --force` to force reasoning on local models with no native reasoning support.",
             "Added Alphabet Limits for Custom Instructions."
         ],
         "changed": [
@@ -986,7 +986,7 @@ export const changelogData = {
         "note": "High-Fidelity Code Mapping",
         "added": [
             "**FileMap Tool:** Introduced a powerful AST based mapping engine that provides structural skeletons of code files (Classes, Functions, Imports) without reading the entire content (95% token efficient than reading full files).",
-            "**Language Parser Manager:** New interactive UI in Settings > Other to download/delete language parsers (JS, TS, Python, C++, Java, HTML)."
+            "**Language Parser Manager:** New interactive UI in Settings › Other to download/delete language parsers (JS, TS, Python, C++, Java, HTML)."
         ],
         "changed": [
             "Upgraded structural analysis core for improved context efficiency."
@@ -1025,7 +1025,7 @@ export const changelogData = {
             "**Live Status Heartbeat:** The VS Code Status Bar now acts as a real-time telemetry feed, showing exactly what the agent is doing (*Thinking*, *Patching*, *Reading*, etc.).",
             "**Clickable Terminal Links:** All file paths and line numbers printed in the terminal are now live links that jump straight to your code.",
             "**Indentation Intelligence:** Upgraded the patching engine to handle proportional Tab/Space conversion and automatic style detection for minimal tool errors.",
-            "**Right-Click UI Overhaul:** Consolidated all actions into a clean 'FluxFlow >' sub-menu available in the Editor, Explorer, and Tab contexts."
+            "**Right-Click UI Overhaul:** Consolidated all actions into a clean 'FluxFlow ›' sub-menu available in the Editor, Explorer, and Tab contexts."
         ],
         "changed": [
             "Enhanced terminal focus logic in IDE.",
