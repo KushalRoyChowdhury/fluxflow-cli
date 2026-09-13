@@ -1,12 +1,25 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.14.0": {
+        "note": "SEPTEMBER 14",
+        "added": [
+            "Added new command `/target` to inspect the active `provider::model-id` identifier.",
+            "Added conditional model and provider scoping syntax in `AGENTS.md` and `FLUXFLOW.md` with XML tags: `<start_model_provider::model-id>`, `<start_model_model-id>`, and `<start_provider_providerName>` (with nested model grouping support).",
+            "Added a new / command: `/target`. Returns the unique model identifier for fluxflow in `provider::model` format.",
+            "Added new provider: APInex."
+        ],
+        "changed": [],
+        "fixes": [
+            "Critical bug fixes for Open Router Integration."
+        ]
+    },
     "4.13.0": {
         "note": "SEPTEMBER 13",
         "added": [
             "Added model management flags to `/model`: `--save` (`-sv`), `--remove` (`-rm`), `--rename` (`-rn`, `-mv`), and `--default` (`-df`) to customize, persist, and manage models per provider directly.",
-            "Added custom thinking level mapping support: `/thinking <Level> --map <target>` maps standardized thinking levels (`Low`, `Medium`, `High`, `xHigh`) to custom provider/model targets. Use if default FluxFlow mapping fails on unconventional thinking levels. Effects the current selected model on current selected provider only.",
-            "Added new provider: TokenHabor."
+            "Added custom thinking level mapping support: `/thinking <Level> --map <target>` maps standardized thinking levels (`Low`, `Medium`, `High`, `xHigh`) to custom effort targets (eg `/thinking xHigh --map max`). Use if default FluxFlow mapping fails on unconventional thinking levels. Effects the current selected model on current selected provider only.",
+            "Added new provider: TokenHarbor."
         ],
         "changed": [
             "Redesigned the input console bar to a modern, minimalist design.",

@@ -46,6 +46,7 @@ import { getPoolsideStream } from './providers/poolside.js';
 import { getNineRouterStream } from './providers/9router.js';
 import { getExpLabsStream } from './providers/explabs.js';
 import { getTokenHarborStream } from './providers/tokenharbor.js';
+import { getAPInexStream } from './providers/apinex.js';
 
 
 // ─── Stutter Detection – pre-compiled regexes (module scope, compiled once) ───
@@ -1329,6 +1330,8 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
                 stream = getExpLabsStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') {
                 stream = getTokenHarborStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === 'APInex' || aiProvider === 'apinex' || aiProvider === 'apx') {
+                stream = getAPInexStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else {
                 const googleClient = getGoogleClient(apiKey);
                 const genStream = await googleClient.models.generateContentStream({
@@ -1683,7 +1686,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
     // }
 
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'CrofAI' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'CrofAI' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -2722,7 +2725,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         currentSystemInstruction = systemInstructionCache.value;
                     } else {
                         const isGeminiOrReasoning = aiProvider === 'Mistral' ? (hasModelReasoning(targetModel) ? true : false) : (!(targetModel || "gemma").toLowerCase().startsWith('gemma') ? true : false);
-                        currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, isGeminiOrReasoning, chatId, !!systemSettings?.keepReasoningContext);
+                        currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, isGeminiOrReasoning, chatId, !!systemSettings?.keepReasoningContext, targetModel);
 
                         if (!systemSettings?.dynamicDirAwareness) {
                             currentSystemInstruction += `\n${dirStructure.replace('\n**Directory Structure**', '\n-- Directory Structure --')}`;
@@ -2960,6 +2963,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         );
                     } else if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') {
                         stream = getTokenHarborStream(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0
+                        );
+                    } else if (aiProvider === 'APInex' || aiProvider === 'apinex' || aiProvider === 'apx') {
+                        stream = getAPInexStream(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -5195,6 +5210,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'aihubmix' || lower === 'aihub') return 'AIHubMix';
         if (lower === 'explabs' || lower === 'experientiallabs' || lower === 'experimentallabs') return 'ExpLabs';
         if (lower === 'tokenharbor' || lower === 'token harbor' || lower === 'token_harbor' || lower === 'thk') return 'TokenHarbor';
+        if (lower === 'apinex' || lower === 'apx') return 'APInex';
         return null;
     };
 

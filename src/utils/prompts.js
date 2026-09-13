@@ -38,10 +38,13 @@ const readCaseInsensitiveFile = (dir, fileNames) => {
     return '';
 };
 
-export const globalFluxflowPath = getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']);
-export const localFluxflowPath = getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']);
+export const getGlobalFluxflowPath = () => getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']);
+export const getLocalFluxflowPath = () => getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']);
 
-const rawGlobalFluxflowMD = globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
+export let globalFluxflowPath = getGlobalFluxflowPath();
+export let localFluxflowPath = getLocalFluxflowPath();
+
+let cachedTargetKey = null;
 
 export let ADD_ID = '';
 export let ADD_NO_INS = false;
@@ -72,11 +75,85 @@ const parseGlobalEasterEgg = (rawContent) => {
     return rest.trim();
 };
 
-export const globalFluxflowMD = parseGlobalEasterEgg(rawGlobalFluxflowMD);
+export const readGlobalInstruction = (force = false) => {
+    globalFluxflowPath = getGlobalFluxflowPath();
+    const raw = globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
+    return parseGlobalEasterEgg(raw);
+};
+
+export const readLocalInstruction = (force = false) => {
+    localFluxflowPath = getLocalFluxflowPath();
+    return localFluxflowPath ? readCaseInsensitiveFile(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
+};
+
+export const refreshInstructionsForTarget = (aiProvider = '', targetModel = '') => {
+    const currentTargetKey = `${aiProvider || ''}::${targetModel || ''}`.toLowerCase().trim();
+    if (cachedTargetKey !== currentTargetKey) {
+        cachedTargetKey = currentTargetKey;
+        globalFluxflowMD = readGlobalInstruction();
+        localFluxflowMD = readLocalInstruction();
+    }
+};
+
+export let globalFluxflowMD = readGlobalInstruction();
+
+export const filterModelConditionalTags = (content, targetModel = '', aiProvider = '') => {
+    if (!content) return '';
+    let result = content;
+
+    const currentProvider = aiProvider ? aiProvider.toLowerCase().trim() : '';
+    const currentUniqueTarget = (aiProvider && targetModel) ? `${aiProvider}::${targetModel}`.toLowerCase().trim() : '';
+    const currentModelId = targetModel ? targetModel.toLowerCase().trim() : '';
+
+    // 0. Pre-resolve <start_provider_providerName>...<end_provider_providerName>
+    // Converts nested <start_model_modelId> into <start_model_providerName::modelId> so Handle 1 handles it
+    result = result.replace(/<start_provider_([^>\r\n]+)>([\s\S]*?)<end_provider_([^>\r\n]+)>/gi, (match, startProv, innerContent, endProv) => {
+        if (startProv.trim().toLowerCase() === endProv.trim().toLowerCase()) {
+            const providerName = startProv.trim().toLowerCase();
+            if (/<start_model_/i.test(innerContent)) {
+                return innerContent
+                    .replace(/<start_model_([^>\r\n]+)>/gi, `<start_model_${providerName}::$1>`)
+                    .replace(/<end_model_([^>\r\n]+)>/gi, `<end_model_${providerName}::$1>`);
+            }
+            // If it's a general provider-level block without model tags
+            if (currentProvider && providerName === currentProvider) {
+                return innerContent;
+            }
+            return '';
+        }
+        return match;
+    });
+
+    // 1. Handle <start_model_unique_target>...<end_model_unique_target>
+    // e.g. <start_model_google::gemini-2.5-flash>...<end_model_google::gemini-2.5-flash>
+    result = result.replace(/<start_model_([^>\r\n]+::[^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+::[^>\r\n]+)>/gi, (match, startTag, innerContent, endTag) => {
+        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
+            if (currentUniqueTarget && startTag.trim().toLowerCase() === currentUniqueTarget) {
+                return innerContent;
+            }
+            return '';
+        }
+        return match;
+    });
+
+    // 2. Handle <start_model_model-id>...<end_model_model-id>
+    // e.g. <start_model_gemini-2.5-flash>...<end_model_gemini-2.5-flash>
+    result = result.replace(/<start_model_([^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+)>/gi, (match, startTag, innerContent, endTag) => {
+        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
+            if (currentModelId && startTag.trim().toLowerCase() === currentModelId) {
+                return innerContent;
+            }
+            return '';
+        }
+        return match;
+    });
+
+    return result;
+};
 
 // Ensure standard about skill is created before reading instructions/skills
 createAboutSkill();
-export const localFluxflowMD = localFluxflowPath ? readCaseInsensitiveFile(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
+export let localFluxflowMD = readLocalInstruction();
 
 const parseSkillFrontmatter = (content) => {
     if (!content) return null;
@@ -190,6 +267,8 @@ const formatPathForUI = (filePath, scope = 'Project') => {
 };
 
 export const getLoadedFilesSummary = () => {
+    globalFluxflowMD = readGlobalInstruction();
+    localFluxflowMD = readLocalInstruction();
     const instructions = [];
     if (globalFluxflowPath && globalFluxflowMD.length > 0) {
         instructions.push({ scope: 'Global', path: globalFluxflowPath });
@@ -289,7 +368,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
     return tempMemoriesStr ? `${tempMemoriesStr}` : '';
 };
 
-export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false, isGemini, chatId, keepReasoningContext = false) => {
+export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false, isGemini, chatId, keepReasoningContext = false, targetModel = '') => {
     // console.log(systemSettings)
 
     let forcedReasoning = false;
@@ -339,8 +418,13 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const userMemories = getCachedUserMemories(chatId, isMemoryEnabled);
     const userMemoriesStr = userMemories?.length > 0 ? `--- Saved Memories ---\n${userMemories}\n\n` : '';
 
+    refreshInstructionsForTarget(aiProvider, targetModel);
+
+    const filteredGlobalMD = filterModelConditionalTags(globalFluxflowMD, targetModel, aiProvider).trim();
+    const filteredLocalMD = filterModelConditionalTags(localFluxflowMD, targetModel, aiProvider).trim();
+
     // const additionalInstructions = [globalFluxflowMD, localFluxflowMD].filter(Boolean).join('\n\n');
-    const additionalInstrStr = globalFluxflowMD.length > 0 || localFluxflowMD.length > 0 ? `--- Additional Instructions ---\n${globalFluxflowMD.length > 0 ? `-- Global --\n${globalFluxflowMD}` : ''}${localFluxflowMD.length > 0 ? `${globalFluxflowMD.length > 0 ? '\n\n' : ''}-- Project --\n${localFluxflowMD}` : ''}\n\n` : '';
+    const additionalInstrStr = filteredGlobalMD.length > 0 || filteredLocalMD.length > 0 ? `--- Additional Instructions ---\n${filteredGlobalMD.length > 0 ? `-- Global --\n${filteredGlobalMD}` : ''}${filteredLocalMD.length > 0 ? `${filteredGlobalMD.length > 0 ? '\n\n' : ''}-- Project --\n${filteredLocalMD}` : ''}\n\n` : '';
 
     const isSystemDir = (() => {
         const cwd = process.cwd().toLowerCase();
@@ -361,6 +445,19 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
     // ${ mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architecture, clean abstractions, stepwise execution. Use latest practices/libraries, verify imports, run automated tests" : `Mode: ${mode}. Concise, Humorous, Sarcastic` }
 
+    function normaliseThinkingLevel(thinkingLevel) {
+        const map = {
+            Low: 'Low',
+            Standard: 'Medium',
+            Medium: 'Medium',
+            High: 'High',
+            xHigh: 'Extended',
+            Max: 'Max'
+        };
+
+        return map[thinkingLevel] ?? '';
+    }
+
     const now = new Date();
     const year = now.getFullYear();
     const month = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
@@ -369,6 +466,8 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const isMetadataOff = !!systemSettings?.autoExcludeMetadata;
 
     const userHasWayyTooMuchMoney = process.env.I_HAVE_TOO_MUCH_MONEY === "true" || process.env.I_HAVE_TOO_MUCH_MONEY === true || false;
+
+    const isNoDev = process.env.NO_DEV === 'true' || process.env.NO_DEV === '1' || process.env.NO_DEV === true || false;
 
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
@@ -379,7 +478,7 @@ mode === "Flow" ? `Concise, Humorous, Sarcastic` :
 mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
 "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}
 
-- OS: ${osDetected}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${additionalInstrStr.length > 0 ? '\n- Additional Instructions ≈ System Prompt' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read available relevant skills for tasks before proceeding: Use ReadFile, with virtual path=\"#skills/{global|project}/skillName\". For references: path=\"#skills/{global|project}/skillName/references/<file-name>.md\"' : ''}
+- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim())} ${normaliseThinkingLevel(thinkingLevel)}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${additionalInstrStr.length > 0 ? '\n- Additional Instructions ≈ System Prompt' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read available relevant skills for tasks before proceeding: Use ReadFile, with virtual path=\"#skills/{global|project}/skillName\". For references: path=\"#skills/{global|project}/skillName/references/<file-name>.md\"' : ''}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}

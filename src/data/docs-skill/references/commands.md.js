@@ -26,7 +26,7 @@ Trigger in chat via /command
 * /mode → Toggle Operating Mode
 * /model model-id --optional-flags → Switch active AI model. Flags are use for customizing model list (--save, --remove, --default, /model old-model new-model --rename)
 * /provider → Select/switch AI provider
-* /thinking effort → Set reasoning effort. Can be mapped based on provider & model support (/thinking effort --map provider-effort-value). Changes the Translation Table only for the currently selected provider and model
+* /thinking effort → Set reasoning effort. Can be mapped based on provider & model support (/thinking effort --map provider-effort-value/'rm' to unmap). Changes the Translation Table only for the currently selected provider and model
 * /wildcard-tooling → Tool compatibility mode for non-tooling models
 * /key → Manage saved API keys
 * /profile → Edit user persona, nickname, and custom instructions

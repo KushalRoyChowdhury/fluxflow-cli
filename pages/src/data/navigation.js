@@ -4,16 +4,16 @@ export const navItems = [
         children: [
             { title: 'Introduction', path: '/' },
             { title: 'Getting Started', path: '/getting-started' },
-            { title: 'Startup Arguments', path: '/startup-args' },
             { title: 'App Commands', path: '/app-commands' },
+            { title: 'Startup Arguments', path: '/startup-args' },
         ],
     },
     {
         title: 'Core Concepts',
         children: [
-            { title: 'Architecture', path: '/architecture' },
             { title: 'Tools', path: '/tools' },
-            { title: 'Supported Models', path: '/models' },
+            { title: 'Architecture', path: '/architecture' },
+            { title: 'Models Management', path: '/models' },
         ],
     },
 ]

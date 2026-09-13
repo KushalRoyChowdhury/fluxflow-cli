@@ -1,726 +1,177 @@
 import DocPage from '../components/DocPage'
 
 const headings = [
-    { id: 'google-gemini', text: 'Google Gemini', level: 2 },
-    { id: 'deepseek', text: 'DeepSeek', level: 2 },
-    { id: 'inferx', text: 'InferX', level: 2 },
-    { id: 'sensenova', text: 'SenseNova', level: 2 },
-    { id: 'poolside', text: 'Poolside', level: 2 },
-    { id: 'crofai', text: 'CrofAI', level: 2 },
-    { id: 'ollama', text: 'Ollama', level: 2 },
-    { id: 'mistral', text: 'Mistral', level: 2 },
-    { id: 'nvidia', text: 'NVIDIA (NIM)', level: 2 },
-    { id: 'openrouter', text: 'OpenRouter', level: 2 },
+    { id: 'model-selection', text: 'Model Selection & Flags', level: 2 },
+    { id: 'model-flags', text: 'Supported Flags', level: 3 },
+    { id: 'openrouter-routing', text: 'OpenRouter Routing & Syntax', level: 2 },
+    { id: 'supported-providers', text: 'Supported Providers', level: 2 },
 ]
-
-function Badge({ type }) {
-    switch (type) {
-        case 'multimodal':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50">Multimodal</span>
-        case 'text':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">Text Only</span>
-        case 'experimental':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100/50 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80">Experimental</span>
-        case 'auto':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">Custom</span>
-        default:
-            return null
-    }
-}
-
-function CategoryHeader({ title }) {
-    return (
-        <tr className="bg-slate-100/90 dark:bg-slate-800/90 border-y border-slate-200 dark:border-slate-700">
-            <td colSpan={3} className="py-2 px-4 font-semibold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                {title}
-            </td>
-        </tr>
-    )
-}
 
 export default function StableModels() {
     return (
         <DocPage headings={headings}>
-            <h1 id="stable-models">Supported Models</h1>
+            <h1 id="stable-models">Model Management &amp; Providers</h1>
             <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
-                FluxFlow supports a variety of high-performance AI models across multiple
-                providers. You can switch between models dynamically using the
-                <code className="mx-1 text-blue-600 dark:text-blue-400 font-mono">/model</code> command during a session.
+                FluxFlow gives you full flexibility to select, persist, and manage AI models across multiple providers.
+                Models can be switched dynamically or configured per provider directly in the terminal via the{' '}
+                <code className="mx-1 text-blue-600 dark:text-blue-400 font-mono">/model</code> command.
             </p>
 
-            {/* GOOGLE GEMINI */}
-            <h2 id="google-gemini" className="text-2xl font-bold text-slate-900 dark:text-white mt-10 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                Google Gemini
+            {/* MODEL SELECTION & FLAGS */}
+            <h2 id="model-selection" className="text-2xl font-bold text-slate-900 dark:text-white mt-10 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                Model Selection &amp; Management
             </h2>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-                The default provider, offering native multimodal capabilities, ultra-fast responses, and large context windows.
+                To switch the active model on the currently selected provider, run:
             </p>
+            <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm my-3 font-mono">
+{`/model <model-id>`}
+            </pre>
+
+            <h3 id="model-flags" className="text-xl font-semibold text-slate-900 dark:text-white mt-8 mb-3">
+                Supported <code className="text-blue-500 font-mono">/model</code> Flags
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+                Manage your model list, defaults, and capabilities per provider directly from the command line:
+            </p>
+
             <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Flag</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Alias</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Usage &amp; Description</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <CategoryHeader title="Gemini 3 Series" />
                         <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemini-3.6-flash</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Flash Latest <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">[Instability Issues]</span></td>
+                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--save</td>
+                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-sv</td>
+                            <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
+                                <div>Saves and persists a custom model ID to the active provider's model list.</div>
+                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-custom-model --save [-m]</code>
+                            </td>
                         </tr>
                         <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemini-3.5-flash-lite</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Latest Flash Lite</td>
+                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--default</td>
+                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-df</td>
+                            <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
+                                <div>Sets the specified model as the default startup model for the current provider.</div>
+                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-model --default [-m]</code>
+                            </td>
                         </tr>
                         <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemini-3-flash-preview</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Fast & Lightweight</td>
+                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--remove</td>
+                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-rm</td>
+                            <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
+                                <div>Removes a model ID from the active provider's saved model list.</div>
+                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-model --remove</code>
+                            </td>
                         </tr>
                         <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemini-3.1-flash-lite</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Ultra-Fast & Lite</td>
+                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--rename</td>
+                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-rn, -mv</td>
+                            <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
+                                <div>Renames an existing model ID in the active provider's list.</div>
+                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model &lt;old-id&gt; &lt;new-id&gt; --rename</code>
+                            </td>
                         </tr>
                         <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemini-3.1-pro-preview</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Pro Reasoning</td>
-                        </tr>
-
-                        <CategoryHeader title="Gemini 2.5 Series" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemini-2.5-flash</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Fast & Reliable</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemini-2.5-flash-lite</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Fast & Cheap</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemini-2.5-pro</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Last gen Pro reasoning</td>
-                        </tr>
-
-                        <CategoryHeader title="Gemma Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemma-4-31b-it</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Standard Default</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemma-4-26b-a4b-it</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Standard & Faster</td>
+                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--multimodal</td>
+                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-m</td>
+                            <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
+                                <div>Enables vision / image multimodal processing support for the model. Can be combined with <code>--save</code> or <code>--default</code>.</div>
+                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-vision-model -m</code>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
-            {/* DEEPSEEK */}
-            <h2 id="deepseek" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                DeepSeek
+            {/* OPENROUTER ROUTING */}
+            <h2 id="openrouter-routing" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                OpenRouter Provider Routing &amp; Syntax
             </h2>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-                High-intelligence reasoning models tailored for coding and complex logic tasks.
+                When using <strong>OpenRouter</strong>, FluxFlow gives you fine-grained control over downstream host routing, priorities, and model variants:
             </p>
-            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-v4-flash</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Fast & Efficient</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-v4-pro</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Intelligence Reasoning</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
 
-            {/* INFERX */}
-            <h2 id="inferx" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                InferX
+            <ul className="space-y-4 mb-6">
+                <li>
+                    <strong>Standard Model Syntax</strong>:
+                    <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
+{`/model <author>/<model-id>
+# Example: /model anthropic/claude-3.5-sonnet
+# Example: /model openai/gpt-4o`}
+                    </pre>
+                </li>
+                <li>
+                    <strong>Dedicated Service Tiers (<code className="font-mono text-blue-500">:flex</code> &amp; <code className="font-mono text-blue-500">:priority</code>)</strong>:
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        Use service tier variant suffixes provided by frontier upstream hosts (e.g. OpenAI, Vertex AI) for discounted flex pricing or prioritized latency. You can also chain downstream provider routing and service tiers:
+                    </p>
+                    <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
+{`/model openai/gpt-5:flex                   # Direct flex tier
+/model openai/gpt-5:priority               # Direct priority tier
+/model openai/gpt-5:openai:flex            # Provider host (openai) + flex tier`}
+                    </pre>
+                </li>
+                <li>
+                    <strong>Enforced Downstream Provider Host (<code className="font-mono text-blue-500">:&lt;provider&gt;</code>)</strong>:
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        Append <code>:&lt;provider&gt;</code> to the model identifier to lock execution to a specific backend host with <code>allow_fallbacks: false</code>:
+                    </p>
+                    <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
+{`/model meta-llama/llama-3.3-70b-instruct:together    # Forces Together AI host
+/model deepseek/deepseek-r1:deepinfra               # Forces DeepInfra host`}
+                    </pre>
+                </li>
+                <li>
+                    <strong>OpenRouter Variants</strong>:
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        Variant suffixes (such as <code>:free</code>, <code>:nitro</code>, <code>:floor</code>, <code>:exacto</code>) are automatically parsed and passed directly as OpenRouter model variants.
+                    </p>
+                    <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
+{`/model google/gemma-4-31b-it:free
+/model mistralai/mistral-large-2411:nitro`}
+                    </pre>
+                </li>
+            </ul>
+
+            {/* SUPPORTED PROVIDERS */}
+            <h2 id="supported-providers" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                Supported Providers
             </h2>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-                High-throughput, dedicated inference hosting for open-weights and frontier reasoning architectures.
+                FluxFlow connects seamlessly to both direct API endpoints and multi-model aggregators:
             </p>
-            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-v4-flash</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Fast & Efficient</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">Devstral-2-123B-Instruct-2512-int4-AutoRound</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Devstral Coding</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">Qwen3-Coder-Next-FP8</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Intelligence Coding</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">Qwen3.6-35B-A3B-FP8</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Reasoning & Coding</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">Qwen3.8-27B-FP8</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Efficiency Reasoning</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-v4-flash-0731</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Fast & Efficient</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-6">
+                <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                    <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Direct Providers</h4>
+                    <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1 list-disc list-inside">
+                        <li><strong>Google Gemini</strong> (Native multimodal &amp; Flash/Pro)</li>
+                        <li><strong>DeepSeek</strong> (platform.deepseek.com)</li>
+                        <li><strong>Mistral AI</strong> (admin.mistral.ai)</li>
+                        <li><strong>NVIDIA NIM</strong> (Local &amp; cloud OpenAI-compatible endpoints)</li>
+                        <li><strong>Ollama</strong> (Local models with multimodal support)</li>
+                        <li><strong>SenseNova</strong> (platform.sensenova.ai)</li>
+                        <li><strong>InferX</strong> (model.inferx.net)</li>
+                        <li><strong>CrofAI</strong> (crof.ai)</li>
+                        <li><strong>Poolside</strong> (platform.poolside.ai)</li>
+                    </ul>
+                </div>
+                <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                    <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Aggregators &amp; Proxies</h4>
+                    <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1 list-disc list-inside">
+                        <li><strong>OpenRouter</strong> (openrouter.ai — routing &amp; variant support)</li>
+                        <li><strong>TokenHarbor</strong> (tokenharbor.ai)</li>
+                        <li><strong>AIHubMix</strong> (aihubmix.com)</li>
+                        <li><strong>Experiential Labs</strong> (api.experientiallabs.ai)</li>
+                        <li><strong>9router</strong> (Local proxy for OAuth subscriptions / Copilot. Also accepts any OpenAI & Anthropic Endpoints. Set ENV ENABLE_9ROUTER=true to enable)</li>
+                    </ul>
+                </div>
             </div>
-
-            {/* SENSENOVA */}
-            <h2 id="sensenova" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                SenseNova
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-                SenseTime's large language model platform providing fast, versatile reasoning and lightweight operations.
-            </p>
-            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">sensenova-6.8-flash-lite</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Fast & Lightweight</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            {/* POOLSIDE */}
-            <h2 id="poolside" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                Poolside
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-                Poolside AI inference platform featuring specialized Laguna reasoning models engineered for code and complex logic.
-            </p>
-            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">poolside/laguna-s-2.1</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Laguna 2.1 (Reasoning / Text Only)</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            {/* CROFAI */}
-            <h2 id="crofai" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                CrofAI
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-                Access high-speed and cost-effective frontier models hosted on CrofAI infrastructure.
-            </p>
-            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-v4-flash-0731</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Fast & Efficient</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-v4-pro-0813</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Intelligence Reasoning</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">kimi-k3-eco</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Efficiency Reasoning</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">kimi-k2.6</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">glm-5.2</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Performance Reasoning</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemma-4-31b-it</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">qwen3.6-27b</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">qwen3.5-397b-a17b</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Capacity Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">qwen3.5-9b</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Fast & Lightweight Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">greg-1-mini</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            {/* OLLAMA */}
-            <h2 id="ollama" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                Ollama
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-                Run local or cloud Ollama models directly within FluxFlow. Type any custom model name (e.g. <code className="font-mono text-blue-600 dark:text-blue-400">llama3.2</code>, <code className="font-mono text-blue-600 dark:text-blue-400">qwen2.5-coder</code>) using <code className="font-mono text-blue-600 dark:text-blue-400">/model &lt;model-name&gt;</code>. Pass <code className="font-mono text-blue-600 dark:text-blue-400">--multimodal</code> or <code className="font-mono text-blue-600 dark:text-blue-400">-m</code> flag for vision models. Eg. <code className="font-mono text-blue-600 dark:text-blue-400">/model gemma4:31b -m</code> OR <code className="font-mono text-blue-600 dark:text-blue-400">/model gemma4:31b --multimodal</code>
-            </p>
-            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">&lt;custom-model-id&gt;</td>
-                            <td className="py-2.5 px-4"><Badge type="auto" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">User-Defined Model Input (Cloud / Local Host)</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            {/* MISTRAL */}
-            <h2 id="mistral" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                Mistral
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-                Access to Mistral AI's reasoning, coding, and cost-saving models.
-            </p>
-            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">ministral-3b-2512</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Cost Saving (Text Only)</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">ministral-8b-2512</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Cost Saving (Text Only)</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">ministral-14b-2512</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Cost Saving (Text Only)</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-small-2506</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Cost Saving</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">open-mistral-nemo</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Cost Saving</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">devstral-2512</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Devstral Coding</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-medium-2508</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Mistral Medium Multimodal</td>
-                        </tr>
-
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-large-2512</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Mistral Large (Multimodal)</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">labs-leanstral-1-5-1</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Enable Lab Models</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            {/* NVIDIA NIM */}
-            <h2 id="nvidia" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                NVIDIA (NIM)
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-                Access to open-weights models hosted on high-speed NVIDIA Infrastructure.
-            </p>
-            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <CategoryHeader title="DeepSeek Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-ai/deepseek-v4-flash</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-ai/deepseek-v4-pro</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-
-                        <CategoryHeader title="StepFun Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">stepfun-ai/step-3.7-flash</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-
-                        <CategoryHeader title="Google Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">google/gemma-4-31b-it</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">google/diffusiongemma-26b-a4b-it</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Caffeinated Speed</td>
-                        </tr>
-
-                        <CategoryHeader title="Mistral Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistralai/mistral-large-3-675b-instruct-2512</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-
-                        <CategoryHeader title="OpenAI Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">openai/gpt-oss-20b</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">openai/gpt-oss-120b</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-
-                        <CategoryHeader title="Z-AI Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">z-ai/glm-5.2</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-
-                        <CategoryHeader title="MiniMax Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">minimaxai/minimax-m3</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-
-                        <CategoryHeader title="NVIDIA Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">nvidia/nemotron-3-ultra-550b-a55b</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only [EXPERIMENTAL]</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">nvidia/nemotron-3-super-120b-a12b</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only [EXPERIMENTAL]</td>
-                        </tr>
-
-                        <CategoryHeader title="Meta Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">meta/llama-3.3-70b-instruct</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">meta/llama-3.2-90b-vision-instruct</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-
-                        <CategoryHeader title="Thinking Machines Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">thinkingmachines/inkling</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only [EXPERIMENTAL]</td>
-                        </tr>
-
-                        <CategoryHeader title="PoolSide Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">poolside/laguna-xs-2.1</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only [EXPERIMENTAL]</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            {/* OPENROUTER */}
-            <h2 id="openrouter" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                OpenRouter
-            </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-                A unified gateway to access a massive ecosystem of top-tier AI models, divided into Paid and Free tiers.
-            </p>
-
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-3">Free Tier</h3>
-            <div className="overflow-x-auto my-4 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">google/gemma-4-31b-it:free</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-
-
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">google/gemma-4-26b-a4b-it:free</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">poolside/laguna-s-2.1:free</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">nvidia/nemotron-3-ultra-550b-a55b:free</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mt-8 mb-3">Paid Tier</h3>
-            <div className="overflow-x-auto my-4 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <CategoryHeader title="Anthropic Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">anthropic/claude-sonnet-4.5</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">anthropic/claude-opus-4.6</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">anthropic/claude-opus-4.8</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">anthropic/claude-fable-5</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">anthropic/claude-opus-5</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-
-                        <CategoryHeader title="OpenAI Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">openai/gpt-5.2-codex</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">openai/gpt-5.2-pro</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">openai/gpt-5.5-pro</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">openai/gpt-5.6-terra</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">openai/gpt-5.6-luna</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">openai/gpt-5.6-sol</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-
-                        <CategoryHeader title="Google & DeepSeek Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">google/gemini-3.5-flash</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek/deepseek-v4-pro</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek/deepseek-v4-flash</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-
-                        <CategoryHeader title="Other Frontier Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">qwen/qwen3.7-plus</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">minimax/minimax-m3</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">moonshotai/kimi-k2.6</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">x-ai/grok-4.5</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">xiaomi/mimo-v2.5-pro</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">z-ai/glm-5</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">z-ai/glm-5.2</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">tencent/hy3</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
         </DocPage>
     )
 }

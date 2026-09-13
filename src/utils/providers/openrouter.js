@@ -68,28 +68,38 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
         'xHigh': 'high'
     };
 
-    const openRouterVariants = ['free', 'nitro', 'floor', 'exact', 'extended', 'beta', 'online'];
+    const openRouterVariants = ['free', 'nitro', 'floor', 'exacto'];
     let formattedModel = model;
     let providerConfig = null;
+    let serviceTier = null;
 
     if (model.includes(':')) {
         const parts = model.split(':');
-        const lastPart = parts[parts.length - 1].toLowerCase().trim();
-        if (!openRouterVariants.includes(lastPart)) {
-            const provider = parts.pop().trim();
-            formattedModel = parts.join(':').trim();
-            if (provider) {
-                providerConfig = {
-                    order: [provider],
-                    allow_fallbacks: false
-                };
+        // Check for service tier at the end (:flex / :priority)
+        if (parts.length > 1) {
+            const lastPart = parts[parts.length - 1].toLowerCase().trim();
+            if (lastPart === 'flex' || lastPart === 'priority') {
+                serviceTier = lastPart;
+                parts.pop();
             }
-        } else {
-            formattedModel = model.trim();
         }
+        // Check for provider routing (if the remaining last segment is not an OpenRouter variant like :free, :nitro, :exacto, etc.)
+        if (parts.length > 1) {
+            const lastPart = parts[parts.length - 1].toLowerCase().trim();
+            if (!openRouterVariants.includes(lastPart)) {
+                const provider = parts.pop().trim();
+                if (provider) {
+                    providerConfig = {
+                        only: [provider],
+                        allow_fallbacks: false
+                    };
+                }
+            }
+        }
+        formattedModel = parts.join(':').trim();
     }
 
-    const rawId = `${apiKey.slice(-5)}${chatId || ''}${thinkingLevel}${formattedModel}${providerConfig ? JSON.stringify(providerConfig) : ''}`;
+    const rawId = `${apiKey.slice(-5)}${chatId || ''}${thinkingLevel}${formattedModel}${serviceTier || ''}${providerConfig ? JSON.stringify(providerConfig) : ''}`;
     const sessionId = await hash(rawId);
 
     const requestPayload = {
@@ -100,6 +110,10 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
         cache_control: { type: 'ephemeral' },
         session_id: sessionId
     };
+
+    if (serviceTier) {
+        requestPayload.service_tier = serviceTier;
+    }
 
     if (providerConfig) {
         requestPayload.provider = providerConfig;

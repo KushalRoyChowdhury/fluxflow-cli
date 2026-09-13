@@ -28,7 +28,8 @@ const DEFAULT_SETTINGS = {
             SenseNova: 'Free',
             Poolside: 'Free',
             ExpLabs: 'Free',
-            TokenHarbor: 'Free'
+            TokenHarbor: 'Free',
+            APInex: 'Free'
         }
     },
     systemSettings: {

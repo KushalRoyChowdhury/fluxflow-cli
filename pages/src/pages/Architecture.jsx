@@ -65,8 +65,32 @@ export default function Architecture() {
             </p>
             <ul>
                 <li>
-                    <strong>Global Sanctuary &amp; Workspace Context (<code>fluxflow.md</code> / <code>agent.md</code>)</strong> —
-                    Instructions are discovered case-insensitively from both the global sanctuary directory (<code>FLUXFLOW_DIR</code>: <code>~/.fluxflow/fluxflow.md</code> located in the user's home directory) and the local workspace (<code>CWD/fluxflow.md</code>). <code>agent.md</code> is supported as a direct alias. Both instruction sets are merged automatically under <code>--- Additional Instructions ---</code> in the system prompt on startup.
+                    <strong>Global Sanctuary &amp; Workspace Context (<code>fluxflow.md</code> / <code>AGENTS.md</code>)</strong> —
+                    Instructions are discovered case-insensitively from both the global sanctuary directory (<code>FLUXFLOW_DIR</code>: <code>~/.fluxflow/fluxflow.md</code> or <code>~/.fluxflow/AGENTS.md</code> located in the user's home directory) and the local workspace (<code>CWD/fluxflow.md</code> or <code>CWD/AGENTS.md</code>). Both instruction sets are merged automatically under <code>--- Additional Instructions ---</code> in the system prompt on startup.
+                </li>
+                <li>
+                    <strong>Conditional Model &amp; Provider Scoping</strong> — Instructions within <code>AGENTS.md</code> or <code>FLUXFLOW.md</code> can be selectively targeted to specific models or providers using XML tags:
+                    <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm my-3 font-mono">
+{`<!-- 1. Unique target (provider + model) -->
+<start_model_google::gemini-2.5-flash>
+Specific instruction for Gemini 2.5 Flash on Google.
+<end_model_google::gemini-2.5-flash>
+
+<!-- 2. Model ID matching (any provider) -->
+<start_model_gemini-2.5-flash>
+Instructions for this model across all providers.
+<end_model_gemini-2.5-flash>
+
+<!-- 3. Provider block & grouping -->
+<start_provider_google>
+  Use Google Search groundings when possible.
+
+  <start_model_gemini-2.5-pro>
+  Deep reasoning workflow.
+  <end_model_gemini-2.5-pro>
+<end_provider_google>`}
+                    </pre>
+                    Tags are matched case-insensitively; unmatched blocks are stripped entirely, while matched blocks have their tags removed and contents injected into the system prompt.
                 </li>
                 <li>
                     <strong>Hierarchical Skill Discovery &amp; Folders</strong> — Skills are discovered and cached on startup from both global and local scopes:
