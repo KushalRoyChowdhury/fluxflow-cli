@@ -83,8 +83,7 @@ const parseGlobalEasterEgg = (rawContent) => {
 // AGENTS.md is loaded once at startup as pure raw byte-for-byte text
 export const readGlobalAgentsInstruction = () => {
     globalAgentsPath = getGlobalAgentsPath();
-    const raw = globalAgentsPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['agents.md', 'agent.md']).trim() : '';
-    return parseGlobalEasterEgg(raw);
+    return globalAgentsPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['agents.md', 'agent.md']).trim() : '';
 };
 
 export const readLocalAgentsInstruction = () => {
@@ -95,7 +94,8 @@ export const readLocalAgentsInstruction = () => {
 // FLUXFLOW.md is dedicated strictly to model & provider conditional tags
 export const readGlobalFluxflowInstruction = () => {
     globalFluxflowPath = getGlobalFluxflowPath();
-    return globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md']).trim() : '';
+    const raw = globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md']).trim() : '';
+    return parseGlobalEasterEgg(raw);
 };
 
 export const readLocalFluxflowInstruction = () => {
@@ -115,57 +115,47 @@ export let localFluxflowMD = readLocalFluxflowInstruction();
 export const filterModelConditionalTags = (content, targetModel = '', aiProvider = '') => {
     if (!content) return '';
 
-    const currentProvider = aiProvider ? aiProvider.toLowerCase().trim() : '';
-    const currentUniqueTarget = (aiProvider && targetModel) ? `${aiProvider}::${targetModel}`.toLowerCase().trim() : '';
-    const currentModelId = targetModel ? targetModel.toLowerCase().trim() : '';
+    const provider = aiProvider.toLowerCase().trim();
+    const model = targetModel.toLowerCase().trim();
+    const uniqueTarget = provider && model ? `${provider}::${model}` : '';
 
     const matchedBlocks = [];
 
-    // 0. Handle provider blocks: <start_provider_providerName>...<end_provider_providerName>
-    const withoutProviderBlocks = content.replace(/<start_provider_([^>\r\n]+)>([\s\S]*?)<end_provider_([^>\r\n]+)>/gi, (match, startProv, innerContent, endProv) => {
-        if (startProv.trim().toLowerCase() === endProv.trim().toLowerCase()) {
-            const providerName = startProv.trim().toLowerCase();
-            if (currentProvider && providerName === currentProvider) {
-                // If nested model tags exist inside, process them
-                if (/<start_model_/i.test(innerContent)) {
-                    const expanded = innerContent
-                        .replace(/<start_model_([^>\r\n]+)>/gi, `<start_model_${providerName}::$1>`)
-                        .replace(/<end_model_([^>\r\n]+)>/gi, `<end_model_${providerName}::$1>`);
-
-                    expanded.replace(/<start_model_([^>\r\n]+::[^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+::[^>\r\n]+)>/gi, (m, startTag, tagContent, endTag) => {
-                        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase() && currentUniqueTarget && startTag.trim().toLowerCase() === currentUniqueTarget) {
-                            const trimmed = tagContent.trim();
-                            if (trimmed) matchedBlocks.push(trimmed);
-                        }
-                        return '';
-                    });
-                } else {
-                    const trimmed = innerContent.trim();
-                    if (trimmed) matchedBlocks.push(trimmed);
+    // 1. Provider blocks (with nested model support & preserving provider content)
+    content.replace(/<start_provider_([^>\r\n]+)>([\s\S]*?)<end_provider_([^>\r\n]+)>/gi, (match, startProv, inner, endProv) => {
+        if (provider && startProv.trim().toLowerCase() === endProv.trim().toLowerCase() && startProv.trim().toLowerCase() === provider) {
+            const providerClean = inner.replace(/<start_model_([^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+)>/gi, (m, startModel, modelInner, endModel) => {
+                if (startModel.trim().toLowerCase() === endModel.trim().toLowerCase()) {
+                    const tag = startModel.trim().toLowerCase();
+                    if (model && (tag === model || tag === uniqueTarget)) {
+                        const trimmed = modelInner.trim();
+                        if (trimmed) matchedBlocks.push(trimmed);
+                    }
                 }
-            }
+                return ''; // Strip nested model blocks out of provider text
+            });
+
+            const trimmedProv = providerClean.trim();
+            if (trimmedProv) matchedBlocks.push(trimmedProv);
         }
         return '';
     });
 
-    // 1. Handle unique target model tags: <start_model_provider::model>...<end_model_provider::model>
-    const withoutUniqueModelBlocks = withoutProviderBlocks.replace(/<start_model_([^>\r\n]+::[^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+::[^>\r\n]+)>/gi, (match, startTag, innerContent, endTag) => {
-        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
-            if (currentUniqueTarget && startTag.trim().toLowerCase() === currentUniqueTarget) {
-                const trimmed = innerContent.trim();
-                if (trimmed) matchedBlocks.push(trimmed);
-            }
+    // 2. Standalone namespaced model blocks: <start_model_provider::model>
+    content.replace(/<start_model_([^>\r\n]+::[^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+::[^>\r\n]+)>/gi, (match, startTag, inner, endTag) => {
+        if (uniqueTarget && startTag.trim().toLowerCase() === endTag.trim().toLowerCase() && startTag.trim().toLowerCase() === uniqueTarget) {
+            const trimmed = inner.trim();
+            if (trimmed) matchedBlocks.push(trimmed);
         }
         return '';
     });
 
-    // 2. Handle generic model tags: <start_model_model-id>...<end_model_model-id>
-    withoutUniqueModelBlocks.replace(/<start_model_([^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+)>/gi, (match, startTag, innerContent, endTag) => {
-        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
-            if (currentModelId && startTag.trim().toLowerCase() === currentModelId) {
-                const trimmed = innerContent.trim();
-                if (trimmed) matchedBlocks.push(trimmed);
-            }
+    // 3. Standalone generic model blocks: <start_model_model-id>
+    content.replace(/<start_model_([^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+)>/gi, (match, startTag, inner, endTag) => {
+        if (startTag.includes('::')) return '';
+        if (model && startTag.trim().toLowerCase() === endTag.trim().toLowerCase() && startTag.trim().toLowerCase() === model) {
+            const trimmed = inner.trim();
+            if (trimmed) matchedBlocks.push(trimmed);
         }
         return '';
     });
