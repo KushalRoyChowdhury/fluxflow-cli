@@ -1,11 +1,22 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.15.0": {
+        "note": "SEPTEMBER 14. Breaking Change to AGENTS.md & FLUXFLOW.md System.",
+        "added": [],
+        "changed": [
+            "Separated `AGENTS.md` and `FLUXFLOW.md` instruction files.",
+            "`AGENTS.md` is now strictly raw byte-for-byte Markdown/text without proprietary tag preprocessing, ensuring 100% portability across all agents & maintaining open standard.",
+            "`FLUXFLOW.md` is now the dedicated file for FluxFlow model and provider conditional tags (`‹start_model_...›`, `‹start_provider_...›`). Only matched conditional blocks are injected; unmatched or raw text in `FLUXFLOW.md` is ignored.",
+            "**NOTE:** If your `FLUXFLOW.md` contains any *text prose* that can be moved to `AGENTS.md`, Copy-Paste it there."
+        ],
+        "fixes": []
+    },
     "4.14.0": {
         "note": "SEPTEMBER 14",
         "added": [
             "Added a new / command: `/target`. Returns the unique model identifier for fluxflow in `provider::model` format.",
-            "Added conditional model and provider scoping syntax in `AGENTS.md` and `FLUXFLOW.md` with XML tags: `‹start_model_provider::model-id›`, `‹start_model_model-id›`, and `‹start_provider_providerName›` (with nested model grouping support). Close blocks with relative ending tags, `‹end_*›`",
+            "Added conditional model and provider scoping syntax in `AGENTS.md` and `FLUXFLOW.md` with XML tags: `‹start_model_provider::model-id›`, `‹start_model_model-id›`, and `‹start_provider_providerName›` (with nested model grouping support). Close blocks with relative ending tags, `‹end_*›`.",
             "Added new provider: APInex."
         ],
         "changed": [],

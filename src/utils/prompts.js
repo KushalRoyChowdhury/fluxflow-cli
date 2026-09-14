@@ -38,9 +38,14 @@ const readCaseInsensitiveFile = (dir, fileNames) => {
     return '';
 };
 
-export const getGlobalFluxflowPath = () => getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']);
-export const getLocalFluxflowPath = () => getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']);
+export const getGlobalAgentsPath = () => getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['agents.md', 'agent.md']);
+export const getLocalAgentsPath = () => getCaseInsensitiveFilePath(process.cwd(), ['agents.md', 'agent.md']);
 
+export const getGlobalFluxflowPath = () => getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md']);
+export const getLocalFluxflowPath = () => getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md']);
+
+export let globalAgentsPath = getGlobalAgentsPath();
+export let localAgentsPath = getLocalAgentsPath();
 export let globalFluxflowPath = getGlobalFluxflowPath();
 export let localFluxflowPath = getLocalFluxflowPath();
 
@@ -75,85 +80,110 @@ const parseGlobalEasterEgg = (rawContent) => {
     return rest.trim();
 };
 
-export const readGlobalInstruction = (force = false) => {
-    globalFluxflowPath = getGlobalFluxflowPath();
-    const raw = globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
+// AGENTS.md is loaded once at startup as pure raw byte-for-byte text
+export const readGlobalAgentsInstruction = () => {
+    globalAgentsPath = getGlobalAgentsPath();
+    const raw = globalAgentsPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['agents.md', 'agent.md']).trim() : '';
     return parseGlobalEasterEgg(raw);
 };
 
-export const readLocalInstruction = (force = false) => {
+export const readLocalAgentsInstruction = () => {
+    localAgentsPath = getLocalAgentsPath();
+    return localAgentsPath ? readCaseInsensitiveFile(process.cwd(), ['agents.md', 'agent.md']).trim() : '';
+};
+
+// FLUXFLOW.md is dedicated strictly to model & provider conditional tags
+export const readGlobalFluxflowInstruction = () => {
+    globalFluxflowPath = getGlobalFluxflowPath();
+    return globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md']).trim() : '';
+};
+
+export const readLocalFluxflowInstruction = () => {
     localFluxflowPath = getLocalFluxflowPath();
-    return localFluxflowPath ? readCaseInsensitiveFile(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
+    return localFluxflowPath ? readCaseInsensitiveFile(process.cwd(), ['fluxflow.md']).trim() : '';
+};
+
+// AGENTS.md content (read once at startup)
+export const globalAgentsMD = readGlobalAgentsInstruction();
+export const localAgentsMD = readLocalAgentsInstruction();
+
+// FLUXFLOW.md content (can re-read on model switch)
+export let globalFluxflowMD = readGlobalFluxflowInstruction();
+export let localFluxflowMD = readLocalFluxflowInstruction();
+
+// Filter function strictly for FLUXFLOW.md model conditionals (ignores non-conditional raw text)
+export const filterModelConditionalTags = (content, targetModel = '', aiProvider = '') => {
+    if (!content) return '';
+
+    const currentProvider = aiProvider ? aiProvider.toLowerCase().trim() : '';
+    const currentUniqueTarget = (aiProvider && targetModel) ? `${aiProvider}::${targetModel}`.toLowerCase().trim() : '';
+    const currentModelId = targetModel ? targetModel.toLowerCase().trim() : '';
+
+    const matchedBlocks = [];
+
+    // 0. Handle provider blocks: <start_provider_providerName>...<end_provider_providerName>
+    const withoutProviderBlocks = content.replace(/<start_provider_([^>\r\n]+)>([\s\S]*?)<end_provider_([^>\r\n]+)>/gi, (match, startProv, innerContent, endProv) => {
+        if (startProv.trim().toLowerCase() === endProv.trim().toLowerCase()) {
+            const providerName = startProv.trim().toLowerCase();
+            if (currentProvider && providerName === currentProvider) {
+                // If nested model tags exist inside, process them
+                if (/<start_model_/i.test(innerContent)) {
+                    const expanded = innerContent
+                        .replace(/<start_model_([^>\r\n]+)>/gi, `<start_model_${providerName}::$1>`)
+                        .replace(/<end_model_([^>\r\n]+)>/gi, `<end_model_${providerName}::$1>`);
+
+                    expanded.replace(/<start_model_([^>\r\n]+::[^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+::[^>\r\n]+)>/gi, (m, startTag, tagContent, endTag) => {
+                        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase() && currentUniqueTarget && startTag.trim().toLowerCase() === currentUniqueTarget) {
+                            const trimmed = tagContent.trim();
+                            if (trimmed) matchedBlocks.push(trimmed);
+                        }
+                        return '';
+                    });
+                } else {
+                    const trimmed = innerContent.trim();
+                    if (trimmed) matchedBlocks.push(trimmed);
+                }
+            }
+        }
+        return '';
+    });
+
+    // 1. Handle unique target model tags: <start_model_provider::model>...<end_model_provider::model>
+    const withoutUniqueModelBlocks = withoutProviderBlocks.replace(/<start_model_([^>\r\n]+::[^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+::[^>\r\n]+)>/gi, (match, startTag, innerContent, endTag) => {
+        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
+            if (currentUniqueTarget && startTag.trim().toLowerCase() === currentUniqueTarget) {
+                const trimmed = innerContent.trim();
+                if (trimmed) matchedBlocks.push(trimmed);
+            }
+        }
+        return '';
+    });
+
+    // 2. Handle generic model tags: <start_model_model-id>...<end_model_model-id>
+    withoutUniqueModelBlocks.replace(/<start_model_([^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+)>/gi, (match, startTag, innerContent, endTag) => {
+        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
+            if (currentModelId && startTag.trim().toLowerCase() === currentModelId) {
+                const trimmed = innerContent.trim();
+                if (trimmed) matchedBlocks.push(trimmed);
+            }
+        }
+        return '';
+    });
+
+    return matchedBlocks.join('\n\n').trim();
 };
 
 export const refreshInstructionsForTarget = (aiProvider = '', targetModel = '') => {
     const currentTargetKey = `${aiProvider || ''}::${targetModel || ''}`.toLowerCase().trim();
     if (cachedTargetKey !== currentTargetKey) {
         cachedTargetKey = currentTargetKey;
-        globalFluxflowMD = readGlobalInstruction();
-        localFluxflowMD = readLocalInstruction();
+        globalFluxflowMD = readGlobalFluxflowInstruction();
+        localFluxflowMD = readLocalFluxflowInstruction();
     }
-};
-
-export let globalFluxflowMD = readGlobalInstruction();
-
-export const filterModelConditionalTags = (content, targetModel = '', aiProvider = '') => {
-    if (!content) return '';
-    let result = content;
-
-    const currentProvider = aiProvider ? aiProvider.toLowerCase().trim() : '';
-    const currentUniqueTarget = (aiProvider && targetModel) ? `${aiProvider}::${targetModel}`.toLowerCase().trim() : '';
-    const currentModelId = targetModel ? targetModel.toLowerCase().trim() : '';
-
-    // 0. Pre-resolve <start_provider_providerName>...<end_provider_providerName>
-    // Converts nested <start_model_modelId> into <start_model_providerName::modelId> so Handle 1 handles it
-    result = result.replace(/<start_provider_([^>\r\n]+)>([\s\S]*?)<end_provider_([^>\r\n]+)>/gi, (match, startProv, innerContent, endProv) => {
-        if (startProv.trim().toLowerCase() === endProv.trim().toLowerCase()) {
-            const providerName = startProv.trim().toLowerCase();
-            if (/<start_model_/i.test(innerContent)) {
-                return innerContent
-                    .replace(/<start_model_([^>\r\n]+)>/gi, `<start_model_${providerName}::$1>`)
-                    .replace(/<end_model_([^>\r\n]+)>/gi, `<end_model_${providerName}::$1>`);
-            }
-            // If it's a general provider-level block without model tags
-            if (currentProvider && providerName === currentProvider) {
-                return innerContent;
-            }
-            return '';
-        }
-        return match;
-    });
-
-    // 1. Handle <start_model_unique_target>...<end_model_unique_target>
-    // e.g. <start_model_google::gemini-2.5-flash>...<end_model_google::gemini-2.5-flash>
-    result = result.replace(/<start_model_([^>\r\n]+::[^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+::[^>\r\n]+)>/gi, (match, startTag, innerContent, endTag) => {
-        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
-            if (currentUniqueTarget && startTag.trim().toLowerCase() === currentUniqueTarget) {
-                return innerContent;
-            }
-            return '';
-        }
-        return match;
-    });
-
-    // 2. Handle <start_model_model-id>...<end_model_model-id>
-    // e.g. <start_model_gemini-2.5-flash>...<end_model_gemini-2.5-flash>
-    result = result.replace(/<start_model_([^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+)>/gi, (match, startTag, innerContent, endTag) => {
-        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
-            if (currentModelId && startTag.trim().toLowerCase() === currentModelId) {
-                return innerContent;
-            }
-            return '';
-        }
-        return match;
-    });
-
-    return result;
 };
 
 // Ensure standard about skill is created before reading instructions/skills
 createAboutSkill();
-export let localFluxflowMD = readLocalInstruction();
 
 const parseSkillFrontmatter = (content) => {
     if (!content) return null;
@@ -250,7 +280,7 @@ const isSystemDocsSkill = (s) => {
 const getUIGlobalSkills = () => (globalSkills || []).filter(s => !isSystemDocsSkill(s));
 const getUILocalSkills = () => (localSkills || []).filter(s => !isSystemDocsSkill(s));
 
-export const loadedFilesCount = (globalFluxflowMD ? 1 : 0) + (localFluxflowMD ? 1 : 0) + getUIGlobalSkills().length + getUILocalSkills().length;
+export const loadedFilesCount = (globalAgentsMD ? 1 : 0) + (localAgentsMD ? 1 : 0) + (globalFluxflowMD ? 1 : 0) + (localFluxflowMD ? 1 : 0) + getUIGlobalSkills().length + getUILocalSkills().length;
 
 const formatPathForUI = (filePath, scope = 'Project') => {
     if (!filePath) return '';
@@ -267,9 +297,15 @@ const formatPathForUI = (filePath, scope = 'Project') => {
 };
 
 export const getLoadedFilesSummary = () => {
-    globalFluxflowMD = readGlobalInstruction();
-    localFluxflowMD = readLocalInstruction();
+    globalFluxflowMD = readGlobalFluxflowInstruction();
+    localFluxflowMD = readLocalFluxflowInstruction();
     const instructions = [];
+    if (globalAgentsPath && globalAgentsMD.length > 0) {
+        instructions.push({ scope: 'Global', path: globalAgentsPath });
+    }
+    if (localAgentsPath && localAgentsMD.length > 0) {
+        instructions.push({ scope: 'Project', path: localAgentsPath });
+    }
     if (globalFluxflowPath && globalFluxflowMD.length > 0) {
         instructions.push({ scope: 'Global', path: globalFluxflowPath });
     }
@@ -418,13 +454,20 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const userMemories = getCachedUserMemories(chatId, isMemoryEnabled);
     const userMemoriesStr = userMemories?.length > 0 ? `--- Saved Memories ---\n${userMemories}\n\n` : '';
 
+    // Re-read FLUXFLOW.md only on model/provider change
     refreshInstructionsForTarget(aiProvider, targetModel);
 
-    const filteredGlobalMD = filterModelConditionalTags(globalFluxflowMD, targetModel, aiProvider).trim();
-    const filteredLocalMD = filterModelConditionalTags(localFluxflowMD, targetModel, aiProvider).trim();
+    // Global: Combine raw AGENTS.md + matched FLUXFLOW.md conditionals
+    const filteredGlobalFluxflow = filterModelConditionalTags(globalFluxflowMD, targetModel, aiProvider).trim();
+    const globalPieces = [globalAgentsMD, filteredGlobalFluxflow].filter(p => p && p.length > 0);
+    const combinedGlobal = globalPieces.join('\n\n').trim();
 
-    // const additionalInstructions = [globalFluxflowMD, localFluxflowMD].filter(Boolean).join('\n\n');
-    const additionalInstrStr = filteredGlobalMD.length > 0 || filteredLocalMD.length > 0 ? `--- Additional Instructions ---\n${filteredGlobalMD.length > 0 ? `-- Global --\n${filteredGlobalMD}` : ''}${filteredLocalMD.length > 0 ? `${filteredGlobalMD.length > 0 ? '\n\n' : ''}-- Project --\n${filteredLocalMD}` : ''}\n\n` : '';
+    // Local/Project: Combine raw AGENTS.md + matched FLUXFLOW.md conditionals
+    const filteredLocalFluxflow = filterModelConditionalTags(localFluxflowMD, targetModel, aiProvider).trim();
+    const localPieces = [localAgentsMD, filteredLocalFluxflow].filter(p => p && p.length > 0);
+    const combinedLocal = localPieces.join('\n\n').trim();
+
+    const additionalInstrStr = combinedGlobal.length > 0 || combinedLocal.length > 0 ? `--- Additional Instructions ---\n${combinedGlobal.length > 0 ? `-- Global --\n${combinedGlobal}` : ''}${combinedLocal.length > 0 ? `${combinedGlobal.length > 0 ? '\n\n' : ''}-- Project --\n${combinedLocal}` : ''}\n\n` : '';
 
     const isSystemDir = (() => {
         const cwd = process.cwd().toLowerCase();

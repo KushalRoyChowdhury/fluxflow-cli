@@ -61,15 +61,21 @@ export default function Architecture() {
 
             <h2 id="project-instructions-skills">Project Instructions &amp; Skills System</h2>
             <p>
-                FluxFlow incorporates a modular, hierarchical context and skill execution architecture that supports both workspace-specific configurations and global machine-wide instructions:
+                FluxFlow incorporates a clean, modular architecture for instructions and custom skills that cleanly separates standard baseline project guidelines from fine-tuned model-specific tweaks:
             </p>
             <ul>
                 <li>
-                    <strong>Global Sanctuary &amp; Workspace Context (<code>fluxflow.md</code> / <code>AGENTS.md</code>)</strong> —
-                    Instructions are discovered case-insensitively from both the global sanctuary directory (<code>FLUXFLOW_DIR</code>: <code>~/.fluxflow/fluxflow.md</code> or <code>~/.fluxflow/AGENTS.md</code> located in the user's home directory) and the local workspace (<code>CWD/fluxflow.md</code> or <code>CWD/AGENTS.md</code>). Both instruction sets are merged automatically under <code>--- Additional Instructions ---</code> in the system prompt on startup.
+                    <strong>Standard Baseline Instructions (<code>AGENTS.md</code> / <code>agent.md</code>)</strong> —
+                    Discovered case-insensitively from both the global directory (<code>~/.fluxflow/AGENTS.md</code>) and the project workspace (<code>./AGENTS.md</code>).
+                    <code>AGENTS.md</code> is read <strong>strictly once at startup</strong> and is injected as pure, raw, byte-for-byte Markdown without any proprietary tag processing, ensuring complete interoperability with other AI tools and IDE agents.
                 </li>
                 <li>
-                    <strong>Conditional Model &amp; Provider Scoping</strong> — Instructions within <code>AGENTS.md</code> or <code>FLUXFLOW.md</code> can be selectively targeted to specific models or providers using XML tags:
+                    <strong>Conditional Model &amp; Provider Tweaks (<code>FLUXFLOW.md</code>)</strong> —
+                    Discovered case-insensitively from global (<code>~/.fluxflow/fluxflow.md</code>) and local (<code>./fluxflow.md</code>) scopes.
+                    <code>FLUXFLOW.md</code> is dedicated exclusively to model &amp; provider conditional XML blocks. It is <strong>re-read dynamically whenever the active <code>provider::model-id</code> key changes</strong> (such as mid-session via <code>/model</code> or provider switching), ensuring prompt adjustments take effect immediately without needing an app restart.
+                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                        Only matching conditional blocks are parsed and extracted from <code>FLUXFLOW.md</code>; any outside raw text or unmatched model blocks are strictly ignored:
+                    </p>
                     <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm my-3 font-mono">
 {`<!-- 1. Unique target (provider + model) -->
 <start_model_google::gemini-2.5-flash>
@@ -90,7 +96,10 @@ Instructions for this model across all providers.
   <end_model_gemini-2.5-pro>
 <end_provider_google>`}
                     </pre>
-                    Tags are matched case-insensitively; unmatched blocks are stripped entirely, while matched blocks have their tags removed and contents injected into the system prompt.
+                </li>
+                <li>
+                    <strong>Combined Instruction Pipeline</strong> —
+                    For both Global and Workspace scopes, matching blocks from <code>FLUXFLOW.md</code> are seamlessly appended to the base <code>AGENTS.md</code> content under <code>--- Additional Instructions ---</code> in the system prompt.
                 </li>
                 <li>
                     <strong>Hierarchical Skill Discovery &amp; Folders</strong> — Skills are discovered and cached on startup from both global and local scopes:

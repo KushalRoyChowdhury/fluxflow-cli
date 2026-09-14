@@ -9,6 +9,7 @@ export const PLUGINS_MD = `# Fluxflow Instructions & Skills System
 
 ### Conditional Model & Provider Instructions (use /target command to get provider name & model-id)
 You can scope instructions conditionally to specific providers, model IDs, or unique provider::model combinations using XML tags:
+> Conditionals will only work in FLUXFLOW.md. AGENTS.md will be read as raw Markdown. Any prose outside valid conditionals in FLUXFLOW.md will be ignored
 
 1. Unique Target (Provider + Model):
 <start_model_google::gemini-2.5-flash>

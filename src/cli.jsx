@@ -7,15 +7,21 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { FLUXFLOW_DIR } from './utils/paths.js';
 
-// Ensure AGENTS.md or FLUXFLOW.md exists in FLUXFLOW_DIR
+// Ensure AGENTS.md and FLUXFLOW.md exist in FLUXFLOW_DIR
 try {
     const agentsMdPath = path.join(FLUXFLOW_DIR, 'AGENTS.md');
     const fluxflowMdPath = path.join(FLUXFLOW_DIR, 'FLUXFLOW.md');
-    if (!fs.existsSync(agentsMdPath) && !fs.existsSync(fluxflowMdPath)) {
-        if (!fs.existsSync(FLUXFLOW_DIR)) {
-            fs.mkdirSync(FLUXFLOW_DIR, { recursive: true });
-        }
+
+    if (!fs.existsSync(FLUXFLOW_DIR)) {
+        fs.mkdirSync(FLUXFLOW_DIR, { recursive: true });
+    }
+
+    if (!fs.existsSync(agentsMdPath)) {
         fs.writeFileSync(agentsMdPath, '', 'utf8');
+    }
+
+    if (!fs.existsSync(fluxflowMdPath)) {
+        fs.writeFileSync(fluxflowMdPath, '', 'utf8');
     }
 } catch (e) {
     // Ignore error if directory or file initialization fails
@@ -102,7 +108,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         const { url } = await openUsageDashboard();
         console.log(`\n✦ FluxFlow Token Usage & Analytics Dashboard\n⠀⠀└─ Serving at: ${url}\n⠀⠀└─ Opened in default browser. Press Ctrl+C to stop.\n`);
         // Keep server process running
-        await new Promise(() => {});
+        await new Promise(() => { });
     }
 
     if (isVersion || isHelp || isHelpCommands || isUpdate || isExport) {
