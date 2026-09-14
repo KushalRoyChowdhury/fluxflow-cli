@@ -8,5 +8,5 @@ token_usage.txt
 readme-git.md
 src/utils/fallback_key.js
 .VSCodeCounter
-providers_to_add.txt
+/providers_to_add.txt
 /dist/

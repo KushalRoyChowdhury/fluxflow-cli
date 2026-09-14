@@ -2,7 +2,7 @@
 export const PROVIDERS_MD = `# FluxFlow AI Providers & Setup
 
 ## Supported Providers
-* Gemini (aistudio.google.com) | NVIDIA NIM (build.nvidia.com) | DeepSeek (platform.deepseek.com) | Mistral (admin.mistral.ai) | Ollama Local/Cloud (ollama.com) | CrofAI (crof.ai) | InferX (inferx.net) | SenseNova (platform.sensenova.ai) | Poolside (platform.poolside.ai) | OpenRouter (openrouter.ai) | AIHubMix (aihubmix.com) | Experiential Labs (experientiallabs.ai) | TokenHarbor (tokenharbor.ai) | APInex (apinex.bond)
+* Gemini (aistudio.google.com) | NVIDIA NIM (build.nvidia.com) | DeepSeek (platform.deepseek.com) | Mistral (admin.mistral.ai) | Ollama Local/Cloud (ollama.com) | InferX (inferx.net) | SenseNova (platform.sensenova.ai) | Poolside (platform.poolside.ai) | OpenRouter (openrouter.ai) | AIHubMix (aihubmix.com) | Experiential Labs (experientiallabs.ai) | TokenHarbor (tokenharbor.ai) | APInex (apinex.bond)
 * Proxy: 9router. Can use OAuth subscription like Codex, Claude Code, GitHub Copilot etc. or any OpenAI/Anthropic API that FluxFlow dont have natively. Set ENV ENABLE_9ROUTER=true, needs 9router package installed (npm) & running
 
 ## OpenRouter: Routing, Tiers & Model Variants

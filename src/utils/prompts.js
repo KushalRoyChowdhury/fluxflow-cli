@@ -484,8 +484,8 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
             Standard: 'Medium',
             Medium: 'Medium',
             High: 'High',
-            xHigh: 'Extended',
-            Max: 'Max'
+            xHigh: '',
+            Max: ''
         };
 
         return map[thinkingLevel] ?? '';

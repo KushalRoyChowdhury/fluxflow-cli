@@ -41,7 +41,7 @@ import { FLUXFLOW_DIR, MEMORIES_FILE, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_F
 import { emojiSpace, getFluxLogo } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, cleanTerminalOutput } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
-import { formatTokens, parseMessageToBlocks, clearBlocksCache, flattenString } from './utils/text.js';
+import { formatTokens, parseMessageToBlocks, clearBlocksCache, flattenString, splitTypewriterTokens } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 import GlintText from './components/GlintText.jsx';
 import { handleExport } from './utils/export.js';
@@ -529,11 +529,11 @@ const SubagentRow = React.memo(({ sa, showTPMEstimate = false }) => {
             const lastTime = lastChunkTimeRef.current;
             const timeSinceLast = lastTime > 0 ? (Date.now() - lastTime) : 0;
 
-            if (lastTime > 0 && timeSinceLast > 1500) {
+            if (lastTime > 0 && timeSinceLast >= 1000) {
                 wpsHistoryRef.current = [];
                 setDisplayedWps(0);
-            } else if (lastTime > 0 && timeSinceLast > 600) {
-                // Chunks paused >600ms — decay the history
+            } else if (lastTime > 0 && timeSinceLast > 500) {
+                // Chunks paused >500ms — decay the history
                 if (wpsHistoryRef.current.length > 0) {
                     wpsHistoryRef.current.shift();
                 }
@@ -553,7 +553,7 @@ const SubagentRow = React.memo(({ sa, showTPMEstimate = false }) => {
                     setDisplayedWps(Math.round(sa.wps));
                 }
             }
-        }, 750);
+        }, 200);
 
         return () => clearInterval(timer);
     }, [sa.status]);
@@ -733,8 +733,8 @@ export default function App({ args = [] }) {
     // Queue text for typewriter or append directly when OFF
     const appendStreamText = (chunkText) => {
         if (systemSettings.progressiveRendering && typewriterTickRef.current) {
-            // Split into word tokens for smooth progressive appearance
-            const tokens = chunkText.split(/(\s+)/).filter(Boolean);
+            // Split into fine-grained tokens (CJK characters, words, symbols, whitespace) for smooth progressive appearance
+            const tokens = splitTypewriterTokens(chunkText);
             for (const tok of tokens) {
                 typewriterQueueRef.current.push(tok);
             }
@@ -815,7 +815,7 @@ export default function App({ args = [] }) {
                 const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
                 const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 
-                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'APInex'];
+                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'APInex'];
                 const normalizeProvider = (pStr) => {
                     if (!pStr) return null;
                     const lower = pStr.toLowerCase();
@@ -825,7 +825,6 @@ export default function App({ args = [] }) {
                     if (lower === 'nvidia') return 'NVIDIA';
                     if (lower === 'mistral') return 'Mistral';
                     if (lower === 'ollama') return 'Ollama';
-                    if (lower === 'crofai' || lower === 'crof') return 'CrofAI';
                     if (lower === 'inferx') return 'InferX';
                     if (lower === 'sensenova') return 'SenseNova';
                     if (lower === 'poolside') return 'Poolside';
@@ -940,7 +939,7 @@ export default function App({ args = [] }) {
                     const parts = val.split('@');
                     const keyPart = parts[0];
                     const provPart = parts[1].toLowerCase();
-                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r', 'explabs', 'tokenharbor', 'token_harbor', 'thk', 'apinex', 'apx'].includes(provPart)) {
+                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r', 'explabs', 'tokenharbor', 'token_harbor', 'thk', 'apinex', 'apx'].includes(provPart)) {
                         let mapped = 'Google';
                         if (provPart === 'google') mapped = 'Google';
                         else if (provPart === 'deepseek') mapped = 'DeepSeek';
@@ -948,7 +947,6 @@ export default function App({ args = [] }) {
                         else if (provPart === 'nvidia') mapped = 'NVIDIA';
                         else if (provPart === 'mistral') mapped = 'Mistral';
                         else if (provPart === 'ollama') mapped = 'Ollama';
-                        else if (provPart === 'crof' || provPart === 'crofai') mapped = 'CrofAI';
                         else if (provPart === 'inferx') mapped = 'InferX';
                         else if (provPart === 'sensenova') mapped = 'SenseNova';
                         else if (provPart === 'poolside' || provPart === 'pool') mapped = 'Poolside';
@@ -1028,7 +1026,7 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
                 const val = args[i + 1].toLowerCase();
-                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r', 'explabs', 'tokenharbor', 'token_harbor', 'thk', 'apinex', 'apx'].includes(val)) {
+                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r', 'explabs', 'tokenharbor', 'token_harbor', 'thk', 'apinex', 'apx'].includes(val)) {
                     let mapped = 'Google';
                     if (val === 'google') mapped = 'Google';
                     else if (val === 'deepseek') mapped = 'DeepSeek';
@@ -1036,7 +1034,6 @@ export default function App({ args = [] }) {
                     else if (val === 'nvidia') mapped = 'NVIDIA';
                     else if (val === 'mistral') mapped = 'Mistral';
                     else if (val === 'ollama') mapped = 'Ollama';
-                    else if (val === 'crof' || val === 'crofai') mapped = 'CrofAI';
                     else if (val === 'inferx') mapped = 'InferX';
                     else if (val === 'sensenova') mapped = 'SenseNova';
                     else if (val === 'poolside' || val === 'pool') mapped = 'Poolside';
@@ -1293,6 +1290,9 @@ export default function App({ args = [] }) {
         if (process.env.forcedReasoning) {
             setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Forced Reasoning:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
             process.env.forcedReasoning = false;
+        }
+        if (thinkingLevel === 'xHigh') {
+            setThinkingLevel('Medium');
         }
     }, [activeModel]);
 
@@ -1865,7 +1865,7 @@ export default function App({ args = [] }) {
 
         // Provider Budget Select keyboard handling
         if (activeView === 'providerBudgetSelect') {
-            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'APInex'];
+            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'APInex'];
             if (key.upArrow) {
                 setPbsCursor(c => (c - 1 + PBS_PROVIDERS.length) % PBS_PROVIDERS.length);
                 return;
@@ -2508,10 +2508,6 @@ export default function App({ args = [] }) {
                 prefix: '',
                 minLength: 0,
             },
-            CrofAI: {
-                prefix: '',
-                minLength: 0,
-            },
             InferX: {
                 prefix: '',
                 minLength: 0,
@@ -2568,7 +2564,7 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-ai/deepseek-v4-flash';
             } else if (aiProvider === 'Ollama' || aiProvider === '9router') {
                 defaultModel = activeModel || '';
-            } else if (aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'APInex') {
+            } else if (aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'APInex') {
                 defaultModel = getDefaultModel(aiProvider, apiTier) || '';
             }
             setActiveModel(defaultModel);
@@ -2578,7 +2574,7 @@ export default function App({ args = [] }) {
                 newSys = { ...newSys, ollamaEndpoint: 'Local' };
                 setSystemSettings(newSys);
             }
-            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'APInex') {
+            if (aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'APInex') {
                 newSys = { ...newSys, memory: false };
                 setSystemSettings(newSys);
             }
@@ -2590,7 +2586,7 @@ export default function App({ args = [] }) {
                 }
             }
 
-            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape && aiProvider === 'Ollama' ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'APInex' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.${warningMsg}\n⠀`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape && aiProvider === 'Ollama' ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'APInex' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.${warningMsg}\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
@@ -2672,7 +2668,7 @@ export default function App({ args = [] }) {
                 { cmd: 'Low', display: getMappedThinkingLevel(aiProvider, activeModel, 'Low') !== null ? `Low (${getMappedThinkingLevel(aiProvider, activeModel, 'Low')})` : 'Low', desc: 'Quick Reasoning' },
                 { cmd: 'Medium', display: getMappedThinkingLevel(aiProvider, activeModel, 'Medium') !== null ? `Medium (${getMappedThinkingLevel(aiProvider, activeModel, 'Medium')})` : 'Medium', desc: 'Balanced Reasoning' },
                 { cmd: 'High', display: getMappedThinkingLevel(aiProvider, activeModel, 'High') !== null ? `High (${getMappedThinkingLevel(aiProvider, activeModel, 'High')})` : 'High', desc: 'Deep Reasoning' },
-                { cmd: 'xHigh', display: getMappedThinkingLevel(aiProvider, activeModel, 'xHigh') !== null ? `xHigh (${getMappedThinkingLevel(aiProvider, activeModel, 'xHigh')})` : 'xHigh', desc: 'Extended Reasoning' }
+                { cmd: 'custom', display: getMappedThinkingLevel(aiProvider, activeModel, 'xHigh') !== null ? `Custom (${getMappedThinkingLevel(aiProvider, activeModel, 'xHigh')})` : 'Custom', desc: 'Extended Reasoning' }
             ]
         },
         {
@@ -3235,11 +3231,11 @@ export default function App({ args = [] }) {
                             const levelArg = rawArgs.slice(0, mapIdx).join(' ').trim();
                             const targetArg = rawArgs.slice(mapIdx + 1).join(' ').trim();
 
-                            const validLevels = ['fast', 'low', 'medium', 'standard', 'high', 'xhigh', 'max'];
+                            const validLevels = ['fast', 'low', 'medium', 'standard', 'high', 'xhigh', 'custom', 'max'];
                             if (!levelArg || !targetArg) {
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Usage: /thinking <level> --map <target_value>. Example: /thinking Standard --map high`, isMeta: true }];
+                                    return [...prev, { id: Date.now(), role: 'system', text: `✦ \x1b[31mINVALID USAGE\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Usage: \x1b[36m/thinking <level> --map <target_value>\x1b[0m (e.g. \x1b[33m/thinking Custom --map high\x1b[0m)\n⠀`, isMeta: true }];
                                 });
                             } else if (!validLevels.includes(levelArg.toLowerCase())) {
                                 setMessages(prev => {
@@ -3247,12 +3243,13 @@ export default function App({ args = [] }) {
                                     return [...prev, {
                                         id: Date.now(),
                                         role: 'system',
-                                        text: `\x1b[31m[Error]\x1b[0m Unknown level "\x1b[33m${levelArg}\x1b[0m" to map. Available standard levels: \x1b[36mLow, Medium, High, xHigh\x1b[0m.`,
+                                        text: `✦ \x1b[31mUNKNOWN LEVEL\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Unknown level "\x1b[33m${levelArg}\x1b[0m" to map. Available: \x1b[36mLow, Medium, High, Custom\x1b[0m.\n⠀`,
                                         isMeta: true
                                     }];
                                 });
                             } else if (targetArg.toLowerCase() === 'rm' || targetArg.toLowerCase() === '--remove' || targetArg.toLowerCase() === '-rm') {
-                                const res = removeThinkingLevelMapping(aiProvider, activeModel, levelArg);
+                                const targetLevel = levelArg.toLowerCase() === 'custom' ? 'xHigh' : levelArg;
+                                const res = removeThinkingLevelMapping(aiProvider, activeModel, targetLevel);
                                 if (res.success) {
                                     setMessages(prev => {
                                         setCompletedIndex(prev.length + 1);
@@ -3261,12 +3258,13 @@ export default function App({ args = [] }) {
                                 } else {
                                     setMessages(prev => {
                                         setCompletedIndex(prev.length + 1);
-                                        return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Failed to remove thinking mapping: ${res.reason}`, isMeta: true }];
+                                        return [...prev, { id: Date.now(), role: 'system', text: `✦ \x1b[31mFAILED TO REMOVE MAPPING\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m ${res.reason}\n⠀`, isMeta: true }];
                                     });
                                 }
                             } else {
+                                const targetLevel = levelArg.toLowerCase() === 'custom' ? 'xHigh' : levelArg;
                                 const targetVal = isNaN(Number(targetArg)) ? targetArg : Number(targetArg);
-                                const res = setThinkingLevelMapping(aiProvider, activeModel, levelArg, targetVal);
+                                const res = setThinkingLevelMapping(aiProvider, activeModel, targetLevel, targetVal);
                                 if (res.success) {
                                     setMessages(prev => {
                                         setCompletedIndex(prev.length + 1);
@@ -3275,7 +3273,7 @@ export default function App({ args = [] }) {
                                 } else {
                                     setMessages(prev => {
                                         setCompletedIndex(prev.length + 1);
-                                        return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Failed to save thinking mapping: ${res.reason}`, isMeta: true }];
+                                        return [...prev, { id: Date.now(), role: 'system', text: `✦ \x1b[31mFAILED TO SAVE MAPPING\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m ${res.reason}\n⠀`, isMeta: true }];
                                     });
                                 }
                             }
@@ -3283,24 +3281,41 @@ export default function App({ args = [] }) {
                         }
 
                         let val = rawArgs[0].toLowerCase();
-                        const validThinkingLevels = ['fast', 'low', 'medium', 'standard', 'high', 'xhigh', 'max'];
+                        const validThinkingLevels = ['fast', 'low', 'medium', 'standard', 'high', 'xhigh', 'custom', 'max'];
                         if (!validThinkingLevels.includes(val)) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
                                 return [...prev, {
                                     id: Date.now(),
                                     role: 'system',
-                                    text: `\x1b[31m[Error]\x1b[0m Unknown thinking level "\x1b[33m${rawArgs[0]}\x1b[0m". Available levels: \x1b[36mLow, Medium, High, xHigh\x1b[0m (or use \x1b[36m/thinking\x1b[0m for interactive picker).`,
+                                    text: `✦ \x1b[31mUNKNOWN THINKING LEVEL\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Level "\x1b[33m${rawArgs[0]}\x1b[0m" is not supported. Available levels: \x1b[36mLow, Medium, High, Custom\x1b[0m.\n⠀`,
                                     isMeta: true
                                 }];
                             });
                             break;
                         }
                         if (val === 'standard') val = 'medium';
-                        if (val === 'max') val = 'xhigh';
+                        if (val === 'max' || val === 'custom') val = 'xhigh';
                         formattedLevel = val.charAt(0).toUpperCase() + val.slice(1);
                         if (val === 'xhigh') {
                             formattedLevel = 'xHigh';
+                        }
+
+                        // Check if Custom / xHigh level is mapped
+                        if (formattedLevel === 'xHigh') {
+                            const isMapped = getMappedThinkingLevel(aiProvider, activeModel, 'xHigh') !== null;
+                            if (!isMapped) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, {
+                                        id: Date.now(),
+                                        role: 'system',
+                                        text: `✦ \x1b[31mCUSTOM LEVEL NOT MAPPED\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Custom Effort level is not mapped. Use \x1b[36m/thinking custom --map <target_value>\x1b[0m first.\n⠀`,
+                                        isMeta: true
+                                    }];
+                                });
+                                break;
+                            }
                         }
 
                         let forceMsg = '';
@@ -3322,7 +3337,10 @@ export default function App({ args = [] }) {
                         } else {
                             setThinkingLevel(formattedLevel);
                             const s = emojiSpace(1);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m ${activeModel}.\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${formattedLevel}.\n${forceMsg} ⠀`, isMeta: true }]; }); // isBypass ? `⠀⠀⠀⠀\x1b[2m└─\x1b[22m bypassed.\n⠀` : ''
+                            const displayLevel = formattedLevel === 'xHigh'
+                                ? (getMappedThinkingLevel(aiProvider, activeModel, 'xHigh') !== null ? `Custom (${getMappedThinkingLevel(aiProvider, activeModel, 'xHigh')})` : 'Custom')
+                                : formattedLevel;
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m ${activeModel}.\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${displayLevel}.\n${forceMsg} ⠀`, isMeta: true }]; }); // isBypass ? `⠀⠀⠀⠀\x1b[2m└─\x1b[22m bypassed.\n⠀` : ''
                         }
                     } else {
                         setActiveView('thinking');
@@ -3459,7 +3477,10 @@ export default function App({ args = [] }) {
                             } else {
                                 setActiveModel(mod);
                                 const isMmActive = isMultimodalFlag || isModelMultimodal(mod);
-                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m ${mod}\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${thinkingLevel}\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMmActive ? 'ON' : 'OFF'}\n⠀`, isMeta: true }]; });
+                                const modelDisplayThinking = thinkingLevel === 'xHigh'
+                                    ? (getMappedThinkingLevel(aiProvider, mod, 'xHigh') !== null ? `Custom (${getMappedThinkingLevel(aiProvider, mod, 'xHigh')})` : 'Custom')
+                                    : thinkingLevel;
+                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m ${mod}\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${modelDisplayThinking}\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMmActive ? 'ON' : 'OFF'}\n⠀`, isMeta: true }]; });
                             }
                         }
                     } else {
@@ -3791,7 +3812,6 @@ export default function App({ args = [] }) {
                                 DeepSeek: 'Free',
                                 NVIDIA: 'Free',
                                 OpenRouter: 'Free',
-                                CrofAI: 'Free',
                                 InferX: 'Free',
                                 SenseNova: 'Free',
                                 AIHubMix: 'Free',
@@ -5194,7 +5214,6 @@ export default function App({ args = [] }) {
                             { label: 'DeepSeek', value: 'DeepSeek' },
                             { label: 'InferX', value: 'InferX' },
                             { label: 'SenseNova', value: 'SenseNova' },
-                            { label: 'CrofAI', value: 'CrofAI' },
                             { label: 'Poolside', value: 'Poolside' },
                             { label: 'Experiential Labs', value: 'ExpLabs' },
                             { label: 'Token Harbor', value: 'TokenHarbor' },
@@ -5232,7 +5251,7 @@ export default function App({ args = [] }) {
                                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                                 setActiveModel(defaultModel);
                                 setApiTier(targetTier);
-                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'APInex') {
+                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'APInex') {
                                     setSystemSettings(s => ({ ...s, memory: false }));
                                     saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
                                 } else {
@@ -5242,7 +5261,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'APInex') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}${warningMsg}\n⠀`,
+                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'APInex') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}${warningMsg}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -5398,7 +5417,7 @@ export default function App({ args = [] }) {
                 );
 
             case 'providerBudgetSelect': {
-                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'APInex'];
+                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'APInex'];
                 const anySelected = PROVIDERS_LIST.some(p => pbsSelected[p]);
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
@@ -5606,7 +5625,7 @@ export default function App({ args = [] }) {
                 const isFreeTier = apiTier !== 'Paid';
                 const usingProviderBudgets = !!(quotas.providerBudgets?.__useProvider);
                 const providerBudgetsMap = quotas.providerBudgets || {};
-                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'APInex'].filter(
+                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'APInex'].filter(
                     p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
                 );
                 const limitsNotSet = !usingProviderBudgets && (shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
@@ -7054,7 +7073,7 @@ export default function App({ args = [] }) {
                                     glintColor={colors.textMuted}
                                     glintWidth={3}
                                 />
-                                <Text color={colors.textMuted}> {activeModel.length > 0 ? `(${thinkingLevel})` : ''}</Text>
+                                <Text color={colors.textMuted}> {activeModel.length > 0 ? thinkingLevel.toLocaleLowerCase().includes('xhigh') ? `` : `(${thinkingLevel})` : ''}</Text>
                                 {loadedFilesCount > 0 && (
                                     <Text color={colors.textMuted}> [{loadedFilesCount} {loadedFilesCount === 1 ? 'file' : 'files'}]</Text>
                                 )}

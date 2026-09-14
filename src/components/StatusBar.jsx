@@ -88,19 +88,18 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
             const lastTime = lastChunkTimeRef.current;
             const timeSinceLast = lastTime > 0 ? (Date.now() - lastTime) : 0;
 
-            if (lastTime > 0 && timeSinceLast > 1500) {
+            if (lastTime > 0 && timeSinceLast >= 1000) {
                 wpsHistoryRef.current = [];
                 setDisplayedWps(0);
-            } else if (lastTime > 0 && timeSinceLast > 600) {
-                // If chunks pause for >600ms, start decaying recent WPS history
+            } else if (lastTime > 0 && timeSinceLast > 500) {
+                // If chunks pause for >500ms, decay recent WPS history
                 if (wpsHistoryRef.current.length > 0) {
                     wpsHistoryRef.current.shift();
                 }
                 const history = wpsHistoryRef.current;
                 if (history.length > 0) {
                     const sum = history.reduce((acc, val) => acc + val, 0);
-                    const avg = Math.round((sum / history.length) * 10) / 10;
-                    setDisplayedWps(avg);
+                    setDisplayedWps(Math.round(sum / history.length));
                 } else {
                     setDisplayedWps(0);
                 }
@@ -108,13 +107,12 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 const history = wpsHistoryRef.current;
                 if (history.length > 0) {
                     const sum = history.reduce((acc, val) => acc + val, 0);
-                    const avg = Math.round((sum / history.length) * 10) / 10;
-                    setDisplayedWps(avg);
+                    setDisplayedWps(Math.round(sum / history.length));
                 } else if (wps > 0) {
-                    setDisplayedWps(wps);
+                    setDisplayedWps(Math.round(wps));
                 }
             }
-        }, 1350);
+        }, 750);
 
         return () => clearInterval(timer);
     }, [isProcessing]);

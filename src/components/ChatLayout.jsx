@@ -1454,31 +1454,12 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         }
 
         const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
-        const trimmed = animatedText.trim();
-        const isUnordered = /^[\*\-\+]\s/.test(trimmed);
-        const isOrdered = /^\d+\.\s/.test(trimmed);
-
-        let content = animatedText;
-        if (isUnordered || isOrdered) {
-            const bullet = isUnordered ? '  • ' : trimmed.match(/^\d+\.\s/)[0];
-            const indent = ' '.repeat(bullet.length);
-            const wrappedPart = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ''), columns - (bullet.length + 10));
-            content = bullet + wrappedPart.split('\n').join('\n' + indent);
-        } else {
-            content = wrapText(animatedText, columns - 10);
-        }
-
-        const wrappedLines = content.split('\n');
         return (
-            <Box flexDirection="column" paddingX={1} width="100%">
-                {wrappedLines.map((wLine, idx) => (
-                    <Box key={idx} flexDirection="row" width="100%">
-                        <Text color={colors.textMuted}>│ </Text>
-                        <Box flexGrow={1} marginLeft={1}>
-                            <InlineMarkdown text={wLine} color={colors.textMuted} italic theme={theme} />
-                        </Box>
-                    </Box>
-                ))}
+            <Box flexDirection="row" width="100%" paddingX={1}>
+                <Text color={colors.textMuted}>│ </Text>
+                <Box flexGrow={1} marginLeft={1}>
+                    <InlineMarkdown text={animatedText} color={colors.textMuted} italic theme={theme} />
+                </Box>
             </Box>
         );
     }
@@ -1500,7 +1481,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
         return (
             <Box flexDirection="column" paddingX={1} width="100%">
-                <CodeRenderer text={animatedText} columns={columns} theme={theme} />
+                <InlineMarkdown text={animatedText} color={colors.text} theme={theme} />
             </Box>
         );
     }

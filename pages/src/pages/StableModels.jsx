@@ -157,7 +157,6 @@ export default function StableModels() {
                         <li><strong>Ollama</strong> (Local models with multimodal support)</li>
                         <li><strong>SenseNova</strong> (platform.sensenova.ai)</li>
                         <li><strong>InferX</strong> (model.inferx.net)</li>
-                        <li><strong>CrofAI</strong> (crof.ai)</li>
                         <li><strong>Poolside</strong> (platform.poolside.ai)</li>
                     </ul>
                 </div>

@@ -21,7 +21,73 @@ export const wrapText = (text, width) => {
 
     if (width <= 5) return text;
 
-    const getVisibleLength = (str) => str.replace(ansiRegex, '').length;
+    // East Asian Width & Emoji 2-column wide check
+    const getCharWidth = (cp) => {
+        if (cp < 0x20 || (cp >= 0x7F && cp < 0xA0)) return 0;
+        // Combining marks
+        if ((cp >= 0x300 && cp <= 0x36F) || (cp >= 0x1DC0 && cp <= 0x1DFF) || (cp >= 0x20D0 && cp <= 0x20FF) || (cp >= 0xFE20 && cp <= 0xFE2F)) return 0;
+        // Wide / Fullwidth ranges (CJK Ideographs, Hiragana, Katakana, Hangul, Fullwidth forms, Emojis)
+        if (
+            (cp >= 0x1100 && cp <= 0x115F) ||
+            (cp >= 0x2329 && cp <= 0x232A) ||
+            (cp >= 0x2E80 && cp <= 0x303E) ||
+            (cp >= 0x3040 && cp <= 0xA4CF) ||
+            (cp >= 0xAC00 && cp <= 0xD7A3) ||
+            (cp >= 0xF900 && cp <= 0xFAFF) ||
+            (cp >= 0xFE10 && cp <= 0xFE19) ||
+            (cp >= 0xFE30 && cp <= 0xFE6F) ||
+            (cp >= 0xFF00 && cp <= 0xFF60) ||
+            (cp >= 0xFFE0 && cp <= 0xFFE6) ||
+            (cp >= 0x1F300 && cp <= 0x1F64F) ||
+            (cp >= 0x1F680 && cp <= 0x1F6FF) ||
+            (cp >= 0x20000 && cp <= 0x3FFFD)
+        ) {
+            return 2;
+        }
+        return 1;
+    };
+
+    const getVisibleLength = (str) => {
+        const clean = str.replace(ansiRegex, '');
+        let len = 0;
+        for (let i = 0; i < clean.length; i++) {
+            const cp = clean.codePointAt(i);
+            if (cp > 0xFFFF) i++; // Account for surrogate pairs
+            len += getCharWidth(cp);
+        }
+        return len;
+    };
+
+    const sliceAnsiAware = (str, maxLen) => {
+        let visibleCount = 0;
+        let cutIdx = str.length;
+        let inAnsi = false;
+
+        for (let i = 0; i < str.length; i++) {
+            if (str[i] === '\x1B' && str[i + 1] === '[') {
+                inAnsi = true;
+            }
+            if (inAnsi) {
+                if (str[i] === 'm' || (str[i] >= '@' && str[i] <= '~' && str[i] !== '[')) {
+                    inAnsi = false;
+                }
+                continue;
+            }
+            const cp = str.codePointAt(i);
+            if (cp > 0xFFFF) i++;
+            const charW = getCharWidth(cp);
+            if (visibleCount + charW > maxLen) {
+                cutIdx = cp > 0xFFFF ? i - 1 : i;
+                break;
+            }
+            visibleCount += charW;
+            if (visibleCount >= maxLen) {
+                cutIdx = i + 1;
+                break;
+            }
+        }
+        return { head: str.substring(0, cutIdx), tail: str.substring(cutIdx) };
+    };
 
     sourceLines.forEach(sLine => {
         const visibleLength = getVisibleLength(sLine);
@@ -39,40 +105,43 @@ export const wrapText = (text, width) => {
         const leadingSpaceMatch = sLine.match(/^(\s*)/);
         const indent = leadingSpaceMatch ? leadingSpaceMatch[1] : '';
 
-        tokens.forEach((token, idx) => {
+        tokens.forEach((token) => {
             if (token.length === 0) return;
 
-            const tokenVisibleLength = getVisibleLength(token);
+            let remainingToken = token;
 
-            if (currentVisibleLength + tokenVisibleLength > width) {
+            while (remainingToken.length > 0) {
+                const tokenVisLen = getVisibleLength(remainingToken);
+
+                if (currentVisibleLength + tokenVisLen <= width) {
+                    currentLine += remainingToken;
+                    currentVisibleLength += tokenVisLen;
+                    break;
+                }
+
+                // Space exceeded: If we already have content on the line, flush it first
                 if (currentLine.trim().length > 0) {
                     finalLines.push(currentLine.trimEnd());
-                    // Start new line with the current indent + the token
-                    // Cap continuation indent to avoid wild shifts on deeply-nested code
                     const cappedIndent = indent.substring(0, Math.min(indent.length, 8));
-                    currentLine = cappedIndent + token;
+                    currentLine = cappedIndent;
                     currentVisibleLength = getVisibleLength(currentLine);
-                } else {
-                    // Ultra long token (e.g. long path or string)
-                    // If it has ANSI, we can't easily slice it, so we just push it
-                    if (ansiRegex.test(token)) {
-                        finalLines.push(token);
-                        currentLine = indent;
-                        currentVisibleLength = getVisibleLength(currentLine);
-                    } else {
-                        // Safe to slice non-ANSI long tokens
-                        let word = token;
-                        while (getVisibleLength(word) > width && width > 10) {
-                            finalLines.push(word.substring(0, width));
-                            word = word.substring(width);
-                        }
-                        currentLine = word;
-                        currentVisibleLength = getVisibleLength(currentLine);
-                    }
                 }
-            } else {
-                currentLine += token;
-                currentVisibleLength += tokenVisibleLength;
+
+                // Threat situation: Single token/word (e.g. CJK text, uninterrupted string)
+                // cannot fit into an empty/indented line because it exceeds max horizontal cells.
+                const availableWidth = Math.max(1, width - currentVisibleLength);
+                if (getVisibleLength(remainingToken) > availableWidth) {
+                    const { head, tail } = sliceAnsiAware(remainingToken, availableWidth);
+                    finalLines.push((currentLine + head).trimEnd());
+                    const cappedIndent = indent.substring(0, Math.min(indent.length, 8));
+                    currentLine = cappedIndent;
+                    currentVisibleLength = getVisibleLength(currentLine);
+                    remainingToken = tail;
+                } else {
+                    currentLine += remainingToken;
+                    currentVisibleLength += getVisibleLength(remainingToken);
+                    remainingToken = '';
+                }
             }
         });
 
@@ -82,6 +151,55 @@ export const wrapText = (text, width) => {
     });
 
     return flattenString(finalLines.join('\n'));
+};
+
+/**
+ * Fast, calibrated token estimator for streaming TPS calculation.
+ * - In modern multilingual LLMs (Gemini, Llama 3, Qwen, DeepSeek), CJK averages ~1.8 to 2 chars per token (~0.55 tokens/char).
+ * - Repeated/adjacent punctuation and symbols group together into composite tokens.
+ */
+export const estimateTokenCount = (str) => {
+    if (!str) return 0;
+
+    let count = 0;
+
+    // 1. CJK / East Asian characters: average ~0.55 tokens per character across modern tokenizers
+    const cjkMatches = str.match(/[\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g);
+    if (cjkMatches) {
+        count += cjkMatches.length * 0.55;
+    }
+
+    // 2. Remove CJK characters to process remaining text
+    const nonCjk = str.replace(/[\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/g, ' ');
+
+    // 3. Count clustered symbols/punctuation (<, >, /, _, @, #, etc.) — adjacent symbols tokenize as single tokens
+    const symbolClusters = nonCjk.match(/[<>/\._@#$%^&*+=`~|\\:;!?'"()\[\]{}-]+/g);
+    if (symbolClusters) {
+        count += symbolClusters.length;
+    }
+
+    // 4. Count alphanumeric word tokens
+    const words = nonCjk.split(/[\s<>/\._@#$%^&*+=`~|\\:;!?'"()\[\]{}-]+/g).filter(Boolean);
+    count += words.length;
+
+    return Math.max(0.1, count);
+};
+
+/**
+ * Splits streaming text chunks into fine-grained tokens for smooth progressive typewriter rendering.
+ * - CJK characters are emitted individually so Japanese/Chinese streams smoothly character-by-character
+ * - Code delimiters, symbols, and whitespace are preserved
+ * - Alphanumeric words stay together
+ */
+export const splitTypewriterTokens = (str) => {
+    if (!str) return [];
+    // Captures:
+    // 1. Single CJK characters / emojis
+    // 2. Whitespace runs (\s+)
+    // 3. Clustered symbols/punctuation
+    // 4. Words
+    const matches = str.match(/[\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]|\s+|[<>/\._@#$%^&*+=`~|\\:;!?'"()\[\]{}-]+|[^\s<>/\._@#$%^&*+=`~|\\:;!?'"()\[\]{}\-\u4e00-\u9fa5\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]+/g);
+    return matches || [str];
 };
 
 /**
@@ -750,7 +868,7 @@ const blocksCache = new Map();
 const streamingBlocksCache = new Map();
 
 const MAX_CACHE_SIZE = 200;
-const CHUNK_SIZE = 6; // Lines per Static batch (active buffer ≤ CHUNK_SIZE lines)
+const CHUNK_SIZE = 5; // Lines per Static batch (active buffer ≤ CHUNK_SIZE lines)
 
 // Hoisted to module scope — avoids recreating a closure on every streaming tick
 const indexBlockIntoMap = (b, map) => {
@@ -963,9 +1081,17 @@ export const parseMessageToBlocks = (msg, columns) => {
     };
     // ─────────────────────────────────────────────────────────────────────────
 
+    const wrapWidth = Math.max(20, (columns || 80) - 6);
+    const thinkWrapWidth = Math.max(20, (columns || 80) - 8);
+
     if (msg.role === 'think') {
         completedBlocks.push(getBlock(`${msg.id}-header`, 'think-header', ''));
-        const lines = text.split('\n');
+        const rawLines = text.split('\n');
+        const lines = [];
+        rawLines.forEach(l => {
+            const wrapped = wrapText(l, thinkWrapWidth);
+            wrapped.split('\n').forEach(wl => lines.push(wl));
+        });
         lines.forEach((line, idx) => {
             const isLast = idx === lines.length - 1;
             enqueue(getBlock(`${msg.id}-${idx}`, 'think-line', line, {}), isLast);
@@ -975,13 +1101,29 @@ export const parseMessageToBlocks = (msg, columns) => {
             completedBlocks.push({ key: `${msg.id}-footer-padding`, type: 'think-footer-padding', text: '' });
         }
     } else {
-        const lines = text.split('\n');
+        const rawLines = text.split('\n');
         let inTable = false;
         let tableLines = [];
         let inCodeBlock = false;
         let currentLang = '';
         let codeLineNum = 0;
         let codeStartIdx = 0;
+
+        const lines = [];
+        rawLines.forEach(l => {
+            const trimmed = l.trim();
+            if (trimmed.startsWith('```')) {
+                inCodeBlock = !inCodeBlock;
+                lines.push(l);
+            } else if (inCodeBlock || trimmed.startsWith('|')) {
+                lines.push(l);
+            } else {
+                const wrapped = wrapText(l, wrapWidth);
+                wrapped.split('\n').forEach(wl => lines.push(wl));
+            }
+        });
+
+        inCodeBlock = false;
 
         lines.forEach((line, idx) => {
             const isLast = idx === lines.length - 1;

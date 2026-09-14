@@ -1,6 +1,18 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.16.0": {
+        "note": "SEPTEMBER 15",
+        "added": [],
+        "changed": [
+            "Improved rendering performance.",
+            "Improved TPS Estimation Algorithm to be more accurate with Code & CJK.",
+            "Removed provider: CrofAI. Going forward CrofAI API will no longer be accessible in FluxFlow."
+        ],
+        "fixes": [
+            "Fixed few redering bugs like token dublication with CJK."
+        ]
+    },
     "4.15.0": {
         "note": "SEPTEMBER 14. Breaking Change to AGENTS.md & FLUXFLOW.md System.",
         "added": [],

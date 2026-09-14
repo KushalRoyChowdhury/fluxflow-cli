@@ -16,7 +16,7 @@ import path, { normalize } from 'path';
 import fs from 'fs';
 import { view_file } from '../tools/view_file.js';
 import { emojiSpace } from './terminal.js';
-import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from './text.js';
+import { applyPatches, generateHighFidelityDiff, parsePatchPairs, estimateTokenCount } from './text.js';
 import { loadSettings } from './settings.js';
 import { subagentProgress } from './subagent_state.js';
 import { isModelMultimodal, getFallbackValue, hasModelReasoning } from '../data/model_config.js';
@@ -38,7 +38,6 @@ import { getMistralStream } from './providers/mistral.js';
 import { getNVIDIAStream, wrapNvidiaStreamWithQueueDepth } from './providers/nvidia.js';
 import { getOpenRouterStream } from './providers/openrouter.js';
 import { getOllamaStream } from './providers/ollama.js';
-import { getCrofAIStream } from './providers/crofai.js';
 import { getInferXStream } from './providers/inferx.js';
 import { getSenseNovaStream } from './providers/sensenova.js';
 import { getAIHubMixStream } from './providers/aihubmix.js';
@@ -393,7 +392,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') ? false : systemSettings?.memory !== false;
 
     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
@@ -552,21 +551,6 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             useNvidiaFallback ? nvidiaApiKey : apiKey,
                             getFallbackValue('nvidia_janitor_fallback'),
                             // "mistralai/mistral-nemotron", // [DEBUGGING POINT]
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast', // Janitor always minimal
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else if (aiProvider === 'CrofAI') {
-                        const stream = getCrofAIStream(
-                            apiKey,
-                            targetModel || getFallbackValue('crofai_fallback') || 'deepseek-v4-flash-0731',
                             janitorContents,
                             janitorPrompt,
                             'Fast', // Janitor always minimal
@@ -1314,8 +1298,6 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
                 stream = getMistralStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'NVIDIA') {
                 stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
-            } else if (aiProvider === 'CrofAI') {
-                stream = getCrofAIStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'InferX') {
                 stream = getInferXStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'SenseNova') {
@@ -1404,7 +1386,7 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
                         }
                     }
                 }
-                const chunkWordCount = chunkText ? chunkText.trim().split(/\s+/).filter(Boolean).length : 0;
+                const chunkWordCount = chunkText ? estimateTokenCount(chunkText) : 0;
                 if (settings && typeof settings.onTokenChunk === 'function') {
                     settings.onTokenChunk(chunkText, chunkWordCount);
                 }
@@ -1504,7 +1486,6 @@ Chats to process:
         if (aiProvider === 'DeepSeek') targetModel = getFallbackValue('deepseek_level_1');
         if (aiProvider === 'Mistral') targetModel = getFallbackValue('mistral_level_1');
         if (aiProvider === 'NVIDIA') targetModel = getFallbackValue('nvidia_janitor_fallback');
-        if (aiProvider === 'CrofAI') targetModel = getFallbackValue('crofai_fallback');
         if (aiProvider === 'InferX') targetModel = getFallbackValue('inferx_fallback');
         if (aiProvider === 'SenseNova') targetModel = getFallbackValue('sensenova_fallback');
         if (aiProvider === 'AIHubMix') targetModel = getFallbackValue('aihubmix_fallback');
@@ -1596,7 +1577,6 @@ export const compressHistory = async (settings, history, isAuto = false) => {
         if (aiProvider === 'DeepSeek') targetModel = getFallbackValue('deepseek_level_1');
         if (aiProvider === 'Mistral') targetModel = getFallbackValue('mistral_level_1');
         if (aiProvider === 'NVIDIA') targetModel = getFallbackValue('nvidia_chat_summarizer_fallback');
-        if (aiProvider === 'CrofAI') targetModel = getFallbackValue('crofai_fallback');
         if (aiProvider === 'InferX') targetModel = getFallbackValue('inferx_fallback');
         if (aiProvider === 'SenseNova') targetModel = getFallbackValue('sensenova_fallback');
         if (aiProvider === 'AIHubMix') targetModel = getFallbackValue('aihubmix_fallback');
@@ -1686,7 +1666,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
     // }
 
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'CrofAI' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -2877,18 +2857,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.0
                         );
                         stream = wrapNvidiaStreamWithQueueDepth(rawStream, targetModel);
-                    } else if (aiProvider === 'CrofAI') {
-                        stream = getCrofAIStream(
-                            settings.apiKey,
-                            targetModel,
-                            activeContents,
-                            currentSystemInstruction,
-                            thinkingLevel,
-                            mode,
-                            isMultiModal,
-                            abortController.signal,
-                            1.0
-                        );
                     } else if (aiProvider === 'InferX') {
                         stream = getInferXStream(
                             settings.apiKey,
@@ -3321,7 +3289,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                         chunkText = convertChannelThinkTags(chunkText);
 
-                        const chunkWordCount = chunkText ? chunkText.trim().split(/\s+/).filter(Boolean).length : 0;
+                        const chunkWordCount = chunkText ? estimateTokenCount(chunkText) : 0;
 
                         if (settings && typeof settings.onTokenChunk === 'function') {
                             settings.onTokenChunk(chunkText, chunkWordCount);
@@ -5202,7 +5170,6 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'nvidia') return 'NVIDIA';
         if (lower === 'mistral') return 'Mistral';
         if (lower === 'ollama') return 'Ollama';
-        if (lower === 'crofai' || lower === 'crof') return 'CrofAI';
         if (lower === 'inferx') return 'InferX';
         if (lower === 'sensenova') return 'SenseNova';
         if (lower === 'poolside') return 'Poolside';

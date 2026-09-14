@@ -27,7 +27,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **NVIDIA**
   - **Ollama**
   - **Mistral**
-  - **CrofAI**
+  - **CrofAI** (*Removed from v4.16 onwards*)
   - **InferX**
   - **SenseNovaAI**
   - **Poolside**

@@ -1,3 +1,0 @@
-- platform.experientiallabs.ai (requires $1 payment for free models, all models free)
-
-- apinex.bond (many free models including Gemini. Free 1M tokens daily)

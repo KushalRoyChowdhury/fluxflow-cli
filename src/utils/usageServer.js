@@ -1109,7 +1109,6 @@ function generateDashboardHtml() {
                     </defs>
                     <circle cx="12" cy="12" r="8.5" stroke="url(#sense-grad)" stroke-width="2"/>
                     <path d="M12 5v14M5 12h14M7 7l10 10M17 7L7 17" stroke="url(#sense-grad)" stroke-width="1.5" stroke-linecap="round"/>
-                    <circle cx="12" cy="12" r="2.8" fill="#06B6D4"/>
                 </svg>\`;
             } else if (p.includes('poolside') || p.includes('pool')) {
                 return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
@@ -1123,13 +1122,8 @@ function generateDashboardHtml() {
                     <path d="M12 7v5l3 3" stroke="#EC4899" stroke-width="2" stroke-linecap="round"/>
                     <circle cx="12" cy="12" r="2" fill="#EC4899"/>
                 </svg>\`;
-            } else if (p.includes('crofai') || p.includes('crof')) {
-                return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L2 8.5v7L12 22l10-6.5v-7L12 2z" stroke="#10B981" stroke-width="2" stroke-linejoin="round" fill="rgba(16,185,129,0.18)"/>
-                    <path d="M12 2v20M2 8.5l10 4.5 10-4.5" stroke="#10B981" stroke-width="1.5"/>
-                </svg>\`;
             } else if (p.includes('aihubmix') || p.includes('hubmix')) {
-                return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
+                return \`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="4.5" r="2.8" fill="#A855F7"/>
                     <circle cx="5" cy="18" r="2.8" fill="#D946EF"/>
                     <circle cx="19" cy="18" r="2.8" fill="#EC4899"/>
