@@ -117,7 +117,14 @@ export const filterModelConditionalTags = (content, targetModel = '', aiProvider
 
     const provider = aiProvider.toLowerCase().trim();
     const model = targetModel.toLowerCase().trim();
+    const modelBasename = path.posix.basename(model);
     const uniqueTarget = provider && model ? `${provider}::${model}` : '';
+    const uniqueBasenameTarget = provider && modelBasename ? `${provider}::${modelBasename}` : '';
+
+    const isModelMatch = (tag) => {
+        if (!tag || !model) return false;
+        return tag === model || tag === modelBasename || tag === uniqueTarget || tag === uniqueBasenameTarget;
+    };
 
     const matchedBlocks = [];
 
@@ -127,7 +134,7 @@ export const filterModelConditionalTags = (content, targetModel = '', aiProvider
             const providerClean = inner.replace(/<start_model_([^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+)>/gi, (m, startModel, modelInner, endModel) => {
                 if (startModel.trim().toLowerCase() === endModel.trim().toLowerCase()) {
                     const tag = startModel.trim().toLowerCase();
-                    if (model && (tag === model || tag === uniqueTarget)) {
+                    if (isModelMatch(tag)) {
                         const trimmed = modelInner.trim();
                         if (trimmed) matchedBlocks.push(trimmed);
                     }
@@ -143,9 +150,12 @@ export const filterModelConditionalTags = (content, targetModel = '', aiProvider
 
     // 2. Standalone namespaced model blocks: <start_model_provider::model>
     content.replace(/<start_model_([^>\r\n]+::[^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+::[^>\r\n]+)>/gi, (match, startTag, inner, endTag) => {
-        if (uniqueTarget && startTag.trim().toLowerCase() === endTag.trim().toLowerCase() && startTag.trim().toLowerCase() === uniqueTarget) {
-            const trimmed = inner.trim();
-            if (trimmed) matchedBlocks.push(trimmed);
+        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
+            const tag = startTag.trim().toLowerCase();
+            if (uniqueTarget && (tag === uniqueTarget || (uniqueBasenameTarget && tag === uniqueBasenameTarget))) {
+                const trimmed = inner.trim();
+                if (trimmed) matchedBlocks.push(trimmed);
+            }
         }
         return '';
     });
@@ -153,9 +163,12 @@ export const filterModelConditionalTags = (content, targetModel = '', aiProvider
     // 3. Standalone generic model blocks: <start_model_model-id>
     content.replace(/<start_model_([^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+)>/gi, (match, startTag, inner, endTag) => {
         if (startTag.includes('::')) return '';
-        if (model && startTag.trim().toLowerCase() === endTag.trim().toLowerCase() && startTag.trim().toLowerCase() === model) {
-            const trimmed = inner.trim();
-            if (trimmed) matchedBlocks.push(trimmed);
+        if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
+            const tag = startTag.trim().toLowerCase();
+            if (model && (tag === model || tag === modelBasename)) {
+                const trimmed = inner.trim();
+                if (trimmed) matchedBlocks.push(trimmed);
+            }
         }
         return '';
     });
