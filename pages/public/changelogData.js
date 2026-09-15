@@ -7,7 +7,7 @@ export const changelogData = {
         "changed": [
             "Improved rendering performance.",
             "Improved TPS Estimation Algorithm to be more accurate with Code & CJK.",
-            "Removed provider: CrofAI. Going forward CrofAI API will no longer be accessible in FluxFlow."
+            "Removed provider: CrofAI. Going forward CrofAI API will no longer be accessible in FluxFlow until further reports from the service."
         ],
         "fixes": [
             "Fixed few redering bugs like token dublication with CJK."
