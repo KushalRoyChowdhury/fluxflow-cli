@@ -1123,7 +1123,7 @@ function generateDashboardHtml() {
                     <circle cx="12" cy="12" r="2" fill="#EC4899"/>
                 </svg>\`;
             } else if (p.includes('aihubmix') || p.includes('hubmix')) {
-                return \`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
+                return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="4.5" r="2.8" fill="#A855F7"/>
                     <circle cx="5" cy="18" r="2.8" fill="#D946EF"/>
                     <circle cx="19" cy="18" r="2.8" fill="#EC4899"/>

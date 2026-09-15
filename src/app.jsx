@@ -2672,9 +2672,7 @@ export default function App({ args = [] }) {
         {
             cmd: '/model',
             desc: 'Select Agent Model',
-            subs: ((aiProvider === 'Ollama' || aiProvider === '9router' || aiProvider === '9Router') && (apiKey === 'LOCAL' || !apiKey))
-                ? []
-                : (mode === 'ICU' || mode.toLowerCase() === 'fluxcu'
+            subs: (mode === 'ICU' || mode.toLowerCase() === 'fluxcu'
                     ? getModels(aiProvider, apiTier).filter(m => isModelMultimodal(m.cmd || m))
                     : getModels(aiProvider, apiTier))
         },

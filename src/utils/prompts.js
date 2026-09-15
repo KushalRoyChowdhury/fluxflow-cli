@@ -1,6 +1,7 @@
 import { TOOL_PROTOCOL } from '../data/main_tools.js';
 import { JANITOR_TOOLS_PROTOCOL } from '../data/janitor_tools.js';
 import thinkingPrompts from '../data/thinking_prompts.json' with { type: 'json' };
+import { getMappedThinkingLevel } from '../data/thinking_config.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -443,7 +444,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         if (thinkingLevel === 'Fast') {
             thinkingConfig = "Effort: Lowest\nNo thinking. Immediate response\nVerify imports, tool results & system stability; avoid syntax errors"
         } else if (thinkingLevel === 'Low') {
-            thinkingConfig = "Effort: Low\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nDont waste tokens, be efficient, use least thinking tokens, focus on result\nGather useful context\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors"
+            thinkingConfig = "Effort: Low\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nDont waste tokens, be efficient, use least thinking tokens, focus on result\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors"
         }
     }
 
@@ -491,7 +492,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
     // ${ mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architecture, clean abstractions, stepwise execution. Use latest practices/libraries, verify imports, run automated tests" : `Mode: ${mode}. Concise, Humorous, Sarcastic` }
 
-    function normaliseThinkingLevel(thinkingLevel) {
+    function normaliseThinkingLevel(thinkingLevel, provider, model) {
         const map = {
             Low: 'Low',
             Standard: 'Medium',
@@ -500,6 +501,12 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
             xHigh: '',
             Max: ''
         };
+
+        // If the level is custom mapped (or the custom 'xHigh' slot is mapped) in thinking_config.js,
+        // treat it as custom and don't append a label.
+        if (getMappedThinkingLevel(provider, model, thinkingLevel) || getMappedThinkingLevel(provider, model, 'xHigh')) {
+            return '';
+        }
 
         return map[thinkingLevel] ?? '';
     }
@@ -524,7 +531,7 @@ mode === "Flow" ? `Concise, Humorous, Sarcastic` :
 mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
 "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}
 
-- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim())} ${normaliseThinkingLevel(thinkingLevel)}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${additionalInstrStr.length > 0 ? '\n- Additional Instructions ≈ System Prompt' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read available relevant skills for tasks before proceeding: Use ReadFile, with virtual path=\"#skills/{global|project}/skillName\". For references: path=\"#skills/{global|project}/skillName/references/<file-name>.md\"' : ''}
+- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim())} ${normaliseThinkingLevel(thinkingLevel, aiProvider, targetModel)}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${additionalInstrStr.length > 0 ? '\n- Additional Instructions ≈ System Prompt' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read available relevant skills for tasks before proceeding: Use ReadFile, with virtual path=\"#skills/{global|project}/skillName\". For references: path=\"#skills/{global|project}/skillName/references/<file-name>.md\"' : ''}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}

@@ -1,5 +1,6 @@
 import { fetchWithBackoff } from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
+import fs from 'fs';
 
 export const getNineRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
@@ -60,7 +61,7 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
         temperature: temperature
     };
 
-    if (effort) {
+    if (effort && effort !== 'none' && (customEffort !== null || thinkingLevel !== 'Fast')) {
         requestPayload.reasoning_effort = effort;
     }
 
@@ -112,6 +113,7 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
 
         for (const line of lines) {
             const cleanLine = line.trim();
+            fs.appendFileSync('9router.txt', `${cleanLine}\n\n`);
             if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
             let isDone = false;
             if (cleanLine === 'data: [DONE]') {
@@ -141,10 +143,11 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
                         // Extract reasoning from all common upstream formats:
                         // 1. delta.reasoning_content
                         // 2. delta.reasoning
-                        // 3. delta.reasoning_details array
-                        let thought = delta.reasoning_content || delta.reasoning || null;
+                        // 3. delta.thinking
+                        // 4. delta.reasoning_details array
+                        let thought = delta.reasoning_content || delta.reasoning || delta.thinking || null;
                         if (!thought && Array.isArray(delta.reasoning_details) && delta.reasoning_details.length > 0) {
-                            thought = delta.reasoning_details.map(d => d.text || '').filter(Boolean).join('');
+                            thought = delta.reasoning_details.map(d => (typeof d === 'string' ? d : (d?.text || ''))).filter(Boolean).join('');
                         }
 
                         if (thought) {
