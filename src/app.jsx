@@ -513,12 +513,10 @@ const SubagentRow = React.memo(({ sa, showTPMEstimate = false }) => {
             if (history.length > 3) {
                 history.shift();
             }
-            // Show immediately — don't wait for the smoothing timer
-            setDisplayedWps(Math.round(sa.wps));
         }
     }, [sa.status, sa.wps, sa.lastChunkTime]);
 
-    // 1350ms display-update timer with decay (mirrors StatusBar exactly)
+    // 750ms display-update timer with decay (mirrors StatusBar exactly)
     useEffect(() => {
         if (sa.status !== 'running') {
             setDisplayedWps(0);
@@ -553,7 +551,7 @@ const SubagentRow = React.memo(({ sa, showTPMEstimate = false }) => {
                     setDisplayedWps(Math.round(sa.wps));
                 }
             }
-        }, 200);
+        }, 750);
 
         return () => clearInterval(timer);
     }, [sa.status]);

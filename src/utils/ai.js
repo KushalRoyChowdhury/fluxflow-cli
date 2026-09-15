@@ -2278,7 +2278,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         const isForceReasoning = process.env.forcedReasoning || false;
 
-        const thinkingPolicyBlock = (thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'xHigh' && aiProvider === 'Google')))
+        const thinkingPolicyBlock = (thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'High' && aiProvider === 'Google')))
             ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma') || isForceReasoning) ? "[system] strictly follow thinking policy as high priority. do not start a response without <think>...</think> [/system]\n" : ""}`
             : '';
 
@@ -2999,7 +2999,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                     if (isGemma4 || isGemini3) {
                                         if (isGemma4) {
-                                            if (thinkingLevel.toLowerCase() !== 'xhigh' || false) return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                                            if (thinkingLevel.toLowerCase() !== 'high' || false) return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
                                             else return { includeThoughts: true, thinkingLevel: ThinkingLevel.HIGH };
                                         }
                                         return {

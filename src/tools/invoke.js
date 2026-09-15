@@ -131,7 +131,7 @@ export const invoke = async (args, context = {}) => {
                     const windowWords = wordStats.chunks.reduce((acc, c) => acc + c.words, 0);
                     const oldestTime = wordStats.chunks[0].time;
                     const timeSpanSec = Math.max(0.4, (now - oldestTime) / 1000);
-                    taskEntry.wps = Math.round((windowWords / timeSpanSec) * 10) / 10;
+                    taskEntry.wps = Math.round(windowWords / timeSpanSec);
                 }
             }
 
