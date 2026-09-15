@@ -98,7 +98,7 @@ Tool Rules:
 - Max 5 tools/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? ' (Goal: 5+)' : ''}
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 **User Communication**
-- AskUser(question=string, optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk
+- AskUser(question=string, optionA?="title::description", ...MAX4). Ambiguity, path divergence, security risk
 
 **Web Tools**
 - WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: exclude limit

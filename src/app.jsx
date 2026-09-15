@@ -1820,6 +1820,15 @@ export default function App({ args = [] }) {
 
         // [LIVE TERMINAL INPUT FORWARDING]
         if (isTerminalFocused && activeCommand) {
+            // Let PageUp, PageDown, and Ctrl+O pass to TerminalBox scroll handlers
+            const isPgUp = key.pageUp || inputText === '\x1b[5~' || inputText === '[5~';
+            const isPgDn = key.pageDown || inputText === '\x1b[6~' || inputText === '[6~';
+            const isCtrlO = key.ctrl && (inputText === 'o' || inputText === '\x0f');
+
+            if (isPgUp || isPgDn || isCtrlO) {
+                return;
+            }
+
             if (key.return) {
                 if (isActiveCommandPty) {
                     // PTY processes (conpty/winpty on Windows, pty on Linux/Mac) expect bare \r for Enter

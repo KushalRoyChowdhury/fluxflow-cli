@@ -5259,7 +5259,7 @@ Tool Rules:
 
 # Provided Tools
 **Communication Tools**
-- AskUser(question=string, optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk
+- AskUser(question=string, optionA?="title::description", ...MAX4). Ambiguity, path divergence, security risk
 ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web Tools**

@@ -348,24 +348,28 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
                     );
                 }
 
-                // 🌐 Harmonized Link System
+                // 🌐 Harmonized Link System (Markdown Standard: [text](url) -> url)
                 if (part.startsWith('[') && (part.includes('](') || part.includes('] ('))) {
                     const match = part.match(REGEX_MD_LINK_PAREN);
-                    if (match) return (
-                        <Text key={j}>
-                            <Text color={highlightColor} underline bold>{match[1]}</Text>
-                            <Text color="gray" italic> ({match[2]})</Text>
-                        </Text>
-                    );
+                    if (match) {
+                        const linkUrl = match[2] || match[1];
+                        return (
+                            <Text key={j} color={highlightColor} underline italic>
+                                {linkUrl}
+                            </Text>
+                        );
+                    }
                 }
                 if (part.startsWith('[') && (part.includes('][') || part.includes('] ['))) {
                     const match = part.match(REGEX_MD_LINK_BRACKET);
-                    if (match) return (
-                        <Text key={j}>
-                            <Text color={highlightColor} underline bold>{match[1]}</Text>
-                            <Text color="gray" italic> [{match[2]}]</Text>
-                        </Text>
-                    );
+                    if (match) {
+                        const linkUrl = match[2] || match[1];
+                        return (
+                            <Text key={j} color={highlightColor} underline italic>
+                                {linkUrl}
+                            </Text>
+                        );
+                    }
                 }
                 if (part.startsWith('http')) {
                     return <Text key={j} color={highlightColor} underline italic>{part}</Text>;
@@ -485,7 +489,7 @@ const MarkdownText = React.memo(({ text, color, columns = 80, italic = false, th
                 const hText = headingMatch[2];
                 result.push(
                     <Box key={i} marginTop={1} marginBottom={0} width="100%">
-                        <Text bold color={level === 1 ? 'cyan' : level === 2 ? 'magenta' : level === 3 ? 'yellow' : level === 4 ? 'green' : level === 5 ? 'blue' : colors.text} underline>
+                        <Text bold color={level === 1 ? 'yellow' : level === 2 ? 'magenta' : level === 3 ? (colors.info || 'cyan') : level === 4 ? 'green' : level === 5 ? 'blue' : colors.text} underline>
                             {hText}
                         </Text>
                     </Box>
@@ -1068,29 +1072,42 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     }
 
     if (msg.isSteeringHint || (msg.role === 'user' && (msg.text?.startsWith('[STEERING HINT]') || msg.text?.startsWith('[QUESTION]')))) {
-        const isQuestion = msg.hintType === 'QUESTION' || msg.text?.startsWith('[QUESTION]');
         const rawContent = msg.hintContent || (msg.text || '').replace(/^\[(?:STEERING HINT|QUESTION)\]\s*/i, '').trim();
-        const tagLabel = isQuestion ? 'QUESTION' : 'STEERING HINT';
-        const tagColor = isQuestion ? (colors.accent || '#c451d6') : (colors.primary || 'cyan');
 
         return (
-            <Box marginBottom={0} marginTop={0} paddingX={1} width="100%">
+            <Box flexDirection="column" width={columns - 1} marginBottom={0} marginTop={0}>
+                <Box width={columns - 1} height={1} overflow="hidden">
+                    <Text color={colors.userMsgBorder}>{'▄'.repeat(Math.max(1, columns - 1))}</Text>
+                </Box>
                 <Box
-                    flexDirection="column"
-                    borderStyle="round"
-                    borderColor={colors.borderMuted}
+                    backgroundColor={colors.userMsgBg}
                     paddingX={1}
                     paddingY={0}
-                    width={Math.max(20, columns - 2)}
+                    width={columns - 1}
+                    flexDirection="column"
                 >
-                    <Box justifyContent="space-between" width="100%">
-                        <Box flexDirection="row" gap={1}>
-                            <Text color={tagColor} bold>✦ {tagLabel}</Text>
-                        </Box>
-                    </Box>
-                    <Box marginTop={0} paddingLeft={2}>
-                        <Text color={colors.text} bold>└─ {rawContent}</Text>
-                    </Box>
+                    {wrapText(
+                        rawContent
+                            .replace(/\r\n/g, '\n')
+                            .replace(/\r/g, '\n')
+                            .replace(/\\\n/g, '\n')
+                            .replace(/\\$/, ''),
+                        columns - 7
+                    )
+                        .split('\n')
+                        .map((line, lineIdx) => (
+                            <Box key={lineIdx} flexDirection="row" width="100%">
+                                <Box flexShrink={0} width={2}>
+                                    <Text bold color={colors.userMsgText}>{lineIdx === 0 ? '✦' : ' '}</Text>
+                                </Box>
+                                <Box flexGrow={1} marginLeft={1}>
+                                    <InlineMarkdown text={line} color={msg.color || colors.userMsgText} theme={theme} />
+                                </Box>
+                            </Box>
+                        ))}
+                </Box>
+                <Box width={columns - 1} height={1} overflow="hidden">
+                    <Text color={colors.userMsgBorder}>{'▀'.repeat(Math.max(1, columns - 1))}</Text>
                 </Box>
             </Box>
         );
@@ -1479,11 +1496,159 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
             return <Box height={1} />;
         }
         const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
+        const trimmed = animatedText.trim();
+
+        // 1. Horizontal Rule (---, ***, ___)
+        if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+            return (
+                <Box flexDirection="column" paddingX={1} width="100%" marginY={0}>
+                    <Box borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} width="100%" borderColor={colors.borderMuted} />
+                </Box>
+            );
+        }
+
+        // 2. Headings (# H1, ## H2, ### H3, etc.)
+        const headingMatch = trimmed.match(REGEX_HEADING);
+        if (headingMatch) {
+            const level = headingMatch[1].length;
+            const hText = headingMatch[2];
+            const headingColors = [
+                'yellow',
+                colors.secondary || 'magenta',
+                colors.info || 'cyan',
+                'green',
+                'blue',
+                colors.text
+            ];
+            const hColor = headingColors[level - 1] || colors.text;
+            return (
+                <Box flexDirection="column" paddingX={1} width="100%" marginTop={1} marginBottom={0}>
+                    <Text bold color={hColor} underline>
+                        <InlineMarkdown text={hText} color={hColor} theme={theme} />
+                    </Text>
+                </Box>
+            );
+        }
+
+        // 3. Blockquotes (> quote)
+        if (trimmed.startsWith('>')) {
+            const quoteText = trimmed.replace(/^>\s*/, '');
+            return (
+                <Box flexDirection="column" paddingX={1} width="100%">
+                    <Box borderStyle="bold" borderLeft borderRight={false} borderTop={false} borderBottom={false} borderColor={colors.borderMuted} paddingLeft={1} marginY={0}>
+                        <InlineMarkdown text={quoteText} color={colors.textMuted} italic theme={theme} />
+                    </Box>
+                </Box>
+            );
+        }
+
+        // 4. Unordered and Ordered Lists (*, -, +, 1.)
+        const isUnordered = /^[\*\-\+]\s/.test(trimmed);
+        const isOrdered = /^\d+\.\s/.test(trimmed);
+        if (isUnordered || isOrdered) {
+            const bullet = isUnordered ? '  • ' : trimmed.match(/^\d+\.\s/)[0];
+            const cleanContent = trimmed.replace(/^[\*\-\+\d+\.]+\s*/, '');
+            return (
+                <Box flexDirection="row" paddingX={1} width="100%">
+                    <Text color={colors.info || colors.textMuted}>{bullet}</Text>
+                    <Box flexGrow={1}>
+                        <InlineMarkdown text={cleanContent} color={colors.text} theme={theme} />
+                    </Box>
+                </Box>
+            );
+        }
+
         return (
             <Box flexDirection="column" paddingX={1} width="100%">
                 <InlineMarkdown text={animatedText} color={colors.text} theme={theme} />
             </Box>
         );
+    }
+
+    if (type === 'table-header' || type === 'table-row') {
+        const isHeader = type === 'table-header';
+        const headerColor = colors.codeText || colors.secondary || colors.info || 'cyan';
+        const colHeaders = block.colHeaders || [];
+        const rawCells = isHeader ? colHeaders : (block.cells || []);
+        const colCount = Math.max(1, block.colCount || colHeaders.length || rawCells.length || 1);
+        const cells = Array.from({ length: colCount }, (_, i) => rawCells[i] || '');
+        const availableWidth = Math.max(20, (columns || 80) - 8);
+
+        // Smart column width calculation:
+        // Only clamp short columns if table has 4+ columns (large tables).
+        // For 2-3 column tables (like Check | Status), give full generous widths so text never vertically squeezes!
+        const isLargeTable = colCount >= 4;
+        const SHORT_COL_REGEX = /^(#|no\.?|num\.?|status|state|type|ok|done|✔|✘|active)$/i;
+        const colWidths = [];
+        let allocatedFixed = 0;
+        let flexibleCount = 0;
+
+        for (let i = 0; i < colCount; i++) {
+            const h = (colHeaders[i] || '').trim();
+            if (isLargeTable && (SHORT_COL_REGEX.test(h) || h === '#')) {
+                const fixedW = Math.max(h.length + 4, 8);
+                colWidths.push(fixedW);
+                allocatedFixed += fixedW;
+            } else {
+                colWidths.push(null); // Flexible
+                flexibleCount++;
+            }
+        }
+
+        const remainingWidth = Math.max(flexibleCount * 12, availableWidth - allocatedFixed);
+        const flexColWidth = flexibleCount > 0 ? Math.max(10, Math.floor(remainingWidth / flexibleCount)) : 10;
+
+        for (let i = 0; i < colCount; i++) {
+            if (colWidths[i] === null) {
+                colWidths[i] = flexColWidth;
+            }
+        }
+
+        const totalTableWidth = colWidths.reduce((acc, w) => acc + w, 0);
+
+        if (isHeader) {
+            return (
+                <Box flexDirection="column" paddingX={1} width="100%" marginTop={0} marginBottom={1}>
+                    <Box
+                        flexDirection="row"
+                        borderStyle="single"
+                        borderBottom
+                        borderTop={false}
+                        borderLeft={false}
+                        borderRight={false}
+                        borderColor={colors.borderMuted}
+                        paddingBottom={0}
+                        width={totalTableWidth}
+                    >
+                        {colHeaders.map((cell, i) => {
+                            const cWidth = colWidths[i] || 6;
+                            return (
+                                <Box key={i} width={cWidth} paddingRight={1} flexDirection="column">
+                                    <InlineMarkdown text={wrapText(cell, Math.max(2, cWidth - 1))} color={headerColor} theme={theme} />
+                                </Box>
+                            );
+                        })}
+                    </Box>
+                </Box>
+            );
+        }
+
+        return (
+            <Box flexDirection="row" paddingX={1} width="100%" marginBottom={1}>
+                {cells.map((cell, ci) => {
+                    const cWidth = colWidths[ci] || 6;
+                    return (
+                        <Box key={ci} width={cWidth} paddingRight={1} flexDirection="column">
+                            <InlineMarkdown text={wrapText(cell, Math.max(2, cWidth - 1))} color={colors.text} theme={theme} />
+                        </Box>
+                    );
+                })}
+            </Box>
+        );
+    }
+
+    if (type === 'table-close') {
+        return <Box height={0} />;
     }
 
     if (type === 'table') {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { wrapText } from '../utils/text.js';
 import { getThemeColors } from '../utils/theme.js';
@@ -141,27 +141,54 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
     };
 
     const cleanOutput = processPTY(output).replace(/\n{3,}/g, '\n\n');
+    const wrapWidth = Math.max(10, (columns || 80) - 6);
 
-    // Bypass wrapText for PTY output to let the native terminal handling do its work
-    const rawLines = isPty
-        ? (cleanOutput ? cleanOutput.split('\n') : [])
-        : (cleanOutput ? wrapText(cleanOutput, columns - 6).split('\n') : []);
+    // Compute actual visual rendered lines (accounting for word/character terminal wrapping)
+    const rawLines = cleanOutput
+        ? cleanOutput.split('\n').flatMap(line => (line ? wrapText(line, wrapWidth).split('\n') : ['']))
+        : [];
 
     const [isExpanded, setIsExpanded] = useState(false);
+    const [scrollOffset, setScrollOffset] = useState(0); // 0 = pinned to bottom/tail
 
-    useInput((input, key) => {
-        if (isFocused && key.ctrl && (input === 'o' || input === '\x0f')) {
-            setIsExpanded(prev => !prev);
+    // Auto-scroll to bottom whenever terminal is unfocused
+    useEffect(() => {
+        if (!isFocused) {
+            setScrollOffset(0);
         }
-    }, { isActive: isFocused });
+    }, [isFocused]);
 
     const limit = Math.max(5, completed ? (terminalHeight - 10) : (terminalHeight - 25));
     const hasCollapsibleContent = rawLines.length > limit;
-    const collapsedCount = rawLines.length - limit;
+    const maxScroll = Math.max(0, rawLines.length - limit);
 
-    const visibleLines = (hasCollapsibleContent && !isExpanded)
-        ? rawLines.slice(rawLines.length - limit)
-        : rawLines;
+    useInput((input, key) => {
+        if (!isFocused) return;
+
+        const isPgUp = key.pageUp || input === '\x1b[5~' || input === '[5~';
+        const isPgDn = key.pageDown || input === '\x1b[6~' || input === '[6~';
+
+        if (key.ctrl && (input === 'o' || input === '\x0f')) {
+            setIsExpanded(prev => !prev);
+            setScrollOffset(0);
+        } else if (isPgUp) {
+            setScrollOffset(prev => Math.min(maxScroll, prev + 5));
+        } else if (isPgDn) {
+            setScrollOffset(prev => Math.max(0, prev - 5));
+        }
+    }, { isActive: isFocused });
+
+    let visibleLines;
+    if (!hasCollapsibleContent || isExpanded) {
+        visibleLines = rawLines;
+    } else {
+        const startIdx = Math.max(0, rawLines.length - limit - scrollOffset);
+        const endIdx = startIdx + limit;
+        visibleLines = rawLines.slice(startIdx, endIdx);
+    }
+
+    const linesAbove = hasCollapsibleContent && !isExpanded ? Math.max(0, rawLines.length - limit - scrollOffset) : 0;
+    const linesBelow = hasCollapsibleContent && !isExpanded ? scrollOffset : 0;
 
     const renderedOutput = visibleLines.join('\n');
     const displayOutput = rawLines.length > 0;
@@ -197,13 +224,18 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
 
             {displayOutput ? (
                 <Box flexDirection="column" marginTop={0} backgroundColor={isPty ? undefined : colors.codeBg} paddingX={1} width="100%">
-                    {hasCollapsibleContent && !isExpanded && (
-                        <Box marginBottom={1}>
-                            <Text color="magenta">...{collapsedCount} lines collapsed...</Text>
+                    {linesAbove > 0 && (
+                        <Box marginBottom={0}>
+                            <Text color="magenta">▲ ...{linesAbove} lines above (Use PageUp to scroll)...</Text>
                         </Box>
                     )}
                     {/* Only apply gray color if completed; let ANSI colors show during live execution */}
                     <Text color={completed ? colors.text : colors.text}>{renderedOutput}</Text>
+                    {linesBelow > 0 && (
+                        <Box marginTop={0}>
+                            <Text color="magenta">▼ ...{linesBelow} lines below (Use PageDown to scroll)...</Text>
+                        </Box>
+                    )}
                 </Box>
             ) : !completed && (
                 <Box marginTop={1} backgroundColor={isPty ? undefined : colors.codeBg} paddingX={1} width="100%">
@@ -213,10 +245,12 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
 
             <Box justifyContent="space-between" marginTop={1}>
                 {!completed ? (
-                    <Text color={colors.textMuted} italic>{isFocused ? "Press TAB to unfocus, then double-press ESC to terminate." : "Double-press ESC to terminate if hanging."}</Text>
-                ) : <Box />}
+                    <Text color={colors.textMuted} italic>{isFocused ? "Use PgUp/PgDn to scroll • Ctrl+O to expand • TAB to unfocus • CTRL+C to stop." : "Press TAB to focus • CTRL+C to terminate."}</Text>
+                ) : (
+                    <Text color={colors.textMuted} italic>{isFocused ? "Use PgUp/PgDn to scroll • Ctrl+O to expand/collapse • TAB to unfocus." : "Press TAB to focus & scroll."}</Text>
+                )}
                 <Text color={colors.textMuted} bold>
-                    {completed ? "● ARCHIVED" : (isFocused ? "▶ TERMINAL FOCUSED" : "● LIVE (Press TAB to focus)")}
+                    {completed ? (isFocused ? "● ARCHIVED (FOCUSED) " : "● ARCHIVED ") : (isFocused ? "▶ TERMINAL FOCUSED " : "● LIVE (Press TAB to focus) ")}
                 </Text>
             </Box>
         </Box>

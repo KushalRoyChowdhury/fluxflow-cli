@@ -1145,21 +1145,42 @@ export const parseMessageToBlocks = (msg, columns) => {
                 currentLang = line.trim().replace(/^```/, '').trim();
                 enqueue(getBlock(`${msg.id}-code-open-${idx}`, 'code-fence-open', currentLang, {}), isLast);
             } else if (isTableRow) {
-                inTable = true;
+                if (!inTable) {
+                    inTable = true;
+                    tableLines = [];
+                }
                 tableLines.push(line);
-                if (isLast) {
-                    // Table at end of message — structural, handle directly
+
+                // When we have at least 2 lines (header + separator), we emit the header block
+                if (tableLines.length === 2) {
+                    const headerLine = tableLines[0];
+                    const rawParts = headerLine.split('|');
+                    if (rawParts[0] !== undefined && rawParts[0].trim() === '') rawParts.shift();
+                    if (rawParts.length > 0 && rawParts[rawParts.length - 1].trim() === '') rawParts.pop();
+                    const colHeaders = rawParts.map(c => c.trim());
+                    enqueue(getBlock(`${msg.id}-table-hdr-${idx}`, 'table-header', headerLine, { colHeaders, colCount: colHeaders.length }), isLast);
+                } else if (tableLines.length > 2) {
+                    // Subsequent data rows stream line-by-line to Static
+                    const rawParts = line.split('|');
+                    if (rawParts[0] !== undefined && rawParts[0].trim() === '') rawParts.shift();
+                    if (rawParts.length > 0 && rawParts[rawParts.length - 1].trim() === '') rawParts.pop();
+                    const cells = rawParts.map(c => c.trim());
+                    const firstHeader = tableLines[0].split('|');
+                    if (firstHeader[0] !== undefined && firstHeader[0].trim() === '') firstHeader.shift();
+                    if (firstHeader.length > 0 && firstHeader[firstHeader.length - 1].trim() === '') firstHeader.pop();
+                    const colHeaders = firstHeader.map(c => c.trim());
+                    const colCount = Math.max(1, colHeaders.length);
+                    enqueue(getBlock(`${msg.id}-table-row-${idx}`, 'table-row', line, { cells, colHeaders, colCount, rowIndex: tableLines.length - 3 }), isLast);
+                }
+
+                // Only emit table-close if the message is NOT streaming or this was guaranteed the last line of the finished message
+                if (isLast && !msg.isStreaming) {
                     flushPending();
-                    if (msg.isStreaming) {
-                        activeBlock = getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: true });
-                    } else {
-                        completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: false }));
-                    }
+                    enqueue(getBlock(`${msg.id}-table-end-${idx}`, 'table-close', '', {}), true);
                 }
             } else {
                 if (inTable) {
-                    flushPending();
-                    completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: false }));
+                    enqueue(getBlock(`${msg.id}-table-end-${idx}`, 'table-close', '', {}), isLast);
                     inTable = false;
                     tableLines = [];
                 }
