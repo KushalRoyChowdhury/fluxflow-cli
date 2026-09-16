@@ -47,7 +47,7 @@ export const web_scrape = async (args) => {
 
             // 2. Set Realistic Identity
             await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.178 Safari/537.36');
-            await page.setViewport({ width: 1366, height: 768 });
+            await page.setViewport({ width: 1920, height: 1440 });
 
             // 3. Jitter Delay
             const jitter = attempt === 1 ? Math.random() * 1000 + 500 : Math.random() * 2000 + 1000;

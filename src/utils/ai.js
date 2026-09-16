@@ -145,6 +145,21 @@ export const stripNakedXmlTags = (str) => {
     });
 };
 
+export const stripTrailingFluffAfterTools = (text) => {
+    if (!text || typeof text !== 'string') return text;
+    const tools = detectToolCalls(text);
+    if (!tools || tools.length === 0) return text;
+
+    const lastTool = tools[tools.length - 1];
+    if (!lastTool.fullMatch) return text;
+
+    const lastIdx = text.lastIndexOf(lastTool.fullMatch);
+    if (lastIdx === -1) return text;
+
+    const endOfLastTool = lastIdx + lastTool.fullMatch.length;
+    return text.substring(0, endOfLastTool).trimEnd();
+};
+
 let client = null;
 
 let globalSettings = {};
@@ -3067,6 +3082,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     let toolCallBuffer = '';
                     let isBufferingToolCall = false;
                     let activeBufferType = null; // 'tool', 'agent', 'end', 'kimi_section', 'kimi_call'
+                    let emittedToolCallInTurn = false;
 
                     const BUFFER_TYPES = {
                         tool: { startPrefix: '[tool', fullPrefix: '[tool:functions.', endTag: ']' },
@@ -3100,7 +3116,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (indices.length > 0) {
                                     const match = indices[0];
                                     if (match.idx > 0) {
-                                        msgs.push({ type: 'text', content: remaining.substring(0, match.idx) });
+                                        if (!emittedToolCallInTurn) {
+                                            msgs.push({ type: 'text', content: remaining.substring(0, match.idx) });
+                                        }
                                     }
 
                                     isBufferingToolCall = true;
@@ -3130,13 +3148,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                     if (splitPoint !== -1) {
                                         if (splitPoint > 0) {
-                                            msgs.push({ type: 'text', content: remaining.substring(0, splitPoint) })
+                                            if (!emittedToolCallInTurn) {
+                                                msgs.push({ type: 'text', content: remaining.substring(0, splitPoint) });
+                                            }
                                         }
                                         isBufferingToolCall = true;
                                         toolCallBuffer = remaining.substring(splitPoint);
                                         remaining = '';
                                     } else {
-                                        msgs.push({ type: 'text', content: remaining });
+                                        if (!emittedToolCallInTurn) {
+                                            msgs.push({ type: 'text', content: remaining });
+                                        }
                                         break;
                                     }
                                 }
@@ -3161,7 +3183,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
 
                                     if (isMismatch) {
-                                        msgs.push({ type: 'text', content: combined });
+                                        if (!emittedToolCallInTurn) {
+                                            msgs.push({ type: 'text', content: combined });
+                                        }
                                         toolCallBuffer = '';
                                         isBufferingToolCall = false;
                                         activeBufferType = null;
@@ -3220,6 +3244,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         const fullMatch = combined.substring(0, endIdx + endLen);
                                         msgs.push({ type: 'text', content: fullMatch });
                                     }
+                                    if (activeBufferType === 'tool' || activeBufferType === 'agent' || activeBufferType?.startsWith('kimi')) {
+                                        emittedToolCallInTurn = true;
+                                    }
                                     toolCallBuffer = '';
                                     isBufferingToolCall = false;
                                     activeBufferType = null;
@@ -3229,7 +3256,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     // Flush buffer if it exceeds limits
                                     const MAX_BUFFER = activeBufferType?.startsWith('kimi') ? 8192 : 512;
                                     if (combined.length > MAX_BUFFER) {
-                                        msgs.push({ type: 'text', content: combined });
+                                        if (!emittedToolCallInTurn) {
+                                            msgs.push({ type: 'text', content: combined });
+                                        }
                                         toolCallBuffer = '';
                                         isBufferingToolCall = false; // Give up on this
                                         activeBufferType = null;
@@ -4989,6 +5018,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 yield { type: 'usage', content: lastUsage };
             }
 
+            // Clean off any conversational filler/fluff emitted AFTER the last tool call in this turn
+            turnText = stripTrailingFluffAfterTools(turnText);
+
             fullAgentResponseChunks.push(turnText);
 
             // [SAFETY] Surgical extraction of top-level leading thinking blocks only.
@@ -5263,7 +5295,7 @@ Tool Rules:
 ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web Tools**
-- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: slower, exclude limit
+- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: very slower, exclude limit
 - WebScrape(url=string). Proactive use for specific webpage/docs
 
 **Workspace Tools**
@@ -5324,7 +5356,7 @@ Current Time: ${time}
 
         const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstructionSubAgent, 'Fast');
         const responseText = response.text || '';
-        const cleanResponse = stripLeadingThinking(responseText).trim();
+        const cleanResponse = stripTrailingFluffAfterTools(stripLeadingThinking(responseText).trim());
         finalAnswer = cleanResponse;
 
         if (logCallback) logCallback(`[Subagent Response]\n${cleanResponse}\n`);

@@ -20,7 +20,7 @@ export const web_search = async (argsString) => {
         const aiPrompt = `Query: ${query}
 
 RESPONSE RULES:
-- ANSWER CONCISELY WITH REQUIRED DETAILS UNDER 300 WORDS.
+- ANSWER CONCISELY (TL;DR style) WITH REQUIRED DETAILS UNDER 300 WORDS.
 - DO NOT CITE, REFERENCE, OR MENTION SOURCES ANYWHERE BETWEEN THE MAIN RESPONSE.
 - DO NOT USE MARKDOWN EXCEPT FOR THE SOURCES SECTION BELOW.
 - END THE RESPONSE WITH EXACTLY:
@@ -108,6 +108,7 @@ Sources:
                     });
 
                     if (extractedData && extractedData.isFinished) {
+                        await new Promise(r => setTimeout(r, 1000));
                         break;
                     }
 
@@ -190,7 +191,7 @@ Sources:
                 // await page.pdf({ path: 'page.pdf', format: 'A4' }).catch(() => {});
 
                 await browser.close();
-                // fs.writeFileSync("DEBUG.txt", `AI Search results for [${query}]:\n\n${aiResult}`);
+                // fs.writeFileSync("DEBUG-ai-search.txt", `AI Search results for [${query}]:\n\n${aiResult}`);
                 return `AI Search results for [${query}]:\n\n${aiResult}`;
             } catch (err) {
                 lastError = err;
@@ -265,6 +266,7 @@ Sources:
             const finalResults = results.join('\n\n');
             await browser.close();
             const prefix = aiMode ? 'AI Mode temporarily failed, used Standard search.\n\n' : '';
+            // fs.writeFileSync("DEBUG-standard-search.txt", `Standard Search results for [${query}]:\n\n${finalResults}`);
             return `${prefix}Search results for [${query}]:\n\n${finalResults}`;
 
         } catch (err) {
