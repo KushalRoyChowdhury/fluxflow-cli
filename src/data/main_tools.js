@@ -101,7 +101,7 @@ ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : "
 - AskUser(question=string, optionA?="title::description", ...MAX4). Ambiguity, path divergence, security risk
 
 **Web Tools**
-- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: exclude limit
+- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: slower, exclude limit
 - WebScrape(url=string). Proactive use for specific webpage/docs
 
 ${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();

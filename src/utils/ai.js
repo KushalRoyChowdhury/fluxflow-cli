@@ -5263,7 +5263,7 @@ Tool Rules:
 ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web Tools**
-- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: exclude limit
+- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: slower, exclude limit
 - WebScrape(url=string). Proactive use for specific webpage/docs
 
 **Workspace Tools**
