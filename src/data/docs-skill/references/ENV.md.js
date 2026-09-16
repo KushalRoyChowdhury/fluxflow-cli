@@ -15,7 +15,8 @@ export const ENV_MD = `# Env Variables
 * SHELL → Terminal shell executable
 * HIGH_CONTEXT → Context window override (false or integer 32k..1M) [Deprecated! Will stop working from next major version]
 * ENABLE_9ROUTER → Enables 9Router provider. Can use OAuth subscription like Codex, Claude Code, GitHub Copilot etc. or use providers not natively in Fluxflow. Set ENV ENABLE_9ROUTER=true, needs 9router package installed (via npm/npx etc) & running
-* 9ROUTER_BASE_URL → 9Router base URL
+* 9ROUTER_BASE_URL
+* 9ROUTER_API_KEY → if any
 
 ## Diagnostic & Optimization Flags
 * SHOW_DEBUG_GRID → (true|false, default: false) Coordinate grid overlay for Computer Use tooling

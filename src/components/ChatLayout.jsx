@@ -1101,7 +1101,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                                     <Text bold color={colors.userMsgText}>{lineIdx === 0 ? '✦' : ' '}</Text>
                                 </Box>
                                 <Box flexGrow={1} marginLeft={1}>
-                                    <InlineMarkdown text={line} color={msg.color || colors.userMsgText} theme={theme} />
+                                    <InlineMarkdown text={line} color={colors.userMsgText} theme={theme} />
                                 </Box>
                             </Box>
                         ))}
