@@ -113,7 +113,7 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
 
         for (const line of lines) {
             const cleanLine = line.trim();
-            fs.appendFileSync('9router.txt', `${cleanLine}\n\n`);
+            // fs.appendFileSync('9router.txt', `${cleanLine}\n\n`);
             if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
             let isDone = false;
             if (cleanLine === 'data: [DONE]') {
