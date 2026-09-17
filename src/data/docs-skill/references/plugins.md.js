@@ -4,7 +4,7 @@ export const PLUGINS_MD = `# Fluxflow Instructions & Skills System
 ## 1. Instructions (AGENTS.md / FLUXFLOW.md)
 * Locations:
   * Global: ~/.fluxflow/FLUXFLOW.md | ~/.fluxflow/AGENTS.md
-  * Workspace: ./FLUXFLOW.md | ./AGENTS.md
+  * Workspace: ./FLUXFLOW.md | ./AGENTS.md | Directory Scoped like src/AGENTS.md
 * Auto indexed on boot
 
 ### Conditional Model & Provider Instructions (use /target command to get provider name & model-id)

@@ -39,6 +39,73 @@ const readCaseInsensitiveFile = (dir, fileNames) => {
     return '';
 };
 
+const AGENTS_EXCLUDES = new Set([
+    '.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out',
+    '.cache', 'bin', 'obj', 'vendor', 'venv', '.idea', '.gradle',
+    '.terraform', 'target', 'coverage', '.vscode',
+    '.svn', '.hg', '.fslckout', '.github', '.gitlab', '.circleci',
+    '.gitea', '.gitee', '.lerna', '.changeset', '.nx',
+    '.npm', '.yarn', '.pnpm-store', '.pnpm', '.expo', '.nuxt', '.svelte-kit',
+    '.docusaurus', '.turbo', '.vercel', 'bower_components', '.netlify',
+    '.vuepress', '.quasar', '.output', '.angular', 'jspm_packages',
+    '.parcel-cache', '.rollup.cache', '.rspack', '.vitepress',
+    '__pycache__', '.pytest_cache', '.mypy_cache', '.tox', '.poetry',
+    'env', 'vhdl', '.ipynb_checkpoints', '.jupyter', '.conda', '.pdm-build',
+    '.bundle', '.yardoc', '.metadata', 'App_Data', 'ClientBin',
+    '.cargo', '.rustc_info', '.go', 'Godeps', '_vendor', '.rake_tasks',
+    'CMakefiles', '.wakatime',
+    '.dart_tool', '.fvm', '.cocoapods', 'Pods', '.pub-cache',
+    '.symlinks', 'DerivedData', '.xcworkspace',
+    '.serverless', '.aws', '.gcloud', '.azure', '.kube',
+    '.vagrant', '.docker', 'postgres-data', 'redis-data', 'mongo-data',
+    '.Spotlight-V100', '.Trashes', '$RECYCLE.BIN',
+    'System Volume Information', '.DocumentRevisions-V100', '.fseventsd',
+    'AppData', 'Application Data', 'Local', 'LocalLow', 'Roaming',
+    '$WinREAgent', '$WINDOWS.~BT', '$WINDOWS.~WS', 'scw', 'System32', 'SysWOW64',
+    '.AppleDouble', '.AppleDB', '.AppleDesktop', '_CodeSignature',
+    '.cmio', '.LSOverride', '.localized', '.TemporaryItems',
+    '.Trash', '.Trash-0', '.Trash-1000', '.gvfs', '.local', '.config',
+    '.dbus', '.fontconfig', '.snap', '.var', '.lost+found', 'lost+found',
+    '.thumb', '.thumbnails',
+    'EFI', 'boot', 'grub',
+    'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache', '.VSCodeCounter',
+    '.skills', 'skills'
+]);
+
+export const findLocalAgentsFiles = (dir = process.cwd(), currentDepth = 0, maxDepth = 8) => {
+    const results = [];
+    if (currentDepth > maxDepth) return results;
+
+    try {
+        if (!fs.existsSync(dir)) return results;
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const name = entry.name;
+            const fullPath = path.join(dir, name);
+
+            if (entry.isDirectory()) {
+                if (!AGENTS_EXCLUDES.has(name) && !AGENTS_EXCLUDES.has(name.toLowerCase())) {
+                    results.push(...findLocalAgentsFiles(fullPath, currentDepth + 1, maxDepth));
+                }
+            } else if (entry.isFile()) {
+                const lowerName = name.toLowerCase();
+                if (lowerName === 'agents.md' || lowerName === 'agent.md') {
+                    results.push(fullPath);
+                }
+            }
+        }
+    } catch (e) {}
+
+    return results;
+};
+
+export const indentText = (text, spaces = 2) => {
+    if (!text) return '';
+    const prefix = ' '.repeat(spaces);
+    return text.split(/\r?\n/).map(line => prefix + line).join('\n');
+};
+
 export const getGlobalAgentsPath = () => getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['agents.md', 'agent.md']);
 export const getLocalAgentsPath = () => getCaseInsensitiveFilePath(process.cwd(), ['agents.md', 'agent.md']);
 
@@ -47,6 +114,7 @@ export const getLocalFluxflowPath = () => getCaseInsensitiveFilePath(process.cwd
 
 export let globalAgentsPath = getGlobalAgentsPath();
 export let localAgentsPath = getLocalAgentsPath();
+export let localAgentsFiles = findLocalAgentsFiles();
 export let globalFluxflowPath = getGlobalFluxflowPath();
 export let localFluxflowPath = getLocalFluxflowPath();
 
@@ -88,8 +156,44 @@ export const readGlobalAgentsInstruction = () => {
 };
 
 export const readLocalAgentsInstruction = () => {
+    localAgentsFiles = findLocalAgentsFiles();
     localAgentsPath = getLocalAgentsPath();
-    return localAgentsPath ? readCaseInsensitiveFile(process.cwd(), ['agents.md', 'agent.md']).trim() : '';
+
+    if (!localAgentsFiles || localAgentsFiles.length === 0) {
+        return '';
+    }
+
+    const cwd = process.cwd();
+    // Sort files so root comes first, then alphabetically by relative path
+    const sortedFiles = [...localAgentsFiles].sort((a, b) => {
+        const relA = path.relative(cwd, a).replace(/\\/g, '/');
+        const relB = path.relative(cwd, b).replace(/\\/g, '/');
+        const isRootA = !relA.includes('/');
+        const isRootB = !relB.includes('/');
+        if (isRootA && !isRootB) return -1;
+        if (!isRootA && isRootB) return 1;
+        return relA.localeCompare(relB);
+    });
+
+    const blocks = [];
+    for (const filePath of sortedFiles) {
+        try {
+            const rawContent = fs.readFileSync(filePath, 'utf8').trim();
+            if (!rawContent) continue;
+
+            const relPath = path.relative(cwd, filePath).replace(/\\/g, '/');
+            const isRoot = !relPath.includes('/');
+
+            if (isRoot) {
+                blocks.push(indentText(rawContent, 2));
+            } else {
+                const dirHeader = path.dirname(relPath) + '/:';
+                blocks.push(`${dirHeader}\n${indentText(rawContent, 2)}`);
+            }
+        } catch (e) {}
+    }
+
+    return blocks.join('\n\n').trim();
 };
 
 // FLUXFLOW.md is dedicated strictly to model & provider conditional tags
@@ -284,7 +388,7 @@ const isSystemDocsSkill = (s) => {
 const getUIGlobalSkills = () => (globalSkills || []).filter(s => !isSystemDocsSkill(s));
 const getUILocalSkills = () => (localSkills || []).filter(s => !isSystemDocsSkill(s));
 
-export const loadedFilesCount = (globalAgentsMD ? 1 : 0) + (localAgentsMD ? 1 : 0) + (globalFluxflowMD ? 1 : 0) + (localFluxflowMD ? 1 : 0) + getUIGlobalSkills().length + getUILocalSkills().length;
+export const loadedFilesCount = (globalAgentsMD ? 1 : 0) + (localAgentsFiles?.length || (localAgentsMD ? 1 : 0)) + (globalFluxflowMD ? 1 : 0) + (localFluxflowMD ? 1 : 0) + getUIGlobalSkills().length + getUILocalSkills().length;
 
 const formatPathForUI = (filePath, scope = 'Project') => {
     if (!filePath) return '';
@@ -307,7 +411,11 @@ export const getLoadedFilesSummary = () => {
     if (globalAgentsPath && globalAgentsMD.length > 0) {
         instructions.push({ scope: 'Global', path: globalAgentsPath });
     }
-    if (localAgentsPath && localAgentsMD.length > 0) {
+    if (localAgentsFiles && localAgentsFiles.length > 0 && localAgentsMD.length > 0) {
+        localAgentsFiles.forEach(f => {
+            instructions.push({ scope: 'Project', path: f });
+        });
+    } else if (localAgentsPath && localAgentsMD.length > 0) {
         instructions.push({ scope: 'Project', path: localAgentsPath });
     }
     if (globalFluxflowPath && globalFluxflowMD.length > 0) {

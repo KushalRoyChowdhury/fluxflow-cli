@@ -1111,12 +1111,22 @@ export default function App({ args = [] }) {
     };
 
     useEffect(() => {
+        let lastCols = stdout?.columns || 80;
+
         const handleResize = () => {
-            // Use a non-destructive clear to prevent title/mode reset
-            stdout.write('\x1b[2J\x1b[3J\x1b[H');
+            const currentCols = stdout?.columns || 80;
+            const currentRows = stdout?.rows || 24;
+
+            // Only perform a full screen clear if columns (width) changed,
+            // because width changes text wrapping. Height changes do not alter line wraps.
+            if (currentCols !== lastCols) {
+                lastCols = currentCols;
+                stdout.write('\x1b[2J\x1b[3J\x1b[H');
+            }
+
             setTerminalSize({
-                columns: stdout.columns,
-                rows: stdout.rows
+                columns: currentCols,
+                rows: currentRows
             });
         };
 
@@ -7160,7 +7170,7 @@ export default function App({ args = [] }) {
             ) : (
                 <>
                     <Box paddingX={1} flexDirection="column" width="100%">
-                        <Static key={`static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}-${systemSettings.theme}`} items={parsedBlocks.completed}>
+                        <Static key={`static-${clearKey}-${chatId}-${terminalSize.columns}-${systemSettings.theme}`} items={parsedBlocks.completed}>
                             {(block) => (
                                 <BlockItem
                                     key={block.key}

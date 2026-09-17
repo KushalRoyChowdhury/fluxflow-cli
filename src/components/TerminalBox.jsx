@@ -158,7 +158,24 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
         }
     }, [isFocused]);
 
-    const limit = Math.max(5, completed ? (terminalHeight - 10) : (terminalHeight - 25));
+    // Effective physical terminal rows from props or process.stdout
+    const effectiveRows = (terminalHeight && terminalHeight > 0) ? terminalHeight : (process.stdout.rows || 24);
+    const isCompactTerminal = effectiveRows <= 24;
+
+    // Strict adaptive limit:
+    // When executing live: TerminalBox header + footer + borders = 5-7 lines.
+    // Together with input box & status bar (6 lines), total fixed UI is 11-13 lines.
+    const overhead = completed ? (isCompactTerminal ? 7 : 9) : (isCompactTerminal ? 11 : 14);
+    const maxAllowed = Math.max(1, effectiveRows - overhead);
+
+    // On compact/split IDE terminals:
+    // rows <= 16: max 2 lines
+    // rows <= 22: max 3 lines
+    // rows <= 28: max 4 lines
+    // taller: up to maxAllowed
+    const liveCap = effectiveRows <= 16 ? 4 : (effectiveRows <= 22 ? 5 : (effectiveRows <= 28 ? 6 : 10));
+    const limit = completed ? Math.min(isCompactTerminal ? 4 : 10, maxAllowed) : Math.min(liveCap, maxAllowed);
+
     const hasCollapsibleContent = rawLines.length > limit;
     const maxScroll = Math.max(0, rawLines.length - limit);
 
@@ -204,11 +221,11 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
             borderColor={colors.codeBorder}
             paddingLeft={2}
             paddingRight={0}
-            paddingY={1}
-            marginY={1}
+            paddingY={isCompactTerminal ? 0 : 1}
+            marginY={isCompactTerminal ? 0 : 1}
             width={columns - 2}
         >
-            <Box marginBottom={1} justifyContent="space-between" width="100%">
+            <Box marginBottom={isCompactTerminal ? 0 : 1} justifyContent="space-between" width="100%">
                 <Box flexShrink={1} paddingRight={2}>
                     <Text>
                         <Text color={colors.text} bold>{completed ? "🏁 FINISHED:" : "⚡ EXECUTING:"} </Text>
@@ -238,12 +255,12 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
                     )}
                 </Box>
             ) : !completed && (
-                <Box marginTop={1} backgroundColor={isPty ? undefined : colors.codeBg} paddingX={1} width="100%">
+                <Box marginTop={isCompactTerminal ? 0 : 1} backgroundColor={isPty ? undefined : colors.codeBg} paddingX={1} width="100%">
                     <Text color={colors.textMuted} italic>Waiting for output...</Text>
                 </Box>
             )}
 
-            <Box justifyContent="space-between" marginTop={1}>
+            <Box justifyContent="space-between" marginTop={isCompactTerminal ? 0 : 1}>
                 {!completed ? (
                     <Text color={colors.textMuted} italic>{isFocused ? "Use PgUp/PgDn to scroll • Ctrl+O to expand • TAB to unfocus • CTRL+C to stop." : "Press TAB to focus • CTRL+C to terminate."}</Text>
                 ) : (
