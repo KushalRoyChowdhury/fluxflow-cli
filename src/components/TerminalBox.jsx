@@ -204,11 +204,20 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
         visibleLines = rawLines.slice(startIdx, endIdx);
     }
 
+    const displayOutput = (visibleLines || []).join('\n').trim();
+    const renderedOutput = (visibleLines || []).join('\n');
+
     const linesAbove = hasCollapsibleContent && !isExpanded ? Math.max(0, rawLines.length - limit - scrollOffset) : 0;
     const linesBelow = hasCollapsibleContent && !isExpanded ? scrollOffset : 0;
 
-    const renderedOutput = visibleLines.join('\n');
-    const displayOutput = rawLines.length > 0;
+    // Format command to max 1 line with truncation if too long
+    const headerPrefix = completed ? "🏁 FINISHED: " : "⚡ EXECUTING: ";
+    const cmdHeaderWidth = Math.max(10, (columns || 80) - (isPty ? 24 : 14));
+    const commandLines = wrapText((command || '').replace(/\r?\n/g, ' ').trim(), cmdHeaderWidth).split('\n');
+    let displayedCommand = (command || '').replace(/\r?\n/g, ' ').trim();
+    if (commandLines.length > 1) {
+        displayedCommand = commandLines[0].length > 3 ? commandLines[0].slice(0, -3) + '...' : commandLines[0] + '...';
+    }
 
     return (
         <Box
@@ -221,15 +230,16 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
             borderColor={colors.codeBorder}
             paddingLeft={2}
             paddingRight={0}
-            paddingY={isCompactTerminal ? 0 : 1}
+            paddingTop={isCompactTerminal ? 0 : 1}
+            paddingBottom={1}
             marginY={isCompactTerminal ? 0 : 1}
             width={columns - 2}
         >
             <Box marginBottom={isCompactTerminal ? 0 : 1} justifyContent="space-between" width="100%">
                 <Box flexShrink={1} paddingRight={2}>
                     <Text>
-                        <Text color={colors.text} bold>{completed ? "🏁 FINISHED:" : "⚡ EXECUTING:"} </Text>
-                        <Text color={colors.text}>{command}</Text>
+                        <Text color={colors.text} bold>{headerPrefix}</Text>
+                        <Text color={colors.text}>{displayedCommand}</Text>
                     </Text>
                 </Box>
                 {isPty && (

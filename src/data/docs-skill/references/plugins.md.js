@@ -1,7 +1,7 @@
 // Export plugins.md content to string
 export const PLUGINS_MD = `# Fluxflow Instructions & Skills System
 
-## 1. Instructions (AGENTS.md / FLUXFLOW.md)
+## 1. Instructions (AGENTS.md / FLUXFLOW.md root only)
 * Locations:
   * Global: ~/.fluxflow/FLUXFLOW.md | ~/.fluxflow/AGENTS.md
   * Workspace: ./FLUXFLOW.md | ./AGENTS.md | Directory Scoped like src/AGENTS.md
@@ -35,12 +35,12 @@ Instruction for this model ID across all providers.
 ## 2. Skills System
 * Locations:
   * Global: ~/.fluxflow/skills/**/SKILL.md
-  * Workspace: ./skills/**/SKILL.md | ./SKILL.md
+  * Workspace: ./skills/**/SKILL.md | ./SKILL.md 
 
 * Format:
   * YAML Frontmatter: --- block with name and description
   * Body: Markdown Instructions/Workflows
 
-* On-Demand Reference Loading:
-  * Reference: Offload deep/contexual specs to references/*.md linked from root SKILL.md. Saves tokens
+* On-Demand Reference System:
+  * Reference: Offload deep/contexual specs to **/{SKILL.md,skill-reference-folder/*.md} & reference in SKILL.md. Saves tokens
 `;

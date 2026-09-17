@@ -1299,7 +1299,7 @@ export default function App({ args = [] }) {
             setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Forced Reasoning:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
             process.env.forcedReasoning = false;
         }
-        if (thinkingLevel === 'xHigh') {
+        if (thinkingLevel === 'xHigh' && !isFirstRender.current) {
             setThinkingLevel('Medium');
         }
     }, [activeModel]);
@@ -1319,19 +1319,20 @@ export default function App({ args = [] }) {
         if (prevProviderRef.current !== aiProvider) {
             prevProviderRef.current = aiProvider;
             if (aiProvider === 'Mistral') {
-                setThinkingLevel('Low');
+                setThinkingLevel('High');
             } else if (aiProvider === 'SenseNova' || aiProvider === 'Poolside') {
                 setThinkingLevel('High');
             } else {
                 setThinkingLevel('Medium');
             }
-        } else {
-            if (aiProvider === 'Google' && thinkingLevel === 'xHigh') {
-                if (activeModel && activeModel.toLowerCase().startsWith('gemini-3')) {
-                    setThinkingLevel('High');
-                }
-            }
         }
+        // else {
+        //     if (aiProvider === 'Google' && thinkingLevel === 'xHigh') {
+        //         if (activeModel && activeModel.toLowerCase().startsWith('gemini-3')) {
+        //             setThinkingLevel('High');
+        //         }
+        //     }
+        // }
 
         return () => {
             clearTimeout(timeoutThinkingOne);

@@ -1,5 +1,5 @@
 // 🎆 surprise.js — A tiny fireworks show for your terminal
-// Run: node surprise.js   (auto-exits after ~14s, or Ctrl+C anytime)
+// Run: node surprise.js   (auto-exits after ~60s, or Ctrl+C anytime)
 // Zero dependencies. Pure ANSI chaos.
 
 const W = process.stdout.columns || 100;

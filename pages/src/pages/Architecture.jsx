@@ -112,7 +112,7 @@ Instructions for this model across all providers.
                     <strong>Skill Manifest Structure</strong> — Each skill file declares structured YAML frontmatter:
                     <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm my-3 font-mono">
 {`---
-name: skill-name
+name: unique-skill-name
 description: Purpose and overview of the skill
 ---
 # Instructions
@@ -125,8 +125,8 @@ description: Purpose and overview of the skill
                 <li>
                     <strong>Deterministic On-Demand Reading &amp; References</strong> — Models load full skill details and auxiliary documentation on demand via virtual path routing:
                     <ul>
-                        <li><em>Primary Skill File:</em> <code>ReadFile(path=&quot;#skills/{'{global|local}'}/skillName&quot;)</code></li>
-                        <li><em>Auxiliary References:</em> <code>ReadFile(path=&quot;#skills/{'{global|local}'}/skillName/reference/filename.md&quot;)</code></li>
+                        <li><em>Primary Skill File:</em> <code>ReadFile(path=&quot;#skills/{'{global|project}'}/skillName&quot;)</code></li>
+                        <li><em>Auxiliary References:</em> <code>ReadFile(path=&quot;#skills/{'{global|project}'}/skillName/{'<references>'}/filename.md&quot;)</code></li>
                     </ul>
                 </li>
                 <li>

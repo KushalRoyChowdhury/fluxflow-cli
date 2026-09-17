@@ -80,7 +80,7 @@ description: System Generated Documentation. Read this if asked anything regardi
 Open Source Terminal AI Assistant
 App Version: ${appVersion}. Check Updates: fluxflow --update check. Update: fluxflow --update
 GitHub: https://github.com/KushalRoyChowdhury/fluxflow-cli
-Documentation: https://fluxflow-cli.onrender.com
+Public Docs: https://fluxflow-cli.onrender.com
 
 [tool:functions.SearchKeyword(keyword="regex/word", path="#docs")]. Usage: search any keyword across docs, avoid hunting excessive references
 
@@ -98,7 +98,7 @@ Documentation: https://fluxflow-cli.onrender.com
 * Priority Instructions (AGENTS.md/FLUXFLOW.md) & Skill System → references/PLUGINS.md
 * Agent Architecture & Memory System → references/ARCHITECTURE.md
 
-Default Context Length: 256k Tokens. Can be changed via ENV/In-app Settings
+Default Context Length: 256k Tokens. Can be changed via ENV/In-app Settings → references/{SETTINGS,ENV}.md
 
 Docs missing required info? Say you are not sure enough to answer. Dont give wrong info`,
 

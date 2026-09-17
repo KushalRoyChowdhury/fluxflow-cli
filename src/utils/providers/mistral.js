@@ -63,11 +63,12 @@ export const getMistralStream = async function* (apiKey, model, contents, system
     };
 
     const customEffort = getMappedThinkingLevel('Mistral', model, thinkingLevel);
-    if (customEffort !== null) {
+    if (customEffort !== null && customEffort !== 'none') {
         if (customEffort && customEffort !== 'none' && customEffort !== 'disabled' && customEffort !== false) {
             requestPayload.reasoning_effort = customEffort;
         }
-    } else if (thinkingLevel && thinkingLevel !== 'Fast' && hasModelReasoning(model)) {
+    } else if (thinkingLevel && reasoningEffortMap[thinkingLevel] !== 'none') {
+    // } else if (thinkingLevel && thinkingLevel !== 'Fast' && hasModelReasoning(model)) {
         requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel] || 'high';
     }
     // console.log(hasModelReasoning(model));

@@ -54,7 +54,8 @@ export default function DocPage({ headings, children }) {
                     Caught a mistake or want to contribute to the documentation?
                     <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli" className="ml-1 text-blue-600 dark:text-blue-400 font-medium hover:underline select-none">Edit this page on GitHub</a>
                 </p>
-                <div className='absolute text-transparent select-none '>HUGE THANKS TO GEMINI CLI. (つ╥﹏╥)つ</div>
+                <div className='text-sm text-slate-500 dark:text-slate-500'>Updated: 2026SEP18 (v4.16.10)</div>
+                <div className='absolute text-transparent select-none h-0 w-0'>HUGE THANKS TO GEMINI CLI. (つ╥﹏╥)つ</div>
             </motion.footer>
         </motion.div>
     )

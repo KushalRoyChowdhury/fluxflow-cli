@@ -74,31 +74,79 @@ const stripSkillDescription = (content) => {
     });
 };
 
-const findReferenceFile = (skillDir, refName) => {
-    const candidateDirs = [
-        path.join(skillDir, 'references'),
-        path.join(skillDir, 'reference'),
-        skillDir
-    ];
-    const targetBase = refName.toLowerCase().endsWith('.md') ? refName.toLowerCase() : `${refName.toLowerCase()}.md`;
-    const targetExact = refName.toLowerCase();
+const findSkillSubFile = (skillDir, subPath) => {
+    if (!subPath) return null;
 
-    for (const cDir of candidateDirs) {
-        if (fs.existsSync(cDir) && fs.statSync(cDir).isDirectory()) {
+    // 1. Direct path check (normalized / case-insensitive)
+    const directPath = path.join(skillDir, subPath);
+    if (fs.existsSync(directPath)) {
+        try {
+            if (fs.statSync(directPath).isFile()) return directPath;
+        } catch (e) {}
+    }
+
+    // Try with .md extension if not present
+    if (!subPath.toLowerCase().endsWith('.md')) {
+        const withMd = path.join(skillDir, `${subPath}.md`);
+        if (fs.existsSync(withMd)) {
             try {
-                const files = fs.readdirSync(cDir);
-                for (const f of files) {
-                    const fLower = f.toLowerCase();
-                    if (fLower === targetBase || fLower === targetExact) {
-                        const full = path.join(cDir, f);
-                        if (fs.statSync(full).isFile()) {
-                            return full;
-                        }
-                    }
-                }
+                if (fs.statSync(withMd).isFile()) return withMd;
             } catch (e) {}
         }
     }
+
+    // 2. Case-insensitive path traversal from skillDir
+    const segments = subPath.replace(/\\/g, '/').split('/').filter(Boolean);
+    let currentDir = skillDir;
+    let found = true;
+
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i].toLowerCase();
+        const isLast = i === segments.length - 1;
+        try {
+            if (!fs.existsSync(currentDir) || !fs.statSync(currentDir).isDirectory()) {
+                found = false;
+                break;
+            }
+            const entries = fs.readdirSync(currentDir);
+            const matchedEntry = entries.find(e => {
+                const eLower = e.toLowerCase();
+                if (eLower === seg) return true;
+                if (isLast && !seg.endsWith('.md') && eLower === `${seg}.md`) return true;
+                return false;
+            });
+
+            if (!matchedEntry) {
+                found = false;
+                break;
+            }
+
+            const nextPath = path.join(currentDir, matchedEntry);
+            if (isLast) {
+                if (fs.statSync(nextPath).isFile()) return nextPath;
+                found = false;
+            } else {
+                currentDir = nextPath;
+            }
+        } catch (e) {
+            found = false;
+            break;
+        }
+    }
+
+    // 3. Fallback: check inside standard folders (references/, scripts/, examples/, resources/) if single filename provided
+    if (segments.length === 1) {
+        const singleFile = segments[0];
+        const fallbackDirs = ['references', 'reference', 'scripts', 'script', 'examples', 'example', 'resources', 'resource'];
+        for (const fDir of fallbackDirs) {
+            const nestedDir = path.join(skillDir, fDir);
+            if (fs.existsSync(nestedDir)) {
+                const subResult = findSkillSubFile(nestedDir, singleFile);
+                if (subResult) return subResult;
+            }
+        }
+    }
+
     return null;
 };
 
@@ -137,8 +185,7 @@ export const view_file = async (args, context = {}) => {
             return `ERROR: Missing skill name in path [${targetPath}].`;
         }
 
-        const isReference = parts[2]?.toLowerCase() === 'references' || parts[2]?.toLowerCase() === 'reference';
-        const refName = isReference ? parts.slice(3).join('/') : null;
+        const subPath = parts.slice(2).join('/');
 
         const baseDir = scope === 'global' ? FLUXFLOW_DIR : process.cwd();
         const skillFiles = findSkillFiles(baseDir);
@@ -166,15 +213,12 @@ export const view_file = async (args, context = {}) => {
         let targetFileToRead = matchedSkillFile;
         let isMainSkill = true;
 
-        if (isReference) {
-            if (!refName) {
-                return `ERROR: Missing reference file name in path [${targetPath}].`;
+        if (subPath) {
+            const subFile = findSkillSubFile(skillDir, subPath);
+            if (!subFile) {
+                return `No such file or reference '${subPath}' exist for skill '${skillName}'. It could be standard file path?`;
             }
-            const refFile = findReferenceFile(skillDir, refName);
-            if (!refFile) {
-                return `No such reference exist for skill '${skillName}'`;
-            }
-            targetFileToRead = refFile;
+            targetFileToRead = subFile;
             isMainSkill = false;
         }
 

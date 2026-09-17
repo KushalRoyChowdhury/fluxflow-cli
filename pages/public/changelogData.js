@@ -1,6 +1,17 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.16.10": {
+        "note": "SEPTEMBER 18",
+        "added": [],
+        "changed": [
+            "LOOONG Chat performance improvements.",
+            "Improved Skill system."
+        ],
+        "fixes": [
+            "Fixed a deadlock bug in UI rendering."
+        ]
+    },
     "4.16.5": {
         "note": "SEPTEMBER 16",
         "added": [],
