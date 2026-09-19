@@ -44,7 +44,7 @@ export const getExpLabsStream = async function* (apiKey, model, contents, system
 
     const customEffort = getMappedThinkingLevel('ExpLabs', model, thinkingLevel);
     const reasoningEffortMap = {
-        'Fast': 'low',
+        'Fast': 'none',
         'Low': 'low',
         'Medium': 'medium',
         'Standard': 'medium',

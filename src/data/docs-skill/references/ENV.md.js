@@ -10,12 +10,13 @@ export const ENV_MD = `# Env Variables
 * SUBAGENT_MODEL → Model override for sub-agents
 * SUBAGENT_PROVIDER → Provider override for sub-agents
 * NVIDIA_BASE_URL → Custom endpoint URL for NVIDIA NIM (Cloud/Local OpenAI Compatible)
+* SUBAGENT_THINKING - Fast, Low (default), Medium, High. Affects at High Level, not Low Level. --map takes priority
 * NVIDIA_API_KEY → API key for NVIDIA NIM
-* OLLAMA_HOST → Custom Ollama endpoint (default: http://127.0.0.1:11434)
+* OLLAMA_HOST → If different from default
 * SHELL → Terminal shell executable
 * HIGH_CONTEXT → Context window override (false or integer 32k..1M) [Deprecated! Will stop working from next major version]
 * ENABLE_9ROUTER → Enables 9Router provider. Can use OAuth subscription like Codex, Claude Code, GitHub Copilot etc. or use providers not natively in Fluxflow. Set ENV ENABLE_9ROUTER=true, needs 9router package installed (via npm/npx etc) & running
-* 9ROUTER_BASE_URL
+* 9ROUTER_BASE_URL → If different from default
 * 9ROUTER_API_KEY → if any
 
 ## Diagnostic & Optimization Flags

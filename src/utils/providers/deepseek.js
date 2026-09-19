@@ -53,7 +53,7 @@ export const getDeepSeekStream = async function* (apiKey, model, contents, syste
     // DeepSeek Specific Reasoning
     const customEffort = getMappedThinkingLevel('DeepSeek', model, thinkingLevel);
     const reasoningEffortMap = {
-        'Low': 'high',
+        'Low': 'low',
         'Medium': 'high',
         'Standard': 'high',
         'High': 'max',

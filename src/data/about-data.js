@@ -90,7 +90,7 @@ Public Docs: https://fluxflow-cli.onrender.com
 * In-App Settings (/settings) & Recommended Presets → references/SETTINGS.md
 * In-app /commands → references/COMMANDS.md
 * CLI Startup Flags → references/STARTUP.md
-* Environment Variables → references/ENV.md
+* Environment Variables, Subagents, API Keys → references/ENV.md
 * Tool System (Workspace, Web, Communication, Sub-Agents, Safety, Creative, Computer Use) → references/TOOLS.md
 * Sub-Agents & Multi-Agent Runtime → references/SUB_AGENTS.md
 * Security, Sandboxing & Checkpoints (/revert, double-ESC) → references/SECURITY.md

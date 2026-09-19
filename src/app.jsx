@@ -7123,7 +7123,7 @@ export default function App({ args = [] }) {
                                                         ) : escPressCount === 1 ? (
                                                             <Text color={colors.inputPrompt} bold>  Press ESC again to {input.length > 0 ? 'clear input' : 'revert codebase to checkpoint'}...</Text>
                                                         ) : (
-                                                            <Text color={colors.inputPlaceholder}>{escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compacting session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
+                                                            <Text color={colors.inputPlaceholder}>{escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compacting session history, please wait..." : !isProcessing ? (messages.filter(m => m.role === 'user').length === 0 ? `  Send message, @file or /cmd (${terminalEnv.shortcut} for newline)` : "  Ask Follow-ups") : "  Enter a prompt to steer the agent."}</Text>
                                                         )}
                                                     </Box>
                                                 )}

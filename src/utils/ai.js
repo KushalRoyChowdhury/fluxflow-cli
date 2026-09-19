@@ -4590,6 +4590,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const isDocSearch = normalizedPath === '#doc' || normalizedPath === '#docs' || normalizedPath === '#documentation' || normalizedPath.includes('#skill/global/fluxflow') || normalizedPath.includes('#skills/global/fluxflow');
 
                                     let postLabel;
+                                    let terminalWidth = 115;
+                                    if (process.stdout.isTTY) {
+                                        terminalWidth = process.stdout.columns - 5 || 120;
+                                    }
+                                    const safeWidth = Math.max(10, (terminalWidth / 2))
                                     if (isDocSearch) {
                                         postLabel = `${keyword ? '✔' : '✘'}  Searched Documentation`;
                                     } else {
@@ -4597,14 +4602,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         const displayPath = _sp && _sp !== '.'
                                             ? `"${_isGlob ? rawPath : (_isDir ? `${_sp}/*` : _sp)}"`
                                             : './';
-                                        postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword : ''}" in ${displayPath.replaceAll('\\', '/')} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                        postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword.length > terminalWidth/2 ? `${keyword.slice(safeWidth)}...` : keyword : ''}" in ${displayPath.replaceAll('\\', '/')} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
                                     }
 
-                                    // Get terminal physical width
-                                    let terminalWidth = 115;
-                                    if (process.stdout.isTTY) {
-                                        terminalWidth = process.stdout.columns - 5 || 120;
-                                    }
                                     const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                                     const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                     yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
@@ -5354,7 +5354,20 @@ Current Time: ${time}
 
         if (logCallback) logCallback(`[Subagent Turn ${turn + 1}]...`);
 
-        const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstructionSubAgent, 'Fast');
+        const validThinkingLevels = ['Fast', 'Low', 'Medium', 'High'];
+        const thinkingOveride = process.env.SUBAGENT_THINKING;
+
+        const thinkingLevelForSubAgents = validThinkingLevels.includes(thinkingOveride)
+            ? thinkingOveride
+            : 'Low';
+
+        const response = await generateSimpleContent(
+            mergedSettings,
+            targetModel,
+            contents,
+            systemInstructionSubAgent,
+            thinkingLevelForSubAgents
+        );
         const responseText = response.text || '';
         const cleanResponse = stripTrailingFluffAfterTools(stripLeadingThinking(responseText).trim());
         finalAnswer = cleanResponse;

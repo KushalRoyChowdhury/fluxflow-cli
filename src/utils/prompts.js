@@ -600,24 +600,25 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
     // ${ mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architecture, clean abstractions, stepwise execution. Use latest practices/libraries, verify imports, run automated tests" : `Mode: ${mode}. Concise, Humorous, Sarcastic` }
 
-    function normaliseThinkingLevel(thinkingLevel, provider, model) {
-        const map = {
-            Low: 'Low',
-            Standard: 'Medium',
-            Medium: 'Medium',
-            High: 'High',
-            xHigh: '',
-            Max: ''
-        };
+    // function normaliseThinkingLevel(thinkingLevel, provider, model) {
+    //     const map = {
+    //         Low: 'Low',
+    //         Standard: 'Medium',
+    //         Medium: 'Medium',
+    //         High: 'High',
+    //         xHigh: '',
+    //         Max: ''
+    //     };
 
-        // If the level is custom mapped (or the custom 'xHigh' slot is mapped) in thinking_config.js,
-        // treat it as custom and don't append a label.
-        if (getMappedThinkingLevel(provider, model, thinkingLevel) || getMappedThinkingLevel(provider, model, 'xHigh')) {
-            return '';
-        }
+    //     // If the level is custom mapped (or the custom 'xHigh' slot is mapped) in thinking_config.js,
+    //     // treat it as custom and don't append a label.
+    //     if (getMappedThinkingLevel(provider, model, thinkingLevel) || getMappedThinkingLevel(provider, model, 'xHigh')) {
+    //         return '';
+    //     }
 
-        return map[thinkingLevel] ?? '';
-    }
+    //     return map[thinkingLevel] ?? '';
+    //     // ${ normaliseThinkingLevel(thinkingLevel, aiProvider, targetModel) }
+    // }
 
     const now = new Date();
     const year = now.getFullYear();
@@ -639,7 +640,7 @@ mode === "Flow" ? `Concise, Humorous, Sarcastic` :
 mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
 "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}
 
-- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim())} ${normaliseThinkingLevel(thinkingLevel, aiProvider, targetModel)}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read available relevant skills for tasks before proceeding (scope: global/project): Use ReadFile, virtual path=\"#skills/scope/skillName\". In-skill references: path=\"#skills/scope/skillName/skill-reference-folder/file-name.md\"' : ''}
+- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim())}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read available relevant skills for tasks before proceeding (scope: global/project): Use ReadFile, virtual path=\"#skills/scope/skillName\". In-skill references: path=\"#skills/scope/skillName/skill-reference-folder/file-name.md\"' : ''}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
@@ -651,6 +652,7 @@ ${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider, systemSettings?.adva
 
 ${nameStr}${nicknameStr}${userInstrStr}${additionalInstrStr}${globalSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Global Skills --\n${globalSkillsPrompt}\n\n` : ''}${localSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Project Skills --\n${localSkillsPrompt}\n\n` : ''}${userMemoriesStr}`.trim();
 };
+
 
 // -- SECURITY RULES --${systemSettings.allowExternalAccess ? '' : '\n- ACCESS CONTROL: CWD only'}
 // -- SECURITY POLICIES --\n- Sensitive files? Ask before Read\n
