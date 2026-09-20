@@ -14,13 +14,19 @@ const AskUserModal = ({ question, options, onResolve, theme = 'Dark' }) => {
 
     const hasOptions = Array.isArray(options) && options.length > 0;
 
+    const isAgentLongRunningPrompt = question === 'Agent has been running for a long time. Do you want to continue execution?';
+
     try {
-        allOptions = [
-            ...(hasOptions ? options : []),
-            hasOptions
-                ? { id: 'CUSTOM', label: 'Suggest something else...', description: 'Provide a custom response' }
-                : { id: 'CUSTOM', label: 'Your Answer', description: '' }
-        ];
+        if (isAgentLongRunningPrompt && hasOptions) {
+            allOptions = [...options];
+        } else {
+            allOptions = [
+                ...(hasOptions ? options : []),
+                hasOptions
+                    ? { id: 'CUSTOM', label: 'Suggest something else...', description: 'Provide a custom response' }
+                    : { id: 'CUSTOM', label: 'Your Answer', description: '' }
+            ];
+        }
     } catch (e) {
         canceled = true;
     }
@@ -98,7 +104,9 @@ const AskUserModal = ({ question, options, onResolve, theme = 'Dark' }) => {
             width="100%"
         >
             <Box paddingX={1} marginBottom={1}>
-                <Text color="yellow" bold>AGENT REQUEST: ACTION REQUIRED</Text>
+                <Text color="yellow" bold>
+                    {isAgentLongRunningPrompt ? 'TURN SAFETY SYSTEM: EXECUTION LIMIT' : 'AGENT REQUEST: ACTION REQUIRED'}
+                </Text>
             </Box>
 
             <Box paddingX={1} marginBottom={1}>

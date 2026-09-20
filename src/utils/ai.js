@@ -2338,8 +2338,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
         let lastUsage = null;
-        let MAX_LOOPS = mode === 'Flux' ? 200 : 15;
-        MAX_LOOPS = mode.toLowerCase().includes('cu') ? 300 : MAX_LOOPS;
+        let MAX_LOOPS = mode === 'Flux' ? 50 : 15;
+        MAX_LOOPS = mode.toLowerCase().includes('cu') ? 75 : MAX_LOOPS;
+        const LOOP_INCREMENT = Math.floor(MAX_LOOPS / 2);
+        let lastPromptedThreshold = 0;
         const MAX_RETRIES = 16;
         yield { type: 'status', content: 'Connecting' };
 
@@ -2347,9 +2349,29 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let fullAgentResponseChunks = [];
         let wasToolCalledInLastLoop = false;
+        let hasTurnCompleted = false;
 
         // 1 extra loop for grace period
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
+            // Check if agent reached 95% of current MAX_LOOPS and prompt user on every limit threshold reached
+            const currentPromptThreshold = Math.floor(MAX_LOOPS * 0.95);
+            if (loop >= currentPromptThreshold && lastPromptedThreshold < currentPromptThreshold && typeof settings?.onAskUser === 'function') {
+                lastPromptedThreshold = currentPromptThreshold;
+                try {
+                    const question = `Agent has been running for a long time. Do you want to continue execution?`;
+                    const options = [
+                        { id: 'continue', label: 'Continue', description: `Add few more steps` },
+                        { id: 'cancel', label: 'Cancel', description: 'Stop extending and finish current turn limit' }
+                    ];
+                    const choice = await settings.onAskUser(question, options);
+                    if (choice && (choice.toLowerCase().includes('continue') || choice === 'Continue')) {
+                        MAX_LOOPS += LOOP_INCREMENT;
+                    }
+                } catch (e) {
+                    // silently proceed on ask user errors
+                }
+            }
+
             // Quota Check
             const quotaCheck = await checkQuotaDetailed('agent', settings);
             if (!quotaCheck.allowed) {
@@ -2784,9 +2806,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                     }
 
-                    // [JIT STEP SENTRY] - Only inject step warning if loop is at >= 80% of MAX_LOOPS for Flow and 98% for Flux
+                    // [JIT STEP SENTRY] - Only inject step warning if loop is at >= 99%
                     // Keeps prompts fully cached and static for the vast majority of runs!
-                    const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.8));
+                    const stepThreshold = Math.floor(MAX_LOOPS * 0.99);
                     const currentStep = loop + 1;
                     if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
                         lastUserMsg.parts[0].text += `\n[system] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue. [/system]`;
@@ -5052,6 +5074,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
 
             if (isActuallyFinished) {
+                hasTurnCompleted = true;
                 const fullAgentTextRaw = fullAgentResponseChunks.join('\n');
                 const cleanedFullResponse = stripLeadingThinking(fullAgentTextRaw).trim();
 
@@ -5148,6 +5171,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 await AdvanceRevertManager.recordTurnDelta(chatId, loop + 1, currentTurnTools);
             }
             wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
+        }
+
+        // Programmatic Fallback: If loop limit was exhausted without natural finish
+        if (!hasTurnCompleted && !TERMINATION_SIGNAL) {
+            const limitMsg = `✦ Turn safety limit reached. Stopping execution.`;
+            yield { type: 'text', content: `\n\n${limitMsg}\n` };
+            const fullAgentTextRaw = (fullAgentResponseChunks.join('\n') + `\n${limitMsg}`).trim();
+            yield {
+                type: 'interactive_turn_finished',
+                data: {
+                    agentText,
+                    fullAgentTextRaw,
+                    history: [...modifiedHistory],
+                    needTitle
+                }
+            };
+            yield { type: 'status', content: '[end]' };
         }
 
     } catch (err) {
@@ -5331,6 +5371,12 @@ Current Time: ${time}
     let finalAnswer = '';
 
     while (turn < maxTurns) {
+        // Quota Check
+        const quotaCheck = await checkQuotaDetailed('subagent', mergedSettings);
+        if (!quotaCheck.allowed) {
+            throw new Error(quotaCheck.reason || `Budget Exhausted for Provider (${mergedSettings?.aiProvider || 'Subagent'})`);
+        }
+
         if (TERMINATION_SIGNAL) {
             if (settings?.taskId && typeof subagentProgress !== 'undefined') {
                 const taskObj = subagentProgress.find(t => t.id === settings.taskId);

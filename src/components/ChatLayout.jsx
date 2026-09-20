@@ -1150,6 +1150,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         const selection = selectionMatch ? selectionMatch[1] : 'No selection';
         const questionMatch = msg.text.match(/Question: (.*)/);
         const question = questionMatch ? questionMatch[1] : null;
+        const isAgentLongRunningPrompt = question === 'Agent has been running for a long time. Do you want to continue execution?';
 
         return (
             <Box marginBottom={0} paddingX={1} width="100%">
@@ -1169,7 +1170,9 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                     width={columns - 2}
                 >
                     <Box paddingX={1}>
-                        <Text color={colors.success} bold>AGENT REQUEST: RESOLVED</Text>
+                        <Text color={colors.success} bold>
+                            {isAgentLongRunningPrompt ? 'TURN SAFETY SYSTEM: RESOLVED' : 'AGENT REQUEST: RESOLVED'}
+                        </Text>
                     </Box>
                     {question && (
                         <Box paddingX={1} marginTop={1}>
