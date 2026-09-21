@@ -3563,7 +3563,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 // Dynamic Thinking Cap based on tier (Only applicable for Gemma)
                                 let isOverVerboseThinking = false;
-                                if ((aiProvider.toLowerCase().includes('google') || aiProvider.toLowerCase().includes('mistral')) && ((targetModel || "").toLowerCase().startsWith('gemma') || (targetModel || "").toLowerCase().includes('stral'))) {
+                                if (aiProvider.toLowerCase().includes('google') && (targetModel || "").toLowerCase().startsWith('gemma')) {
                                     const thinkingCaps = {
                                         'low': 256,
                                         'medium': 1024,
