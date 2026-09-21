@@ -175,17 +175,22 @@ export const view_file = async (args, context = {}) => {
         const rest = normalized.replace(/^#skills?\/?/i, '');
         const parts = rest.split('/').filter(Boolean);
 
-        const scope = parts[0]?.toLowerCase();
-        if (scope !== 'global' && scope !== 'project') {
-            return `ERROR: Invalid skill scope '${scope || ''}'. Expected 'global' or 'project'.`;
+        let scope = 'project';
+        let skillName = '';
+        let subPath = '';
+
+        if (parts[0]?.toLowerCase() === 'global' || parts[0]?.toLowerCase() === 'project') {
+            scope = parts[0].toLowerCase();
+            skillName = parts[1];
+            subPath = parts.slice(2).join('/');
+        } else {
+            skillName = parts[0];
+            subPath = parts.slice(1).join('/');
         }
 
-        const skillName = parts[1];
         if (!skillName) {
             return `ERROR: Missing skill name in path [${targetPath}].`;
         }
-
-        const subPath = parts.slice(2).join('/');
 
         const baseDir = scope === 'global' ? FLUXFLOW_DIR : process.cwd();
         const skillFiles = findSkillFiles(baseDir);
