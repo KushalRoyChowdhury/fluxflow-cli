@@ -146,6 +146,7 @@ export const stripNakedXmlTags = (str) => {
 };
 
 export const stripTrailingFluffAfterTools = (text) => {
+    // return text;
     if (!text || typeof text !== 'string') return text;
     const tools = detectToolCalls(text);
     if (!tools || tools.length === 0) return text;
@@ -3105,6 +3106,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     let isBufferingToolCall = false;
                     let activeBufferType = null; // 'tool', 'agent', 'end', 'kimi_section', 'kimi_call'
                     let emittedToolCallInTurn = false;
+                    let isToolCallInBacktick = false; // true when the buffered tool format is inside a backtick/code-fence (visible example, not a real call)
+                    let isInsideCodeFence = false;   // persistent across chunks: true while inside a ```...``` fence
+
+                    // Count triple-backtick sequences in `text` and toggle isInsideCodeFence for each one found.
+                    // Must be called with every segment of text that is "consumed" (emitted or skipped over)
+                    // so that the fence state stays accurate across streaming chunks.
+                    const toggleFenceState = (text) => {
+                        let i = 0;
+                        while (i + 2 < text.length) {
+                            if (text[i] === '`' && text[i + 1] === '`' && text[i + 2] === '`') {
+                                isInsideCodeFence = !isInsideCodeFence;
+                                i += 3;
+                            } else {
+                                i++;
+                            }
+                        }
+                    };
 
                     const BUFFER_TYPES = {
                         tool: { startPrefix: '[tool', fullPrefix: '[tool:functions.', endTag: ']' },
@@ -3137,10 +3155,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 if (indices.length > 0) {
                                     const match = indices[0];
-                                    if (match.idx > 0) {
-                                        if (!emittedToolCallInTurn) {
-                                            msgs.push({ type: 'text', content: remaining.substring(0, match.idx) });
-                                        }
+                                    const textBefore = remaining.substring(0, match.idx);
+
+                                    // Update fence state for the text BEFORE [tool so we know if we're inside a fence at that position
+                                    toggleFenceState(textBefore);
+                                    const charBefore = match.idx > 0 ? remaining[match.idx - 1] : '';
+                                    // Treat as a visible example (not a real call) if inside a code fence OR preceded by a backtick
+                                    isToolCallInBacktick = isInsideCodeFence || charBefore === '`';
+
+                                    if (match.idx > 0 && !emittedToolCallInTurn) {
+                                        msgs.push({ type: 'text', content: textBefore });
                                     }
 
                                     isBufferingToolCall = true;
@@ -3170,10 +3194,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                     if (splitPoint !== -1) {
                                         if (splitPoint > 0) {
+                                            const textBeforeSplit = remaining.substring(0, splitPoint);
+                                            toggleFenceState(textBeforeSplit);
                                             if (!emittedToolCallInTurn) {
-                                                msgs.push({ type: 'text', content: remaining.substring(0, splitPoint) });
+                                                msgs.push({ type: 'text', content: textBeforeSplit });
                                             }
                                         }
+                                        // At the split point, check fence state for the pending tag start
+                                        const splitCharBefore = splitPoint > 0 ? remaining[splitPoint - 1] : '';
+                                        isToolCallInBacktick = isInsideCodeFence || splitCharBefore === '`';
                                         isBufferingToolCall = true;
                                         toolCallBuffer = remaining.substring(splitPoint);
                                         remaining = '';
@@ -3181,6 +3210,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (!emittedToolCallInTurn) {
                                             msgs.push({ type: 'text', content: remaining });
                                         }
+                                        toggleFenceState(remaining);
                                         break;
                                     }
                                 }
@@ -3208,9 +3238,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (!emittedToolCallInTurn) {
                                             msgs.push({ type: 'text', content: combined });
                                         }
+                                        toggleFenceState(combined);
                                         toolCallBuffer = '';
                                         isBufferingToolCall = false;
                                         activeBufferType = null;
+                                        isToolCallInBacktick = false;
                                         remaining = '';
                                         break;
                                     }
@@ -3261,14 +3293,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 if (endIdx !== -1) {
                                     const endLen = endTag.length;
+                                    const fullMatch = combined.substring(0, endIdx + endLen);
                                     if (!activeBufferType?.startsWith('kimi')) {
                                         // Standard tools are outputted to frontend (app.jsx intercepts standard ones)
-                                        const fullMatch = combined.substring(0, endIdx + endLen);
                                         msgs.push({ type: 'text', content: fullMatch });
                                     }
-                                    if (activeBufferType === 'tool' || activeBufferType === 'agent' || activeBufferType?.startsWith('kimi')) {
+                                    // Update fence state for the entire tool call text (it may contain ``` inside args)
+                                    toggleFenceState(fullMatch);
+                                    if ((activeBufferType === 'tool' || activeBufferType === 'agent' || activeBufferType?.startsWith('kimi')) && !isToolCallInBacktick) {
                                         emittedToolCallInTurn = true;
                                     }
+                                    isToolCallInBacktick = false; // reset for next tool call
                                     toolCallBuffer = '';
                                     isBufferingToolCall = false;
                                     activeBufferType = null;
@@ -3281,9 +3316,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (!emittedToolCallInTurn) {
                                             msgs.push({ type: 'text', content: combined });
                                         }
+                                        toggleFenceState(combined);
                                         toolCallBuffer = '';
                                         isBufferingToolCall = false; // Give up on this
                                         activeBufferType = null;
+                                        isToolCallInBacktick = false;
                                     } else {
                                         toolCallBuffer = combined;
                                     }
@@ -3790,8 +3827,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     label = `${path ? '✔' : '✘'}  ${action}: ${path ? `${path === '.' ? `./${recurse > 1 ? '*' : ''}` : `${path.replaceAll('\\', '/')}${recurse > 1 ? `${path.endsWith('/') ? `*` : `/*`}` : `${path.endsWith('/') ? '' : '/'}`}`}` : 'No Folder Selected'}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                    const path = parseArgs(toolCall.args).path || null;
-                                    label = `${path ? '✔' : '✘'}  ${action}: ${path.replaceAll('\\', '/') || 'No File Changes'}`;
+                                    const parsedToolArgs = parseArgs(toolCall.args);
+                                    const path = parsedToolArgs.path || null;
+                                    const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && v.startsWith('^LINE:'));
+                                    const sep = hasLineAnchor ? '፡' : ':';
+                                    label = `${path ? '✔' : '✘'}  ${action}${sep} ${path ? path.replaceAll('\\', '/') : 'No File Changes'}`;
                                 } else if (normToolName === 'write_pdf') {
                                     const path = parseArgs(toolCall.args).path || null;
                                     label = `${path ? '✔' : '✘'}  Generated: ${path.replaceAll('\\', '/') || 'No PDF Generated'}`;
@@ -4442,7 +4482,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             // Restore UI feedback
                                             const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                            const feedbackLabel = `${filePath ? '✔' : '✘'} ${action}: ${filePath.replaceAll('\\', '/') || 'No File Changes'}`;
+                                            const parsedToolArgs = parseArgs(toolCall.args);
+                                            const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && v.startsWith('^LINE:'));
+                                            const sep = hasLineAnchor ? '፡' : ':';
+                                            const feedbackLabel = `${filePath ? '✔' : '✘'} ${action}${sep} ${filePath ? filePath.replaceAll('\\', '/') : 'No File Changes'}`;
                                             // Get terminal physical width
                                             let terminalWidth = 115;
                                             if (process.stdout.isTTY) {
@@ -5191,13 +5234,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
     } catch (err) {
-        const rawErrStr = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return err.message || String(err); } })() : String(err);
+        const causeStr = err?.cause ? ` (Cause: ${err.cause?.message || String(err.cause)})` : '';
+        const rawErrStr = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return (err.message ? `${err.message}${causeStr}` : '') || String(err); } })() : String(err);
         const errLog = rawErrStr.replace(/^(Error:\s*)+/i, '');
         const date = new Date().toLocaleString();
         const agentErrDir = path.join(LOGS_DIR, 'agent');
         yield { type: 'text', content: `\n\n✦ CRITICAL ERROR: ${errLog.includes('fetch failed') ? 'Failed to Connect. Check your Internet Connection or Wait a moment' : errLog}\n⠀` };
         if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
-        fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${err}\n\n----------------------------------------------------------------------\n\n`);
+        fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${err}${err?.cause ? `\nCAUSE: ${err.cause?.stack || err.cause}` : ''}\n\n----------------------------------------------------------------------\n\n`);
 
         if (typeof flushGoogleBuffer === 'function') {
             yield* flushGoogleBuffer();
@@ -5342,7 +5386,7 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 - CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find definitions, logic, relevant code, standard junk auto-excluded
 - ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
 - ReadFile(path=string, startLine?=int, endLine?=int)
-- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchors: ^LINE:...$ syntax, must for large blocks/escape sequences
+- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchors: ^LINE:...$ syntax, must for large blocks & escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
 - Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user`.trim();
 
@@ -5535,10 +5579,12 @@ Current Time: ${time}
                 label = `${path ? '✔' : '✘'} \x1b[95mCreated\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}` : 'No File Changes'}`;
             }
 
-            else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file' || normalizedToolName === 'patchfile' || normalizedToolName === 'updatefile') {
-                const path = parseArgs(toolCall.args).path || null;
-                const content = parseArgs(toolCall.args).content || null;
-                label = `${path ? '✔' : '✘'} \x1b[95mEdited\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}` : 'No File Changes'}`;
+            else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file') {
+                const parsedToolArgs = parseArgs(toolCall.args);
+                const path = parsedToolArgs.path || null;
+                const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && v.startsWith('^LINE:'));
+                const sep = hasLineAnchor ? '፡' : ':';
+                label = `${path ? '✔' : '✘'} \x1b[95mEdited\x1b[0m${sep} ${path ? `${path.replaceAll('\\', '/')}` : 'No File Changes'}`;
             }
 
             else if (normalizedToolName === 'exec_command' || normalizedToolName === 'execcommand' || normalizedToolName === 'run') {

@@ -231,34 +231,35 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
 
             {/* 🔋 PERFORMANCE & TELEMETRY ZONE */}
             <Box>
-                {isProcessing ? (
+                {isProcessing && !showTPMEstimate ? (
                     <Box>
-                        <Text color={dotColor}>●</Text>
-                        {showTPMEstimate && (
-                            <>
-                                <Text color={colors.textMuted} bold> {displayedWps} tps</Text>
-                                <Text color={colors.textMuted} dimColor> ┃</Text>
-                            </>
-                        )}
+                        <Text color={dotColor}>● </Text>
                     </Box>
                 ) : null}
+                {isProcessing && showTPMEstimate && (
+                    <>
+                        <Text color={colors.textMuted}>{displayedWps} tok/s</Text>
+                        <Text color={colors.textMuted} dimColor> ┃</Text>
+                    </>
+                )}
                 {tokens > 0 &&
                     <>
                         <Box marginX={1}>
                             <Text color={colors.text}>
-                                {formatTokens(tokensTotal)}
+                                {formatTokens(tokensTotal)} tok
                                 {(() => {
                                     const prompt = typeof promptTokens === 'number' ? promptTokens : 0;
                                     const cached = typeof cachedTokens === 'number' ? cachedTokens : 0;
                                     const pct = prompt > 0 ? (cached / prompt) * 100 : 0;
                                     if (pct < 1) return null;
-                                    return <Text color={colors.success || 'green'} dimColor> {pct.toFixed(0)}%</Text>;
+                                    return <Text color={colors.success || 'green'} dimColor> [{pct.toFixed(0)}% cached]</Text>;
                                 })()}
                             </Text>
                         </Box>
 
                         <Text color={colors.textMuted} dimColor>┃</Text>
-                    </>}
+                    </>
+                }
 
                 <Box marginLeft={1}>
                     <Text color={colors.textMuted} bold>{memoryUsage} {memoryUnit}</Text>

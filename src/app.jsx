@@ -616,7 +616,7 @@ const SubagentRow = React.memo(({ sa, showTPMEstimate = false }) => {
     return (
         <Box justifyContent="space-between" width="100%">
             <Text color="white"> • {sa.title} <Text color="white" dimColor>({sa.id})</Text></Text>
-            <Text color="white"><Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text><Text color={dotColor}> ●</Text>{showTPMEstimate && <Text color="white" dimColor bold> ({displayedWps} tps)</Text>}</Text>
+            <Text color="white"><Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text><Text color={dotColor}> ●</Text>{showTPMEstimate && <Text color="white" dimColor bold> ({displayedWps} tok/s)</Text>}</Text>
         </Box>
     );
 });
@@ -2686,7 +2686,7 @@ export default function App({ args = [] }) {
                 { cmd: 'Low', display: getMappedThinkingLevel(aiProvider, activeModel, 'Low') !== null ? `Low (${getMappedThinkingLevel(aiProvider, activeModel, 'Low')})` : 'Low', desc: 'Quick Reasoning' },
                 { cmd: 'Medium', display: getMappedThinkingLevel(aiProvider, activeModel, 'Medium') !== null ? `Medium (${getMappedThinkingLevel(aiProvider, activeModel, 'Medium')})` : 'Medium', desc: 'Balanced Reasoning' },
                 { cmd: 'High', display: getMappedThinkingLevel(aiProvider, activeModel, 'High') !== null ? `High (${getMappedThinkingLevel(aiProvider, activeModel, 'High')})` : 'High', desc: 'Deep Reasoning' },
-                { cmd: 'custom', display: getMappedThinkingLevel(aiProvider, activeModel, 'xHigh') !== null ? `Custom (${getMappedThinkingLevel(aiProvider, activeModel, 'xHigh')})` : 'Custom', desc: 'Extended Reasoning' }
+                { cmd: 'custom', display: getMappedThinkingLevel(aiProvider, activeModel, 'xHigh') !== null ? `Custom (${getMappedThinkingLevel(aiProvider, activeModel, 'xHigh')})` : 'Custom', desc: 'Custom Reasoning Value' }
             ]
         },
         {

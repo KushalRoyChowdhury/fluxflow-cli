@@ -1,6 +1,19 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.16.16": {
+        "note": "SEPTEMBER 23",
+        "added": [],
+        "changed": [
+            "Added auto scope fallback for skill loading tools.",
+            "Removed Reasoning Cap for Mistral API due to later changes in model database Architecture.",
+            "Status bar improvements."
+        ],
+        "fixes": [
+            "Fixed double reasoning bug in Mistral API.",
+            "Fixed UI Rendering Issues."
+        ]
+    },
     "4.16.12": {
         "note": "SEPTEMBER 18",
         "added": [

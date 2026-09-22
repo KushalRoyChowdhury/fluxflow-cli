@@ -360,17 +360,17 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
                         );
                     }
                 }
-                if (part.startsWith('[') && (part.includes('][') || part.includes('] ['))) {
-                    const match = part.match(REGEX_MD_LINK_BRACKET);
-                    if (match) {
-                        const linkUrl = match[2] || match[1];
-                        return (
-                            <Text key={j} color={highlightColor} underline italic>
-                                {linkUrl}
-                            </Text>
-                        );
-                    }
-                }
+                // if (part.startsWith('[') && (part.includes('][') || part.includes('] ['))) {
+                //     const match = part.match(REGEX_MD_LINK_BRACKET);
+                //     if (match) {
+                //         const linkUrl = match[2] || match[1];
+                //         return (
+                //             <Text key={j} color={highlightColor} underline italic>
+                //                 {linkUrl}
+                //             </Text>
+                //         );
+                //     }
+                // }
                 if (part.startsWith('http')) {
                     return <Text key={j} color={highlightColor} underline italic>{part}</Text>;
                 }
@@ -1525,7 +1525,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
             ];
             const hColor = headingColors[level - 1] || colors.text;
             return (
-                <Box flexDirection="column" paddingX={1} width="100%" marginTop={1} marginBottom={0}>
+                <Box flexDirection="column" paddingX={1} width="100%" marginTop={0} marginBottom={0}>
                     <Text bold color={hColor} underline>
                         <InlineMarkdown text={hText} color={hColor} theme={theme} />
                     </Text>

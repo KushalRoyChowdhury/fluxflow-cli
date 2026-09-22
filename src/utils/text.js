@@ -714,7 +714,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
         const blocks = body.split(sep);
         const processedBlocks = blocks.map(block => {
             const lines = block.split('\n').filter(l => l.trim() !== '');
-            if (lines.length > 45) {
+            if (lines.length > 120) {
                 return `[[VERIFIED]]\n${block}\n[[/VERIFIED]]`;
             }
             return block;
