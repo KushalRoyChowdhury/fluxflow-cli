@@ -2290,7 +2290,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
 
-        const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools\nInstead, output in chat the exact string you WOULD have produced & wait for system response\n' : '';
+        const wildcardToolingPrompt = wildcardTooling ? '[system] exact tool string format [tool:functions.ToolName(arg="value")] in chat [/system]\nYou cannot execute tools\nInstead, output in chat the exact string you WOULD have produced & wait for system response\n' : '';
 
         const isForceReasoning = process.env.forcedReasoning || false;
 
@@ -2316,7 +2316,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (shouldCheckExclude && !hasMovingParts) {
             firstUserMsg = cleanPromptForModel.trim();
         } else {
-            firstUserMsg = `[System Metadata]\nTime: ${shouldCheckExclude ? dateTimeStrExclude : dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}[system] exact tool string [tool:functions.ToolName(arg="value")] in chat [/system]\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+            firstUserMsg = `[System Metadata]\nTime: ${shouldCheckExclude ? dateTimeStrExclude : dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
         }
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
@@ -3163,8 +3163,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     // Treat as a visible example (not a real call) if inside a code fence OR preceded by a backtick
                                     isToolCallInBacktick = isInsideCodeFence || charBefore === '`';
 
-                                    if (match.idx > 0 && !emittedToolCallInTurn) {
-                                        msgs.push({ type: 'text', content: textBefore });
+                                    if (match.idx > 0) {
+                                        if (!emittedToolCallInTurn) {
+                                            msgs.push({ type: 'text', content: textBefore });
+                                        } else {
+                                            const lfOnly = textBefore.replace(/[^\n]/g, '');
+                                            if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
+                                        }
                                     }
 
                                     isBufferingToolCall = true;
@@ -3198,6 +3203,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             toggleFenceState(textBeforeSplit);
                                             if (!emittedToolCallInTurn) {
                                                 msgs.push({ type: 'text', content: textBeforeSplit });
+                                            } else {
+                                                const lfOnly = textBeforeSplit.replace(/[^\n]/g, '');
+                                                if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
                                             }
                                         }
                                         // At the split point, check fence state for the pending tag start
@@ -3209,6 +3217,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     } else {
                                         if (!emittedToolCallInTurn) {
                                             msgs.push({ type: 'text', content: remaining });
+                                        } else {
+                                            const lfOnly = remaining.replace(/[^\n]/g, '');
+                                            if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
                                         }
                                         toggleFenceState(remaining);
                                         break;
@@ -3237,6 +3248,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (isMismatch) {
                                         if (!emittedToolCallInTurn) {
                                             msgs.push({ type: 'text', content: combined });
+                                        } else {
+                                            const lfOnly = combined.replace(/[^\n]/g, '');
+                                            if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
                                         }
                                         toggleFenceState(combined);
                                         toolCallBuffer = '';
@@ -3315,6 +3329,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (combined.length > MAX_BUFFER) {
                                         if (!emittedToolCallInTurn) {
                                             msgs.push({ type: 'text', content: combined });
+                                        } else {
+                                            const lfOnly = combined.replace(/[^\n]/g, '');
+                                            if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
                                         }
                                         toggleFenceState(combined);
                                         toolCallBuffer = '';
@@ -4659,7 +4676,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (process.stdout.isTTY) {
                                         terminalWidth = process.stdout.columns - 5 || 120;
                                     }
-                                    const safeWidth = Math.max(10, (terminalWidth / 2))
+                                    const safeWidth = Math.max(10, (terminalWidth + 5) / 3);
                                     if (isDocSearch) {
                                         postLabel = `${keyword ? '✔' : '✘'}  Searched Documentation`;
                                     } else {
@@ -5363,7 +5380,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-You cant execute tools. Instead, output in chat the exact string [tool:functions.ToolName(arg1="value1")] & wait for system response ← no exception, tool:functions must
+You cant execute tools. Instead output in chat the exact string [tool:functions.ToolName(arg1="value1")] ← mandatory, tool:functions must
 Tool Rules:
 - Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n, quote: \\\")
 - Same file, multiple edits? ONE PatchFile (≤15 blocks)

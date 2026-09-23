@@ -4141,7 +4141,8 @@ export default function App({ args = [] }) {
                                 isContinuingModelTurn = false;
                             };
 
-                            turnMessages.forEach(tm => {
+                            for (let tmIdx = 0; tmIdx < turnMessages.length; tmIdx++) {
+                                const tm = turnMessages[tmIdx];
                                 const isResult = tm.role === 'system' && (
                                     tm.text?.startsWith('[TOOL RESULT]') ||
                                     tm.text?.startsWith('SUCCESS:') ||
@@ -4152,7 +4153,7 @@ export default function App({ args = [] }) {
                                 );
                                 const rawOriginalText = tm.fullText || tm.text || '';
                                 const rawTrimmedText = rawOriginalText.trim();
-                                if (!rawTrimmedText && !tm.binaryPart) return;
+                                if (!rawTrimmedText && !tm.binaryPart) continue;
 
                                 if (isResult) {
                                     const emitText = !rawTrimmedText.startsWith('[TOOL RESULT]') ? `[TOOL RESULT]: ${rawTrimmedText}` : rawTrimmedText;
@@ -4168,14 +4169,27 @@ export default function App({ args = [] }) {
                                     const endsWithNewline = rawOriginalText.endsWith('\n');
                                     const hasToolCall = rawTrimmedText.toLowerCase().includes('tool:functions.') || rawTrimmedText.toLowerCase().includes('agent:generalist.');
 
+                                    // Find next agent message text to verify if it starts with '['
+                                    let nextAgentStartsWithBracket = false;
+                                    for (let nextIdx = tmIdx + 1; nextIdx < turnMessages.length; nextIdx++) {
+                                        const nextMsg = turnMessages[nextIdx];
+                                        if (nextMsg.role === 'agent') {
+                                            const nextText = (nextMsg.fullText || nextMsg.text || '').trim();
+                                            if (nextText) {
+                                                nextAgentStartsWithBracket = nextText.startsWith('[');
+                                                break;
+                                            }
+                                        }
+                                    }
+
                                     turnAgentParts.push(rawTrimmedText);
-                                    if (hasToolCall && endsWithNewline) {
+                                    if (hasToolCall && endsWithNewline && nextAgentStartsWithBracket) {
                                         isContinuingModelTurn = true;
                                     } else {
                                         isContinuingModelTurn = false;
                                     }
                                 }
-                            });
+                            }
 
                             flushTurn();
                         }

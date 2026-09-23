@@ -1,7 +1,7 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-    "4.16.16": {
+    "4.16.17": {
         "note": "SEPTEMBER 23",
         "added": [],
         "changed": [
@@ -11,7 +11,8 @@ export const changelogData = {
         ],
         "fixes": [
             "Fixed double reasoning bug in Mistral API.",
-            "Fixed UI Rendering Issues."
+            "Fixed UI Rendering Issues.",
+            "\"Fixed\" eternal turn context glitches."
         ]
     },
     "4.16.12": {

@@ -51,7 +51,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     // =====================================================================================================
 
     const fluxTools = `**Workspace Tools (path = relative; first argument; separator: '/')**
-- ReadFile(path=string, startLine?=int, endLine?=int)${aiProvider === 'Google' || isMultiModal ? `. Supports images/docs` : ''}
+- ReadFile(path=string, startLine?=int, endLine?=int)${aiProvider === 'Google' || isMultiModal ? `. Supports images` : ''}
 - ReadFolder(path=string, recurse?=int[1..3])
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchor: ^LINE:...$ syntax, must for large blocks &  escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
@@ -63,7 +63,7 @@ ${_cachedAdvanceRollback ? `
 Info: initial = current task prompt. Revert id = turn before disaster (eg. disaster: turn_3 → revert: turn_2). Reason explicitly
 - EmergencyRollback(method="getCheckpoint/forceRevert", id=string). Rollback workspace in this agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. getCheckpoint: id excluded\n` : ''}${enableSubAgents ? `
 **Sub Agent Tools**
-Default to using subagents whenever helpful, no user nudge needed
+Default to always using subagents whenever helpful, no user nudge needed
 Invocations:
 • Invoke (async/background, ≤7 parallel). Parallelize long tasks. May take time
 • InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
@@ -93,7 +93,7 @@ Invocations:
 
     return `
 -- TOOLS --
-You cant execute tools. Instead, output in chat the exact string [tool:functions.ToolName(arg1="value1")] & wait for system response ← no exception, tool:functions must
+You cant execute tools. Instead output in chat the exact string [tool:functions.ToolName(arg1="value1")] ← mandatory, tool:functions must, in NEW line
 Tool Rules:
 - Max 5 tools/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? ' (Goal: 5+)' : ''}
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
