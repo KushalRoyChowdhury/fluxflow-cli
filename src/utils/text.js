@@ -1267,7 +1267,7 @@ export const TOOL_LABELS = {
 // PRE-COMPILED REGEXES
 // Hoisted out of cleanSignals to prevent V8 from re-compiling during stream GC
 // ============================================================================
-const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|agent:generalist|agent\.generalist|\s*turn\s*:))/gi;
+const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:(?:functions\.)?|tool\.functions|agent:generalist|agent\.generalist|\s*turn\s*:))/gi;
 // Helper: returns true when `idx` in `str` falls inside a backtick code block or inline code span
 const isInsideBacktick = (str, idx) => {
     let inInlineCode = false;
@@ -1336,7 +1336,7 @@ export const cleanSignals = (text, role = 'agent') => {
         }
     }
 
-    const trigger = 'tool:functions.';
+    const trigger = 'tool:';
     const subagentTrigger = 'agent:generalist.';
 
     // FAST PATH: Bypass the heavy while-loop entirely if the tool trigger isn't present or not agent role
@@ -1358,18 +1358,6 @@ export const cleanSignals = (text, role = 'agent') => {
             // Skip tool calls that are inside backtick inline-code spans
             if (!bypassBacktick && isInsideBacktick(result, triggerIdxToUse)) {
                 // Advance past this occurrence so we don't loop forever
-                const searchFrom = triggerIdxToUse + currentTrigger.length;
-                const nextTool = lowerResult.indexOf(trigger, searchFrom);
-                const nextAgent = lowerResult.indexOf(subagentTrigger, searchFrom);
-                // If there are no more triggers outside of backticks we can bail
-                if (nextTool === -1 && nextAgent === -1) break;
-                // Otherwise the next iteration will pick them up naturally; just continue
-                // but we need to skip: temporarily remove/re-check by breaking the inner
-                // search — the safest way is to replace only up to the backtick span so
-                // subsequent indexOf calls skip what we already checked.
-                // We do this by shifting the search with a sentinel: not modifying result,
-                // just advance search pointer via a slice-and-restore trick.
-                // Simpler: collect all non-backtick trigger positions up front.
                 let safeIdx = -1;
                 let searchPos = 0;
                 while (true) {

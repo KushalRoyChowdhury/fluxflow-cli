@@ -57,8 +57,8 @@ const RE_STUTTER_WORD_BOUNDARY = /^[^\w]+|[^\w]+$/g;
 const RE_STUTTER_NON_ALNUM = /[^a-z0-9]/gi;
 
 // ─── Live Streaming / Tool Sniffing – pre-compiled regexes ───
-const RE_TOOL_CALL_FUNC = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
-const RE_TOOL_CALL_ANY = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
+const RE_TOOL_CALL_FUNC = /\[\s*tool:(?:functions\.)?([a-z0-9_]+)\s*\(/gi;
+const RE_TOOL_CALL_ANY = /\[\s*(?:tool:(?:functions\.)?|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
 const RE_TOOL_PARTIAL_ARGS_FALLBACK = /(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/;
 const RE_STRIP_QUOTES = /["']/g;
 const RE_BACKSLASH_SLASH = /\\/g;
@@ -419,7 +419,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         .slice(-14)
         .map(msg => {
             let processedText = stripLeadingThinking(stripAnsi(msg.text))
-                .replace(/\[tool:functions\..*?\]/g, '')
+                .replace(/\[tool:(?:functions\.)?.*?\]/g, '')
                 .replace(/\[Prompted on:.*?\]/g, '')
                 .replace(/\[METADATA \(PRIORITY: DYNAMIC\)\] Time: ([^|\n]+)/g, (match, p1) => {
                     return `[METADATA (PRIORITY: DYNAMIC)] Time: ${p1.replace(/:\d{2}/g, '')}`;
@@ -461,7 +461,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         needTitle
     );
 
-    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '').replace(/\[\[END\]\]/g, '').replace(/\[\[TOOL RESULTS\]\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
+    let agentRes = `${cleanedFullResponse.replace(/\[tool:(?:functions\.)?.*?\]/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '').replace(/\[\[END\]\]/g, '').replace(/\[\[TOOL RESULTS\]\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
     if (agentRes.length > AGENT_CONTEXT_LENGTH) {
         agentRes += '\n... (truncated) ...';
     }
@@ -2290,7 +2290,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
 
-        const wildcardToolingPrompt = wildcardTooling ? '[system] exact tool string format [tool:functions.ToolName(arg="value")] in chat [/system]\nYou cannot execute tools\nInstead, output in chat the exact string you WOULD have produced & wait for system response\n' : '';
+        const wildcardToolingPrompt = wildcardTooling ? '[system] exact tool string format [tool:ToolName(arg="value")] in chat [/system]\nYou cannot execute tools\nInstead, output in chat the exact string you WOULD have produced & wait for system response\n' : '';
 
         const isForceReasoning = process.env.forcedReasoning || false;
 
@@ -3125,7 +3125,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     };
 
                     const BUFFER_TYPES = {
-                        tool: { startPrefix: '[tool', fullPrefix: '[tool:functions.', endTag: ']' },
+                        tool: { startPrefix: '[tool', fullPrefix: '[tool:', endTag: ']' },
                         agent: { startPrefix: '[agent', fullPrefix: '[agent:generalist.', endTag: ']' },
                         end: { startPrefix: '[[END]]', fullPrefix: '[[END]]', endTag: '[[END]]' },
                         kimi_section: { startPrefix: '<|tool_calls_section_begin|>', fullPrefix: '<|tool_calls_section_begin|>', endTag: '<|tool_calls_section_end|>' },
@@ -3805,7 +3805,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const normalizedSkillPath = (targetPath || '').trim().toLowerCase().replaceAll('\\', '/');
                                     const isSkillPath = normalizedSkillPath.startsWith('#skill');
                                     if (isSkillPath) {
-                                        if (normalizedSkillPath.startsWith('#skill/global/fluxflow') || normalizedSkillPath.startsWith('#skills/global/fluxflow')) {
+                                        if (normalizedSkillPath.startsWith('#skill/global/fluxflow') || normalizedSkillPath.startsWith('#skills/global/fluxflow') || normalizedSkillPath.includes('#skill/fluxflow') || normalizedSkillPath.includes('#skills/fluxflow')) {
                                             label = '✔  Read Documentation';
                                         } else {
                                             label = `✔  Read Skill: ${path.basename(targetPath.replaceAll('\\', '/'))}`;
@@ -4669,7 +4669,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         }
                                     }
                                     const normalizedPath = (rawPath || '').trim().toLowerCase().replaceAll('\\', '/');
-                                    const isDocSearch = normalizedPath === '#doc' || normalizedPath === '#docs' || normalizedPath === '#documentation' || normalizedPath.includes('#skill/global/fluxflow') || normalizedPath.includes('#skills/global/fluxflow');
+                                    const isDocSearch = normalizedPath === '#doc' || normalizedPath === '#docs' || normalizedPath === '#documentation' || normalizedPath.includes('#skill/global/fluxflow') || normalizedPath.includes('#skill/fluxflow') || normalizedPath.includes('#skills/fluxflow') || normalizedPath.includes('#skills/global/fluxflow');
 
                                     let postLabel;
                                     let terminalWidth = 115;
@@ -5380,7 +5380,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-You cant execute tools. Instead output in chat the exact string [tool:functions.ToolName(arg1="value1")] ← mandatory, tool:functions must
+You cant execute tools. Instead output in chat the exact string [tool:ToolName(arg1="value1")] ← mandatory
 Tool Rules:
 - Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n, quote: \\\")
 - Same file, multiple edits? ONE PatchFile (≤15 blocks)

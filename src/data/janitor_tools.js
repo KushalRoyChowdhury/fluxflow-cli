@@ -1,5 +1,5 @@
 export const JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = true) => `
-To use tools, must output exactly '[tool:functions.ToolName(arg1="value1")]' structured string in chat response ← no exception
+To use tools, must output exactly '[tool:ToolName(arg1="value1")]' structured string in chat response ← no exception
 
 -- Chat Management Tools --
 - Chat(title="<short creative title of FULL conversation in 3 or 4 words>"). Consider full chat context to generate title NOT just latest message

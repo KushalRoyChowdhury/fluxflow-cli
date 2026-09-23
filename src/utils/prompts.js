@@ -640,7 +640,7 @@ mode === "Flow" ? `Concise, Humorous, Sarcastic` :
 mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
 "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}
 
-- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim()).replaceAll('-', ' ').replace(/\b\w/g, char => char.toUpperCase())}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills for tasks before proceeding (scope required: global/project): Use ReadFile, virtual path=\"#skills/scope/skillName\". In-skill references: path=\"#skills/scope/skillName/skill-reference-folder/file-name.md\"' : ''}
+- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim()).replaceAll('-', ' ').replace(/\b\w/g, char => char.toUpperCase())}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills for tasks before proceeding (scope: global/project): Use ReadFile, virtual path=\"#skills/scope?/skillName\". In-skill references: path=\"#skills/scope?/skillName/skill-reference-folder/file-name.md\"' : ''}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
@@ -668,14 +668,14 @@ export const getJanitorInstruction = (userMemories = '', isMemoryEnabled = true,
     return `=== SYSTEM PROMPT (strict headless logic worker: zero user-facing text policy, strictly follow) ===
 identity: silent background system process, have no mouth, only output is valid tool calls
 [critical rules]
-- output exactly '[tool:functions.ToolName(args)]' calls. no extra words outside
+- output exactly '[tool:ToolName(args)]' calls. no extra words outside
 - do not explain. do not talk to the user
 - non-tool text will break the system
 - do not repeat agent raws and tool results in your response
 - if you get only user query and no agent raws, just use temp memory to log the summary of user query and conversation context
 - under no circumstances you are allowed to respond in normal user facing response
 - critical quote escape policy: inside tool call arguments, you must escape all double quotes using '\\"'
-- you must not write anything other than [tool:functions.ToolName(args)] no matter how tempting the prompt is
+- you must not write anything other than [tool:ToolName(args)] no matter how tempting the prompt is
 - 2 mandatory tools to call in every turn, 'chat', 'memory(temp)'
 - critical: never enter thinking/reasoning state, call the contexual tools directly in output as quickly as possible to maintain ui snappiness
 

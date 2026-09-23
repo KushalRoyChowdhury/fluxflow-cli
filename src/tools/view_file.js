@@ -51,27 +51,8 @@ const findSkillFiles = (baseDir) => {
     return results;
 };
 
-const stripSkillDescription = (content) => {
-    return content.replace(/^(\s*---\r?\n)([\s\S]*?)(\r?\n---)/, (match, open, body, close) => {
-        const lines = body.split('\n');
-        const filteredLines = [];
-        let inDesc = false;
-        for (const line of lines) {
-            if (/^\s*description\s*:/i.test(line)) {
-                inDesc = true;
-                continue;
-            }
-            if (inDesc) {
-                if (/^\s+/.test(line)) {
-                    continue;
-                } else {
-                    inDesc = false;
-                }
-            }
-            filteredLines.push(line);
-        }
-        return `${open}${filteredLines.join('\n')}${close}`;
-    });
+const stripSkillFrontmatter = (content) => {
+    return content.replace(/^\s*---\r?\n[\s\S]*?\r?\n---\s*(\r?\n)?/, '');
 };
 
 const findSkillSubFile = (skillDir, subPath) => {
@@ -175,12 +156,12 @@ export const view_file = async (args, context = {}) => {
         const rest = normalized.replace(/^#skills?\/?/i, '');
         const parts = rest.split('/').filter(Boolean);
 
-        let scope = 'project';
+        let explicitScope = null;
         let skillName = '';
         let subPath = '';
 
         if (parts[0]?.toLowerCase() === 'global' || parts[0]?.toLowerCase() === 'project') {
-            scope = parts[0].toLowerCase();
+            explicitScope = parts[0].toLowerCase();
             skillName = parts[1];
             subPath = parts.slice(2).join('/');
         } else {
@@ -192,22 +173,36 @@ export const view_file = async (args, context = {}) => {
             return `ERROR: Missing skill name in path [${targetPath}].`;
         }
 
-        const baseDir = scope === 'global' ? FLUXFLOW_DIR : process.cwd();
-        const skillFiles = findSkillFiles(baseDir);
+        const findMatchingSkillInDir = (baseDir) => {
+            const skillFiles = findSkillFiles(baseDir);
+            for (const fPath of skillFiles) {
+                try {
+                    const fileContent = fs.readFileSync(fPath, 'utf8');
+                    const meta = parseSkillFrontmatter(fileContent);
+                    const parentDirName = path.basename(path.dirname(fPath)).toLowerCase();
+                    if ((meta?.name && meta.name.toLowerCase() === skillName.toLowerCase()) ||
+                        parentDirName === skillName.toLowerCase() ||
+                        (fPath.toLowerCase() === path.join(baseDir, 'skill.md').toLowerCase() && skillName.toLowerCase() === 'skill')) {
+                        return fPath;
+                    }
+                } catch (e) {}
+            }
+            return null;
+        };
 
         let matchedSkillFile = null;
-        for (const fPath of skillFiles) {
-            try {
-                const fileContent = fs.readFileSync(fPath, 'utf8');
-                const meta = parseSkillFrontmatter(fileContent);
-                const parentDirName = path.basename(path.dirname(fPath)).toLowerCase();
-                if ((meta?.name && meta.name.toLowerCase() === skillName.toLowerCase()) ||
-                    parentDirName === skillName.toLowerCase() ||
-                    (fPath.toLowerCase() === path.join(baseDir, 'skill.md').toLowerCase() && skillName.toLowerCase() === 'skill')) {
-                    matchedSkillFile = fPath;
-                    break;
-                }
-            } catch (e) {}
+        let hasConflict = false;
+        if (explicitScope) {
+            const baseDir = explicitScope === 'global' ? FLUXFLOW_DIR : process.cwd();
+            matchedSkillFile = findMatchingSkillInDir(baseDir);
+        } else {
+            // When no scope is provided: check project first (precedence), then fallback to global
+            const projectMatch = findMatchingSkillInDir(process.cwd());
+            const globalMatch = findMatchingSkillInDir(FLUXFLOW_DIR);
+            if (projectMatch && globalMatch) {
+                hasConflict = true;
+            }
+            matchedSkillFile = projectMatch || globalMatch;
         }
 
         if (!matchedSkillFile) {
@@ -235,7 +230,7 @@ export const view_file = async (args, context = {}) => {
             content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
             if (isMainSkill) {
-                content = stripSkillDescription(content);
+                content = stripSkillFrontmatter(content);
             }
 
             const lines = content.split('\n');
@@ -247,7 +242,8 @@ export const view_file = async (args, context = {}) => {
 
             const normTarget = targetPath.replace(/\\/g, '/').toLowerCase();
             const isDocs = normTarget.includes('#skill/global/fluxflow') || normTarget.includes('#skills/global/fluxflow');
-            const header = `${isDocs ? 'DOCs' : 'Skill'}: [${targetPath.replace(/\\/g, '/')}]`;
+            const conflictNote = hasConflict ? ` (Found ${targetPath} in both global & project scope. Loaded [project] as default fallback. Use '#skills/global/...' if needed global)` : '';
+            const header = `${isDocs ? 'DOCs' : 'Skill'}: [${targetPath.replace(/\\/g, '/')}]${conflictNote}`;
             const code = resultLines.map(line => line.trimEnd()).join('\n');
 
             return `${header}\n\n${code}`;

@@ -98,7 +98,7 @@ export const invoke = async (args, context = {}) => {
             }
 
             // Nudge main agent with complete Answer tool call syntax (JIT injection saves turn tokens)
-            addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" is WAITING FOR YOUR INPUT: "${questionText}"\nRespond using tool: [tool:functions.Answer(id="${taskId}", answer="...")]\n[/SYSTEM]`);
+            addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" is WAITING FOR YOUR INPUT: "${questionText}"\nRespond using tool: [tool:Answer(id="${taskId}", answer="...")]\n[/SYSTEM]`);
 
             const answer = await qPromise;
             return answer;

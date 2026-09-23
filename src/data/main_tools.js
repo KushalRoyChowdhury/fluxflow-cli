@@ -93,7 +93,8 @@ Invocations:
 
     return `
 -- TOOLS --
-You cant execute tools. Instead output in chat the exact string [tool:functions.ToolName(arg1="value1")] ← mandatory, tool:functions must, in NEW line
+You cant execute tools. Instead output in chat the exact string [tool:ToolName(arg1="value1")] ← mandatory, in NEW line
+
 Tool Rules:
 - Max 5 tools/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? ' (Goal: 5+)' : ''}
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}

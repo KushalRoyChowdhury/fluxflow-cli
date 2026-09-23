@@ -52,7 +52,7 @@ export const getProgress = async (args, context = {}) => {
                 const header = '[Subagent Response]';
                 const body = log.substring(header.length);
                 let result = body;
-                const trigger = 'tool:functions.';
+                const trigger = 'tool:';
                 while (true) {
                     const lowerResult = result.toLowerCase();
                     const triggerIdx = lowerResult.indexOf(trigger);

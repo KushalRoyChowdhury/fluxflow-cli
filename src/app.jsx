@@ -331,7 +331,7 @@ const ResolutionModal = ({ data, onResolve, onEdit, theme = 'Dark' }) => {
 
 const parseAgentText = (text) => {
     const blocks = [];
-    const toolRegex = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\s*(?:tool:(?:functions\.)?|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
 
     let lastIdx = 0;
     let match;
@@ -4167,7 +4167,7 @@ export default function App({ args = [] }) {
                                     }
 
                                     const endsWithNewline = rawOriginalText.endsWith('\n');
-                                    const hasToolCall = rawTrimmedText.toLowerCase().includes('tool:functions.') || rawTrimmedText.toLowerCase().includes('agent:generalist.');
+                                    const hasToolCall = rawTrimmedText.toLowerCase().includes('tool:') || rawTrimmedText.toLowerCase().includes('agent:generalist.');
 
                                     // Find next agent message text to verify if it starts with '['
                                     let nextAgentStartsWithBracket = false;
@@ -4736,12 +4736,12 @@ export default function App({ args = [] }) {
                         // [CONTEXT TRACKING] Update state based on chunk content
                         if (chunkText.includes('```')) inCodeBlock = !inCodeBlock;
 
-                        if (chunkLower.includes('tool:functions.') || chunkLower.includes('agent:generalist.')) {
+                        if (chunkLower.includes('tool:') || chunkLower.includes('agent:generalist.')) {
                             inToolCall = true;
                             // [HARDENING] Reset balance and look for outer bracket in context
                             toolCallBalance = 0;
                             inToolCallString = null;
-                            if (chunkText.includes('[tool:functions.') || chunkText.includes('[agent:generalist.')) toolCallBalance = 0; // The '[' will be counted in the loop
+                            if (chunkText.includes('[tool:') || chunkText.includes('[agent:generalist.')) toolCallBalance = 0; // The '[' will be counted in the loop
                         }
 
                         if (inToolCall) {
@@ -4862,7 +4862,7 @@ export default function App({ args = [] }) {
                         } else if (!inThinkMode) {
                             // [SIGNAL MONITOR] Mark turn state if tool call encountered
                             const chunkLower = chunkText.toLowerCase();
-                            if (!toolCallEncounteredInTurn && (chunkLower.includes('tool:functions.') || chunkLower.includes('agent:generalist.'))) {
+                            if (!toolCallEncounteredInTurn && (chunkLower.includes('tool:') || chunkLower.includes('agent:generalist.'))) {
                                 toolCallEncounteredInTurn = true;
                             }
 

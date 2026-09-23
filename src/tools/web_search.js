@@ -11,7 +11,7 @@ import { getPuppeteerConfig } from '../utils/puppeteer_helper.js';
  */
 export const web_search = async (argsString) => {
     const { query, limit = 5, aiMode = false } = parseArgs(argsString);
-    if (!query) return 'ERROR: Missing "query" argument for web_search.';
+    if (!query) return 'ERROR: Missing "query" argument for WebSearch.';
 
     const maxRetries = 3;
     let lastError = null;
