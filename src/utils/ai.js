@@ -1281,7 +1281,7 @@ export const initAI = (apiKey, settings = {}) => {
 /**
  * Generic helper to generate non-streaming content from any provider
  */
-const generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = 'Fast', temperature = 0.75, usageKey = 'agent') => {
+export const generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = 'Fast', temperature = 0.75, usageKey = 'agent') => {
     return withRetry(async () => {
         const { aiProvider = 'Google', apiKey, mode } = settings;
         let fullText = '';
@@ -1305,7 +1305,7 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
         try {
             let stream;
             if (aiProvider === 'Ollama') {
-                stream = getOllamaStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, systemSettings?.ollamaEndpoint || 'Cloud');
+                stream = getOllamaStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, settings.systemSettings?.ollamaEndpoint || 'Cloud');
             } else if (aiProvider === 'OpenRouter') {
                 stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'DeepSeek') {

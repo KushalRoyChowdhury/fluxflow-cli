@@ -27,4 +27,5 @@ fluxflow [options]
 * --help → CLI help menu
 * --help commands → In-chat slash commands list
 * --playground → Launch Playground mode
+* --prompt, -p → Headless mode, non interactive run, no agentic tools, no chat context, single turn response
 `;

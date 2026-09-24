@@ -158,6 +158,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --auto-exec <on|off>                     Toggle permission for autonomous command execution
   --yolo <on|off>                          Same as --auto-exec
   --external-access <on|off>               Toggle permission for file reads outside CWD
+  -p, --prompt <text>                      One-shot non-TUI answer (custom system instruction, no loop)
   -v, --version                            Show installed version
   --help                                   Show this help menu
   --help commands                          Show available /commands
@@ -427,6 +428,95 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
             console.error(`[ERROR] Failed to change directory to "${targetCwd}": ${e.message}`);
             process.exit(0);
         }
+    }
+
+    // 3.5 ONE-SHOT PROMPT: -p/--prompt -> non-TUI, custom system instruction, no loop
+    const promptIdx = args.findIndex(a => a === '-p' || a === '--prompt');
+    if (promptIdx !== -1) {
+        const promptText = args[promptIdx + 1];
+        if (!promptText) {
+            console.error('[ERROR] -p/--prompt requires a prompt string.');
+            process.exit(1);
+        }
+        const { loadSettings } = await import('./utils/settings.js');
+        const { getProviderAPIKey } = await import('./utils/secrets.js');
+        const { getDefaultModel } = await import('./data/model_config.js');
+        const { generateSimpleContent } = await import('./utils/ai.js');
+        const { checkQuotaDetailed } = await import('./utils/usage.js');
+
+        const baseSettings = await loadSettings();
+        const scanArgs = args.filter((_, idx) => idx !== promptIdx && idx !== promptIdx + 1);
+        const getFlag = (names) => {
+            for (const n of names) {
+                const i = scanArgs.indexOf(n);
+                if (i !== -1 && i + 1 < scanArgs.length) return scanArgs[i + 1];
+            }
+            return null;
+        };
+        const provider = getFlag(['--provider']) || baseSettings.aiProvider || 'Google';
+        const model = getFlag(['--model']) || baseSettings.activeModel || getDefaultModel(provider, baseSettings.apiTier) || getDefaultModel(provider, 'paid');
+        const apiKey = getFlag(['--key']) || await getProviderAPIKey(provider);
+
+        if (!apiKey) {
+            console.error(`[ERROR] No API key resolved for provider "${provider}".`);
+            process.exit(1);
+        }
+
+        const quotaCheck = await checkQuotaDetailed('agent', { aiProvider: provider });
+        if (!quotaCheck.allowed) {
+            console.error(`[ERROR] ${quotaCheck.reason || 'Budget Exhausted'} - adjust with /budget set.`);
+            process.exit(1);
+        }
+
+        const oneShotSettings = {
+            aiProvider: provider,
+            apiKey,
+            model,
+            mode: 'flow',
+            thinkingLevel: getFlag(['--thinking']) || 'Fast',
+            systemSettings: baseSettings.systemSettings || {},
+        };
+
+        const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+        const day = String(now.getDate()).padStart(2, '0');
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        const dateTimeStr = `${year}-${month}-${day}, ${timeStr}`;
+
+        const oneShotInstruction = `Identity: FluxFlow. Sassy, friendly, CLI Assistant
+NO markdown, just plain text. Dont ask questions at response end
+-- Additional Context --
+- OS: ${osDetected}
+- Model: ${path.basename(oneShotSettings.model).trim().replace(':free', '').replace('-free', '').replace('free/', '').replaceAll('-', ' ').replace(/\b\w/g, char => char.toUpperCase().trim())}
+- Time: ${dateTimeStr}
+- Headless, non interactive mode. No conversation context
+- 'fluxflow' TUI needed for full agentic capability & tools`.trim();
+
+        try {
+            // ANSI colour codes:
+            // \x1b[36m = Cyan, \x1b[35m = Magenta, \x1b[0m = Reset
+            const cyan = '\x1b[36m';
+            const magenta = '\x1b[35m';
+            const reset = '\x1b[0m';
+
+            const modelName = path.basename(oneShotSettings.model)
+                .trim()
+                .replace(':free', '')
+                .replace('-free', '')
+                .replace('free/', '')
+                .replaceAll('-', ' ')
+                .replace(/\b\w/g, char => char.toUpperCase().trim());
+
+            process.stdout.write(`Responding with ${cyan}${modelName}${reset} from ${magenta}${oneShotSettings.aiProvider}${reset}:\n`);
+            const { text } = await generateSimpleContent(oneShotSettings, model, promptText, oneShotInstruction, oneShotSettings.thinkingLevel);
+            process.stdout.write((text || '').trim() + '\n\n');
+        } catch (err) {
+            console.error(`[ERROR] Prompt request failed: ${err.message.trim()}\n\n`);
+            process.exit(1);
+        }
+        process.exit(0);
     }
 
     // 4. CLEAN SLATE (Non-destructive clear to preserve scrollback and title)

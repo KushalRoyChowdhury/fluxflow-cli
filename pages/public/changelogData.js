@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.18.0": {
+        "note": "SEPTEMBER 25",
+        "added": [
+            "Added new CLI command, `--prompt` (alias `-p`). `fluxflow -p \"text\"`, to run a headless instance. No conversation context, no agentic tools."
+        ],
+        "changed": [],
+        "fixes": [
+            "Fixed a tokenization bug with `2>&1` syntax in shell commands."
+        ]
+    },
     "4.17.0": {
         "note": "SEPTEMBER 24",
         "added": [],

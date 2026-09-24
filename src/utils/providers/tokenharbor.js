@@ -43,7 +43,7 @@ export const getTokenHarborStream = async function* (apiKey, model, contents, sy
 
     const customEffort = getMappedThinkingLevel('TokenHarbor', model, thinkingLevel);
     const reasoningEffortMap = {
-        'Fast': 'low',
+        'Fast': 'none',
         'Low': 'low',
         'Medium': 'medium',
         'Standard': 'medium',

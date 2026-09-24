@@ -17,7 +17,7 @@ export const isPtyAvailable = !!pty;
 const stripAnsi = (str) => {
     if (typeof str !== 'string') return str;
     // eslint-disable-next-line no-control-regex
-    return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+    return str.replace(/(?:\u001b][\s\S]*?(?:\u0007|\u001b\\))|(?:[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><])/g, '');
 };
 
 export const cleanTerminalOutput = (text) => {
@@ -230,6 +230,11 @@ export const adjustWindowsCommand = (command, usePowerShell = false) => {
                     }
                     tokens.push('&&');
                     i++; // Skip the second &
+                } else if (current.endsWith('2>') && command[i + 1] === '1') {
+                    // Atomic dup-redirect token: 2>&1
+                    tokens.push('2>&1');
+                    current = '';
+                    i++; // consume the '1'
                 } else {
                     if (current.length > 0) {
                         tokens.push(current);
