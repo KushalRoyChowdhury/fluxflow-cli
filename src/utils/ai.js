@@ -7,7 +7,7 @@ import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE,
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';
 import { getTruncatedHistory, loadHistory } from './history.js';
-import { checkQuota, checkQuotaDetailed, incrementUsage, addToUsage } from './usage.js';
+import { checkQuota, checkQuotaDetailed, incrementUsage, addToUsage, recordTimedUsage } from './usage.js';
 import { dispatchTool } from './tools.js';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
 import { parseArgs } from './arg_parser.js';
@@ -72,12 +72,11 @@ export const convertChannelThinkTags = (str) => {
 
 export const RE_LEADING_THINK = /^\s*(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\]|$)/i;
 
-export const isInsideBacktick = (str, idx) => {
-    let inCode = false;
-    for (let i = 0; i < idx; i++) {
-        if (str[i] === '`') inCode = !inCode;
-    }
-    return inCode;
+export const isInsideBacktick = (str, idx, matchLen = 1) => {
+    // Check if the match is wrapped specifically in inline backtick: `...`
+    const prevChar = idx > 0 ? str[idx - 1] : '';
+    const nextChar = (idx + matchLen < str.length) ? str[idx + matchLen] : '';
+    return prevChar === '`' && nextChar === '`';
 };
 
 // Finds the genuine, outermost </think> closing tag outside backticks
@@ -85,7 +84,7 @@ export const findGenuineThinkClose = (str) => {
     const regex = /(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/gi;
     let match;
     while ((match = regex.exec(str)) !== null) {
-        if (isInsideBacktick(str, match.index)) continue;
+        if (isInsideBacktick(str, match.index, match[0].length)) continue;
         return { index: match.index, length: match[0].length };
     }
     return { index: -1, length: 0 };
@@ -749,6 +748,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     if (candidates > 0) {
                         await addToUsage('candidateTokens', candidates, effectiveProvider, jModel);
                     }
+                    recordTimedUsage({ provider: effectiveProvider, model: jModel, prompt: lastUsage.promptTokenCount || 0, cached, output: candidates, reasoning: lastUsage.thoughtsTokenCount || 0 });
                 }
 
                 // const date = new Date().toLocaleString();
@@ -1424,6 +1424,7 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
             if (candidates > 0) {
                 await addToUsage('candidateTokens', candidates, aiProvider, model);
             }
+            recordTimedUsage({ provider: aiProvider, model, prompt: usageMetadata.promptTokenCount || 0, cached, output: candidates, reasoning: usageMetadata.thoughtsTokenCount || 0 });
             if (settings && typeof settings.onUsage === 'function') {
                 settings.onUsage({
                     totalTokenCount: total,
@@ -2284,7 +2285,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let taggedContextStr = '';
         if (taggedContextBlocks.length > 0) {
-            taggedContextStr = '[Tagged File Contents] Auto Read User Tagged files by System, No need to re-read\n' + taggedContextBlocks.join('\n\n') + '\n[Tagged File Contents]\n';
+            taggedContextStr = '\n[Tagged File Contents] Auto Read User Tagged files by System, No need to re-read\n' + taggedContextBlocks.join('\n\n') + '\n[Tagged File Contents]\n';
         }
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
@@ -2316,7 +2317,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (shouldCheckExclude && !hasMovingParts) {
             firstUserMsg = cleanPromptForModel.trim();
         } else {
-            firstUserMsg = `[System Metadata]\nTime: ${shouldCheckExclude ? dateTimeStrExclude : dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+            firstUserMsg = `[System Metadata]\nTime: ${shouldCheckExclude ? dateTimeStrExclude : dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
         }
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
@@ -5096,6 +5097,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (candidates > 0) {
                     await addToUsage('candidateTokens', candidates, aiProvider, targetModel);
                 }
+                recordTimedUsage({ provider: aiProvider, model: targetModel, prompt: lastUsage.promptTokenCount || 0, cached, output: candidates, reasoning: lastUsage.thoughtsTokenCount || 0 });
 
                 yield { type: 'usage', content: lastUsage };
             }
@@ -5400,7 +5402,7 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 - WebScrape(url=string). Proactive use for specific webpage/docs
 
 **Workspace Tools**
-- CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find definitions, logic, relevant code, standard junk auto-excluded
+- CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", regex?=bool:auto). Find definitions, logic, relevant code, standard junk auto-excluded
 - ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
 - ReadFile(path=string, startLine?=int, endLine?=int)
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchors: ^LINE:...$ syntax, must for large blocks & escape sequences

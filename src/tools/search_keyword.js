@@ -291,7 +291,7 @@ export const search_keyword = async (args) => {
             const patterns = pathArg.split(';').map(p => p.trim()).filter(Boolean);
             const hasNegation = patterns.some(p => p.startsWith('!'));
             const isGlob = patterns.some(p => fg.isDynamicPattern(p) || /[*?{}[\]()|+]/.test(p));
-           if (isGlob) {
+            if (isGlob) {
                 pathArgType = 'glob';
                 const posixPath = pathArg.replace(/\\/g, '/');
                 const posixPatterns = patterns.map(p => p.replace(/\\/g, '/'));
@@ -368,23 +368,34 @@ export const search_keyword = async (args) => {
                     }
                 }
             } else {
-                // Strip trailing slash so both "src/utils" and "src/utils/" work
-                const normalised = pathArg.replace(/[\/\\]+$/, '');
-                const fullPath = path.resolve(rootDir, normalised);
-                try {
-                    const stat = await fs.stat(fullPath);
-                    if (stat.isDirectory()) {
-                        pathArgType = 'dir';
-                        filesToSearch = await getFilesRecursively(fullPath, excludes, rootDir);
-                    } else if (stat.isFile()) {
-                        pathArgType = 'file';
-                        filesToSearch.push({ fullPath, relativePath: path.relative(rootDir, fullPath) });
-                    } else {
-                        return `ERROR: Path is neither a file nor a directory: ${pathArg}`;
+                // Non-glob: honor ;-separated list of plain file/dir paths (Bug #1 fix)
+                const resolved = [];
+                let sawFile = false;
+                let sawDir = false;
+                for (const p of patterns) {
+                    // Strip trailing slash so both "src/utils" and "src/utils/" work
+                    const normalised = p.replace(/[\/\\]+$/, '');
+                    const fullPath = path.resolve(rootDir, normalised);
+                    try {
+                        const stat = await fs.stat(fullPath);
+                        if (stat.isDirectory()) {
+                            sawDir = true;
+                            const sub = await getFilesRecursively(fullPath, excludes, rootDir);
+                            resolved.push(...sub);
+                        } else if (stat.isFile()) {
+                            sawFile = true;
+                            resolved.push({ fullPath, relativePath: path.relative(rootDir, fullPath) });
+                        } else {
+                            return `ERROR: Path is neither a file nor a directory: ${p}`;
+                        }
+                    } catch {
+                        return `ERROR: Path not found: ${p}`;
                     }
-                } catch {
-                    return `ERROR: Path not found: ${pathArg}`;
                 }
+                filesToSearch = resolved;
+                if (sawFile && !sawDir) pathArgType = 'file';
+                else if (sawDir && !sawFile) pathArgType = 'dir';
+                else pathArgType = 'dir'; // mixed or empty → treat as dir-like scope
             }
         } else {
             filesToSearch = await getFilesRecursively(rootDir, excludes);

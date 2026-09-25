@@ -1,5 +1,6 @@
 import { fetchWithBackoff } from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
+// import fs from 'fs';
 
 export const getSenseNovaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
@@ -102,6 +103,7 @@ export const getSenseNovaStream = async function* (apiKey, model, contents, syst
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
+        // fs.appendFileSync('debug.txt', `${lines}\n\n`);
         buffer = lines.pop();
 
         for (const line of lines) {

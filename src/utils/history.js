@@ -476,15 +476,34 @@ export const saveChatContext = async (chatId, chatTokens, contextTokens) => {
         let contextData = readEncryptedJson(CONTEXT_FILE, []);
         if (!Array.isArray(contextData)) contextData = [];
 
-        const data = { total: chatTokens, context: contextTokens };
+        const total = chatTokens || 0;
+        const context = contextTokens || 0;
+        const data = { total, context };
+
         const existingIdx = contextData.findIndex(item => Object.keys(item)[0] === String(chatId));
-        if (existingIdx !== -1) {
-            contextData[existingIdx] = { [String(chatId)]: data };
+        if (total === 0 && context === 0) {
+            // If entry is empty (0/0), remove it
+            if (existingIdx !== -1) {
+                contextData.splice(existingIdx, 1);
+            }
         } else {
-            contextData.push({ [String(chatId)]: data });
+            if (existingIdx !== -1) {
+                contextData[existingIdx] = { [String(chatId)]: data };
+            } else {
+                contextData.push({ [String(chatId)]: data });
+            }
         }
 
-        writeEncryptedJson(CONTEXT_FILE, contextData);
+        // Prune any legacy or existing entries that are 0 / empty
+        const cleaned = contextData.filter(item => {
+            if (!item || typeof item !== 'object') return false;
+            const key = Object.keys(item)[0];
+            if (!key) return false;
+            const val = item[key];
+            return val && ((val.total || 0) > 0 || (val.context || 0) > 0);
+        });
+
+        writeEncryptedJson(CONTEXT_FILE, cleaned);
     });
 };
 

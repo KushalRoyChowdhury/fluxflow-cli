@@ -2363,11 +2363,11 @@ export default function App({ args = [] }) {
                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
                     chatCachedTokenStartRef.current = sessionTotalCachedTokens;
                     chatSessionPromptStartRef.current = sessionTotalPromptTokens;
-                    chatLoadingRef.current = false;
                     setChatTokens(savedData.total);
                     setChatCachedTokens(0);
                     setChatPromptTokens(0);
                     setSessionStats({ tokens: savedData.context });
+                    chatLoadingRef.current = false;
 
                     const resumedMsgs = [...h[id].messages];
                     const hasLogo = resumedMsgs[0]?.text?.includes('░░░███');
@@ -2394,6 +2394,17 @@ export default function App({ args = [] }) {
                 // Auto-restore playground session history if it exists
                 const playgroundHistory = await loadHistory();
                 if (playgroundHistory[PLAYGROUND_CHAT_ID]) {
+                    chatLoadingRef.current = true;
+                    const savedData = await loadChatContext(PLAYGROUND_CHAT_ID);
+                    chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                    chatCachedTokenStartRef.current = sessionTotalCachedTokens;
+                    chatSessionPromptStartRef.current = sessionTotalPromptTokens;
+                    setChatTokens(savedData.total);
+                    setChatCachedTokens(0);
+                    setChatPromptTokens(0);
+                    setSessionStats({ tokens: savedData.context });
+                    chatLoadingRef.current = false;
+
                     const resumedMsgs = [...playgroundHistory[PLAYGROUND_CHAT_ID].messages];
                     if (!resumedMsgs[0]?.isLogo) {
                         resumedMsgs.unshift({ id: 'logo-' + Date.now(), role: 'system', isLogo: true, isMeta: true });
@@ -2693,8 +2704,8 @@ export default function App({ args = [] }) {
             cmd: '/model',
             desc: 'Select Agent Model',
             subs: (mode === 'ICU' || mode.toLowerCase() === 'fluxcu'
-                    ? getModels(aiProvider, apiTier).filter(m => isModelMultimodal(m.cmd || m))
-                    : getModels(aiProvider, apiTier))
+                ? getModels(aiProvider, apiTier).filter(m => isModelMultimodal(m.cmd || m))
+                : getModels(aiProvider, apiTier))
         },
         {
             cmd: '/wildcard-tooling',
@@ -2869,11 +2880,11 @@ export default function App({ args = [] }) {
                                 chatTokenStartRef.current = sessionTotalTokens - savedData.total;
                                 chatCachedTokenStartRef.current = sessionTotalCachedTokens;
                                 chatSessionPromptStartRef.current = sessionTotalPromptTokens;
-                                chatLoadingRef.current = false;
                                 setChatTokens(savedData.total);
                                 setChatCachedTokens(0);
                                 setChatPromptTokens(0);
                                 setSessionStats({ tokens: savedData.context });
+                                chatLoadingRef.current = false;
 
                                 // Ensure logo is present at the start of resumed history
                                 const resumedMsgs = [...target.messages];
@@ -4766,19 +4777,17 @@ export default function App({ args = [] }) {
                         // 1. Detect transition to THINK mode (Strictly at the START of response for this turn)
                         const RE_STREAM_THINK_OPEN = /^\s*(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])/i;
 
-                        const isInsideBacktick = (str, idx) => {
-                            let inCode = false;
-                            for (let i = 0; i < idx; i++) {
-                                if (str[i] === '`') inCode = !inCode;
-                            }
-                            return inCode;
+                        const isInsideBacktick = (str, idx, matchLen = 1) => {
+                            const prevChar = idx > 0 ? str[idx - 1] : '';
+                            const nextChar = (idx + matchLen < str.length) ? str[idx + matchLen] : '';
+                            return prevChar === '`' && nextChar === '`';
                         };
 
                         const findGenuineThinkClose = (str) => {
                             const regex = /(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/gi;
                             let match;
                             while ((match = regex.exec(str)) !== null) {
-                                if (isInsideBacktick(str, match.index)) continue;
+                                if (isInsideBacktick(str, match.index, match[0].length)) continue;
                                 return { index: match.index, length: match[0].length };
                             }
                             return { index: -1, length: 0 };
@@ -6633,11 +6642,11 @@ export default function App({ args = [] }) {
                                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
                                     chatCachedTokenStartRef.current = sessionTotalCachedTokens;
                                     chatSessionPromptStartRef.current = sessionTotalPromptTokens;
-                                    chatLoadingRef.current = false;
                                     setChatTokens(savedData.total);
                                     setChatCachedTokens(0);
                                     setChatPromptTokens(0);
                                     setSessionStats({ tokens: savedData.context });
+                                    chatLoadingRef.current = false;
 
                                     // Ensure logo is present at the start of resumed history
                                     const resumedMsgs = [...h[id].messages];

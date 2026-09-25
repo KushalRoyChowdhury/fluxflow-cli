@@ -54,6 +54,7 @@ export const HISTORY_FILE = path.join(SECRET_DIR, 'history.json');
 export const HISTORY_DIR = path.join(SECRET_DIR, 'history');
 export const USAGE_FILE_OLD = path.join(FLUXFLOW_DIR, 'usage.json');
 export const USAGE_FILE = path.join(SECRET_DIR, 'usage.json');
+export const USAGE_FILE_TIMED = path.join(SECRET_DIR, 'timed_usage');
 export const MEMORIES_FILE = path.join(SECRET_DIR, 'memories.json');
 export const TEMP_MEM_FILE = path.join(SECRET_DIR, 'memory-temp.json');
 export const TEMP_MEM_CHAT_FILE = path.join(SECRET_DIR, 'temp-memory-chat.json');

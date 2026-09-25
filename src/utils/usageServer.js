@@ -1,6 +1,6 @@
 import http from 'http';
 import { exec } from 'child_process';
-import { getAllUsageData } from './usage.js';
+import { getAllUsageData, getTimedUsage } from './usage.js';
 import { DATA_DIR } from './paths.js';
 import { FLUXFLOW_LOGO_BASE64 } from './logoBase64.js';
 
@@ -821,7 +821,7 @@ function generateDashboardHtml() {
                 <div class="chart-header">
                     <div class="chart-title-group">
                         <div class="chart-title">Token Consumption Trends</div>
-                        <div class="chart-subtitle">Prompt (Input), Candidate (Output), and Cached tokens breakdown</div>
+                        <div class="chart-subtitle">INPUT, OUTPUT, and Cached tokens breakdown</div>
                     </div>
                     <div class="chart-controls">
                         <button class="chart-btn active" data-chart-type="bar">Stacked Bar</button>
@@ -888,6 +888,7 @@ function generateDashboardHtml() {
                     <div class="tabs-group" id="table-mode-tabs">
                         <button class="tab-btn active" data-table-mode="daily">Daily Records</button>
                         <button class="tab-btn" data-table-mode="models">Model Stats</button>
+            <button class="tab-btn" data-table-mode="timed">Timed (Per-Call)</button>
                     </div>
                     <input type="text" id="table-search" placeholder="Search..." style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.8rem; outline: none;">
                 </div>
@@ -907,7 +908,7 @@ function generateDashboardHtml() {
 
     <footer>
         <div>FluxFlow CLI • High-Fidelity Agentic Terminal</div>
-        <div>Data stored locally in ${DATA_DIR.replaceAll('\\\\', '/').replaceAll('\\', '/') }</div>
+        <div>Data stored locally in ${DATA_DIR.replaceAll('\\\\', '/').replaceAll('\\', '/')}</div>
     </footer>
 
     <script>
@@ -919,10 +920,18 @@ function generateDashboardHtml() {
         let dailySortOrder = 'desc';
         let modelSortField = 'tokens';
         let modelSortOrder = 'desc';
+        let timedSortField = 'time';
+        let timedSortOrder = 'desc';
         let timelineChart = null;
         let providerPieChart = null;
         let toolChart = null;
         let codeChart = null;
+
+        function getModelBaseName(modelStr) {
+            if (!modelStr || typeof modelStr !== 'string') return modelStr || '';
+            const slashIdx = Math.max(modelStr.lastIndexOf('/'), modelStr.lastIndexOf(String.fromCharCode(92)));
+            return slashIdx !== -1 ? modelStr.slice(slashIdx + 1) : modelStr;
+        }
 
         function formatNumber(num) {
             if (num === undefined || num === null) return '0';
@@ -1142,34 +1151,36 @@ function generateDashboardHtml() {
         }
 
         function renderBudget(budgetData) {
+            const section = document.getElementById('budget-section');
             const grid = document.getElementById('budget-grid-cards');
             const tierPill = document.getElementById('budget-tier-pill');
             const resetBadge = document.getElementById('budget-reset-badge');
             const subtitleEl = document.getElementById('budget-subtitle');
 
             if (!budgetData) {
-                grid.innerHTML = '<div style="color: var(--text-dim); padding: 1rem;">No budget constraints configured.</div>';
+                if (section) section.style.display = 'none';
                 return;
             }
 
             const isProviderMode = budgetData.providerBudgetsList && budgetData.providerBudgetsList.length > 0;
 
             if (isProviderMode) {
+                // Filter only providers that have at least one active limit (not unlimited)
+                const activeProviders = budgetData.providerBudgetsList.filter(p => !p.isDailyUnlimited || !p.isMonthlyUnlimited);
+                if (activeProviders.length === 0) {
+                    if (section) section.style.display = 'none';
+                    return;
+                }
+                if (section) section.style.display = 'block';
+
                 tierPill.style.display = 'inline-block';
                 tierPill.className = 'badge-positive';
-                tierPill.textContent = \`Provider Mode (\${budgetData.providerBudgetsList.length} Active)\`;
+                tierPill.textContent = \`Provider Mode (\${activeProviders.length} Active)\`;
                 subtitleEl.textContent = 'Enforcing provider-specific daily, monthly, and turn quotas';
-            } else {
-                tierPill.style.display = 'none';
-                subtitleEl.textContent = 'Real-time spend against configured global daily and monthly token limits';
-            }
+                resetBadge.textContent = 'Reset: ' + (budgetData.resetMode || 'None') + (budgetData.resetMode === 'Custom' ? \` (Day \${budgetData.resetDay})\` : '');
 
-            resetBadge.textContent = 'Reset: ' + (budgetData.resetMode || 'None') + (budgetData.resetMode === 'Custom' ? \` (Day \${budgetData.resetDay})\` : '');
-
-            let cardsHtml = '';
-
-            if (isProviderMode) {
-                budgetData.providerBudgetsList.forEach(prov => {
+                let cardsHtml = '';
+                activeProviders.forEach(prov => {
                     const dailyTokens = prov.dailyTokens || 0;
                     const dailyLimit = prov.dailyTokenLimit || 0;
                     const isDailyUnlimited = prov.isDailyUnlimited;
@@ -1182,7 +1193,50 @@ function generateDashboardHtml() {
                     const monthlyPct = (!isMonthlyUnlimited && monthlyLimit > 0) ? Math.min(100, (monthlyTokens / monthlyLimit) * 100) : 0;
                     const monthlyColor = monthlyPct >= 90 ? 'linear-gradient(90deg, #f43f5e, #e11d48)' : monthlyPct >= 75 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 'linear-gradient(90deg, #a855f7, #7c3aed)';
 
-                    // Unified Provider Card grouping both Daily and Monthly
+                    const dailyBlock = isDailyUnlimited ? '' : \`
+                        <!-- Daily Budget Sub-Block -->
+                        <div class="budget-sub-block">
+                            <div class="budget-sub-header">
+                                <span class="budget-sub-title">⚡ Daily Token Budget</span>
+                                <span class="budget-tag" style="font-size: 0.68rem; padding: 1px 6px;">\${dailyPct.toFixed(1)}%</span>
+                            </div>
+                            <div class="budget-values">
+                                <div class="budget-cur mono">\${formatNumber(dailyTokens)}</div>
+                                <div class="budget-max mono">/ \${formatNumber(dailyLimit)}</div>
+                            </div>
+                            <div class="budget-progress-track">
+                                <div class="budget-progress-fill" style="width: \${dailyPct}%; background: \${dailyColor};"></div>
+                            </div>
+                            <div class="budget-footer">
+                                <span>\${formatNumber(Math.max(0, dailyLimit - dailyTokens))} remaining</span>
+                                <span class="mono">\${dailyPct.toFixed(0)}% used</span>
+                            </div>
+                        </div>
+                    \`;
+
+                    const monthlyBlock = isMonthlyUnlimited ? '' : \`
+                        <!-- Monthly Budget Sub-Block -->
+                        <div class="budget-sub-block">
+                            <div class="budget-sub-header">
+                                <span class="budget-sub-title">📅 Monthly / Cycle Budget</span>
+                                <span class="budget-tag" style="font-size: 0.68rem; padding: 1px 6px;">\${monthlyPct.toFixed(1)}%</span>
+                            </div>
+                            <div class="budget-values">
+                                <div class="budget-cur mono">\${formatNumber(monthlyTokens)}</div>
+                                <div class="budget-max mono">/ \${formatNumber(monthlyLimit)}</div>
+                            </div>
+                            <div class="budget-progress-track">
+                                <div class="budget-progress-fill" style="width: \${monthlyPct}%; background: \${monthlyColor};"></div>
+                            </div>
+                            <div class="budget-footer">
+                                <span>\${formatNumber(Math.max(0, monthlyLimit - monthlyTokens))} remaining</span>
+                                <span class="mono">\${monthlyPct.toFixed(0)}% used</span>
+                            </div>
+                        </div>
+                    \`;
+
+                    const divider = (!isDailyUnlimited && !isMonthlyUnlimited) ? '<div class="budget-sub-divider"></div>' : '';
+
                     cardsHtml += \`
                         <div class="budget-card">
                             <div class="budget-card-header">
@@ -1191,49 +1245,13 @@ function generateDashboardHtml() {
                                     <span>\${prov.provider}</span>
                                 </div>
                             </div>
-
-                            <!-- Daily Budget Sub-Block -->
-                            <div class="budget-sub-block">
-                                <div class="budget-sub-header">
-                                    <span class="budget-sub-title">⚡ Daily Token Budget</span>
-                                    <span class="budget-tag" style="font-size: 0.68rem; padding: 1px 6px;">\${isDailyUnlimited ? 'Unlimited' : dailyPct.toFixed(1) + '%'}</span>
-                                </div>
-                                <div class="budget-values">
-                                    <div class="budget-cur mono">\${formatNumber(dailyTokens)}</div>
-                                    <div class="budget-max mono">/ \${isDailyUnlimited ? '∞ Limit' : formatNumber(dailyLimit)}</div>
-                                </div>
-                                <div class="budget-progress-track">
-                                    <div class="budget-progress-fill" style="width: \${isDailyUnlimited ? 100 : dailyPct}%; background: \${isDailyUnlimited ? 'rgba(56,189,248,0.3)' : dailyColor};"></div>
-                                </div>
-                                <div class="budget-footer">
-                                    <span>\${isDailyUnlimited ? 'No daily cap' : \`\${formatNumber(Math.max(0, dailyLimit - dailyTokens))} remaining\`}</span>
-                                    <span class="mono">\${isDailyUnlimited ? 'Active' : \`\${dailyPct.toFixed(0)}% used\`}</span>
-                                </div>
-                            </div>
-
-                            <div class="budget-sub-divider"></div>
-
-                            <!-- Monthly Budget Sub-Block -->
-                            <div class="budget-sub-block">
-                                <div class="budget-sub-header">
-                                    <span class="budget-sub-title">📅 Monthly / Cycle Budget</span>
-                                    <span class="budget-tag" style="font-size: 0.68rem; padding: 1px 6px;">\${isMonthlyUnlimited ? 'Unlimited' : monthlyPct.toFixed(1) + '%'}</span>
-                                </div>
-                                <div class="budget-values">
-                                    <div class="budget-cur mono">\${formatNumber(monthlyTokens)}</div>
-                                    <div class="budget-max mono">/ \${isMonthlyUnlimited ? '∞ Limit' : formatNumber(monthlyLimit)}</div>
-                                </div>
-                                <div class="budget-progress-track">
-                                    <div class="budget-progress-fill" style="width: \${isMonthlyUnlimited ? 100 : monthlyPct}%; background: \${isMonthlyUnlimited ? 'rgba(168,85,247,0.3)' : monthlyColor};"></div>
-                                </div>
-                                <div class="budget-footer">
-                                    <span>\${isMonthlyUnlimited ? 'No monthly cap' : \`\${formatNumber(Math.max(0, monthlyLimit - monthlyTokens))} remaining\`}</span>
-                                    <span class="mono">\${isMonthlyUnlimited ? 'Active' : \`\${monthlyPct.toFixed(0)}% used\`}</span>
-                                </div>
-                            </div>
+                            \${dailyBlock}
+                            \${divider}
+                            \${monthlyBlock}
                         </div>
                     \`;
                 });
+                grid.innerHTML = cardsHtml;
             } else {
                 // Global Mode Cards
                 const daily = budgetData.daily || {};
@@ -1251,7 +1269,62 @@ function generateDashboardHtml() {
                 const monthlyPct = (!isMonthlyUnlimited && monthlyLimit > 0) ? Math.min(100, (monthlyTokens / monthlyLimit) * 100) : 0;
                 const monthlyColor = monthlyPct >= 90 ? 'linear-gradient(90deg, #f43f5e, #e11d48)' : monthlyPct >= 75 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 'linear-gradient(90deg, #a855f7, #7c3aed)';
 
-                cardsHtml += \`
+                // If both daily and monthly global budgets are unlimited, hide the entire budget section
+                if (isDailyUnlimited && isMonthlyUnlimited) {
+                    if (section) section.style.display = 'none';
+                    return;
+                }
+                if (section) section.style.display = 'block';
+
+                tierPill.style.display = 'none';
+                subtitleEl.textContent = 'Real-time spend against configured global daily and monthly token limits';
+                resetBadge.textContent = 'Reset: ' + (budgetData.resetMode || 'None') + (budgetData.resetMode === 'Custom' ? \` (Day \${budgetData.resetDay})\` : '');
+
+                const dailyBlock = isDailyUnlimited ? '' : \`
+                    <!-- Daily Budget Sub-Block -->
+                    <div class="budget-sub-block">
+                        <div class="budget-sub-header">
+                            <span class="budget-sub-title">⚡ Daily Token Budget</span>
+                            <span class="budget-tag" style="font-size: 0.68rem; padding: 1px 6px;">\${dailyPct.toFixed(1)}%</span>
+                        </div>
+                        <div class="budget-values">
+                            <div class="budget-cur mono">\${formatNumber(dailyTokens)}</div>
+                            <div class="budget-max mono">/ \${formatNumber(dailyLimit)}</div>
+                        </div>
+                        <div class="budget-progress-track">
+                            <div class="budget-progress-fill" style="width: \${dailyPct}%; background: \${dailyColor};"></div>
+                        </div>
+                        <div class="budget-footer">
+                            <span>\${formatNumber(Math.max(0, dailyLimit - dailyTokens))} remaining</span>
+                            <span class="mono">\${dailyPct.toFixed(0)}% used</span>
+                        </div>
+                    </div>
+                \`;
+
+                const monthlyBlock = isMonthlyUnlimited ? '' : \`
+                    <!-- Monthly Budget Sub-Block -->
+                    <div class="budget-sub-block">
+                        <div class="budget-sub-header">
+                            <span class="budget-sub-title">📅 Monthly / Cycle Budget</span>
+                            <span class="budget-tag" style="font-size: 0.68rem; padding: 1px 6px;">\${monthlyPct.toFixed(1)}%</span>
+                        </div>
+                        <div class="budget-values">
+                            <div class="budget-cur mono">\${formatNumber(monthlyTokens)}</div>
+                            <div class="budget-max mono">/ \${formatNumber(monthlyLimit)}</div>
+                        </div>
+                        <div class="budget-progress-track">
+                            <div class="budget-progress-fill" style="width: \${monthlyPct}%; background: \${monthlyColor};"></div>
+                        </div>
+                        <div class="budget-footer">
+                            <span>\${formatNumber(Math.max(0, monthlyLimit - monthlyTokens))} remaining</span>
+                            <span class="mono">\${monthlyPct.toFixed(0)}% used</span>
+                        </div>
+                    </div>
+                \`;
+
+                const divider = (!isDailyUnlimited && !isMonthlyUnlimited) ? '<div class="budget-sub-divider"></div>' : '';
+
+                const cardsHtml = \`
                     <div class="budget-card">
                         <div class="budget-card-header">
                             <div class="budget-group-title">
@@ -1260,51 +1333,13 @@ function generateDashboardHtml() {
                             </div>
                             <span class="budget-tag">Global Cap</span>
                         </div>
-
-                        <!-- Daily Budget Sub-Block -->
-                        <div class="budget-sub-block">
-                            <div class="budget-sub-header">
-                                <span class="budget-sub-title">⚡ Daily Token Budget</span>
-                                <span class="budget-tag" style="font-size: 0.68rem; padding: 1px 6px;">\${isDailyUnlimited ? 'Unlimited' : dailyPct.toFixed(1) + '%'}</span>
-                            </div>
-                            <div class="budget-values">
-                                <div class="budget-cur mono">\${formatNumber(dailyTokens)}</div>
-                                <div class="budget-max mono">/ \${isDailyUnlimited ? '∞ Limit' : formatNumber(dailyLimit)}</div>
-                            </div>
-                            <div class="budget-progress-track">
-                                <div class="budget-progress-fill" style="width: \${isDailyUnlimited ? 100 : dailyPct}%; background: \${isDailyUnlimited ? 'rgba(56,189,248,0.3)' : dailyColor};"></div>
-                            </div>
-                            <div class="budget-footer">
-                                <span>\${isDailyUnlimited ? 'No daily cap enforced' : \`\${formatNumber(Math.max(0, dailyLimit - dailyTokens))} remaining\`}</span>
-                                <span class="mono">\${isDailyUnlimited ? 'Active' : \`\${dailyPct.toFixed(0)}% used\`}</span>
-                            </div>
-                        </div>
-
-                        <div class="budget-sub-divider"></div>
-
-                        <!-- Monthly Budget Sub-Block -->
-                        <div class="budget-sub-block">
-                            <div class="budget-sub-header">
-                                <span class="budget-sub-title">📅 Monthly / Cycle Budget</span>
-                                <span class="budget-tag" style="font-size: 0.68rem; padding: 1px 6px;">\${isMonthlyUnlimited ? 'Unlimited' : monthlyPct.toFixed(1) + '%'}</span>
-                            </div>
-                            <div class="budget-values">
-                                <div class="budget-cur mono">\${formatNumber(monthlyTokens)}</div>
-                                <div class="budget-max mono">/ \${isMonthlyUnlimited ? '∞ Limit' : formatNumber(monthlyLimit)}</div>
-                            </div>
-                            <div class="budget-progress-track">
-                                <div class="budget-progress-fill" style="width: \${isMonthlyUnlimited ? 100 : monthlyPct}%; background: \${isMonthlyUnlimited ? 'rgba(168,85,247,0.3)' : monthlyColor};"></div>
-                            </div>
-                            <div class="budget-footer">
-                                <span>\${isMonthlyUnlimited ? 'No monthly cap enforced' : \`\${formatNumber(Math.max(0, monthlyLimit - monthlyTokens))} remaining\`}</span>
-                                <span class="mono">\${isMonthlyUnlimited ? 'Active' : \`\${monthlyPct.toFixed(0)}% used\`}</span>
-                            </div>
-                        </div>
+                        \${dailyBlock}
+                        \${divider}
+                        \${monthlyBlock}
                     </div>
                 \`;
+                grid.innerHTML = cardsHtml;
             }
-
-            grid.innerHTML = cardsHtml;
         }
 
         function renderTimelineChart(timeline) {
@@ -1335,7 +1370,9 @@ function generateDashboardHtml() {
                             borderWidth: isLine ? 2 : 0,
                             fill: isLine,
                             stack: 'tokens',
-                            tension: 0.3
+                            tension: 0.3,
+                            maxBarThickness: 48,
+                            borderRadius: isLine ? 0 : 2
                         },
                         {
                             label: 'Input (Uncached)',
@@ -1345,17 +1382,21 @@ function generateDashboardHtml() {
                             borderWidth: isLine ? 2 : 0,
                             fill: isLine,
                             stack: 'tokens',
-                            tension: 0.3
+                            tension: 0.3,
+                            maxBarThickness: 48,
+                            borderRadius: isLine ? 0 : 2
                         },
                         {
-                            label: 'Output (Candidate)',
+                            label: 'Output',
                             data: candidateData,
                             backgroundColor: isLine ? 'rgba(168, 85, 247, 0.65)' : '#a855f7',
                             borderColor: '#a855f7',
                             borderWidth: isLine ? 2 : 0,
                             fill: isLine,
                             stack: 'tokens',
-                            tension: 0.3
+                            tension: 0.3,
+                            maxBarThickness: 48,
+                            borderRadius: isLine ? 0 : { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 }
                         }
                     ]
                 },
@@ -1482,18 +1523,21 @@ function generateDashboardHtml() {
                             label: 'Success',
                             data: timeline.map(t => t.toolSuccess || 0),
                             backgroundColor: 'rgba(16, 185, 129, 0.75)',
+                            maxBarThickness: 48,
                             borderRadius: 4
                         },
                         {
                             label: 'Failed',
                             data: timeline.map(t => t.toolFailure || 0),
                             backgroundColor: 'rgba(244, 63, 94, 0.75)',
+                            maxBarThickness: 48,
                             borderRadius: 4
                         },
                         {
                             label: 'Denied',
                             data: timeline.map(t => t.toolDenied || 0),
                             backgroundColor: 'rgba(245, 158, 11, 0.75)',
+                            maxBarThickness: 48,
                             borderRadius: 4
                         }
                     ]
@@ -1527,6 +1571,7 @@ function generateDashboardHtml() {
                             label: 'Lines Added (+)',
                             data: timeline.map(t => t.linesAdded || 0),
                             backgroundColor: 'rgba(56, 189, 248, 0.85)',
+                            maxBarThickness: 48,
                             borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
                             stack: 'codeStack'
                         },
@@ -1534,6 +1579,7 @@ function generateDashboardHtml() {
                             label: 'Lines Removed (-)',
                             data: timeline.map(t => -(t.linesRemoved || 0)),
                             backgroundColor: 'rgba(244, 63, 94, 0.85)',
+                            maxBarThickness: 48,
                             borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 },
                             stack: 'codeStack'
                         }
@@ -1604,12 +1650,19 @@ function generateDashboardHtml() {
                     dailySortField = field;
                     dailySortOrder = (field === 'date') ? 'desc' : 'desc';
                 }
-            } else {
+            } else if (tableMode === 'models') {
                 if (modelSortField === field) {
                     modelSortOrder = modelSortOrder === 'asc' ? 'desc' : 'asc';
                 } else {
                     modelSortField = field;
                     modelSortOrder = (field === 'model' || field === 'provider') ? 'asc' : 'desc';
+                }
+            } else {
+                if (timedSortField === field) {
+                    timedSortOrder = timedSortOrder === 'asc' ? 'desc' : 'asc';
+                } else {
+                    timedSortField = field;
+                    timedSortOrder = (field === 'model' || field === 'provider') ? 'asc' : 'desc';
                 }
             }
             if (rawData && rawData.timeline) {
@@ -1627,18 +1680,16 @@ function generateDashboardHtml() {
 
             if (tableMode === 'daily') {
                 titleEl.textContent = 'Daily Detailed Token Records';
-                subtitleEl.textContent = 'Itemized log of daily token counts, cache ratios, and tool operations (click headers to sort)';
+                subtitleEl.textContent = 'Itemized log of daily token stats';
                 searchInput.placeholder = 'Filter by date...';
 
                 thead.innerHTML = \`
                     <tr>
                         <th class="sortable" onclick="handleSort('date')">Date \${getSortIndicator('date', dailySortField, dailySortOrder)}</th>
                         <th class="sortable" onclick="handleSort('tokens')">Total Tokens \${getSortIndicator('tokens', dailySortField, dailySortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('promptTokens')">Prompt (In) \${getSortIndicator('promptTokens', dailySortField, dailySortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('candidateTokens')">Candidate (Out) \${getSortIndicator('candidateTokens', dailySortField, dailySortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('cachedTokens')">Cached Tokens \${getSortIndicator('cachedTokens', dailySortField, dailySortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('promptTokens')">INPUT \${getSortIndicator('promptTokens', dailySortField, dailySortOrder)}</th>
                         <th class="sortable" onclick="handleSort('cachePct')">Cache % \${getSortIndicator('cachePct', dailySortField, dailySortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('requests')">Requests \${getSortIndicator('requests', dailySortField, dailySortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('candidateTokens')">OUTPUT \${getSortIndicator('candidateTokens', dailySortField, dailySortOrder)}</th>
                         <th class="sortable" onclick="handleSort('toolSuccessRate')">Tool Success \${getSortIndicator('toolSuccessRate', dailySortField, dailySortOrder)}</th>
                         <th class="sortable col-code" onclick="handleSort('linesAdded')">Code Lines \${getSortIndicator('linesAdded', dailySortField, dailySortOrder)}</th>
                     </tr>
@@ -1653,9 +1704,6 @@ function generateDashboardHtml() {
                     if (dailySortField === 'date') {
                         valA = new Date(a.date).getTime();
                         valB = new Date(b.date).getTime();
-                    } else if (dailySortField === 'requests') {
-                        valA = a.totalRequests || 0;
-                        valB = b.totalRequests || 0;
                     } else if (dailySortField === 'cachePct') {
                         valA = (a.promptTokens || 0) > 0 ? ((a.cachedTokens || 0) / (a.promptTokens || 1)) : 0;
                         valB = (b.promptTokens || 0) > 0 ? ((b.cachedTokens || 0) / (b.promptTokens || 1)) : 0;
@@ -1670,7 +1718,7 @@ function generateDashboardHtml() {
                 });
 
                 if (rows.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: var(--text-dim); padding: 2rem;">No matching daily token records found.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 2rem;">No matching daily token records found.</td></tr>';
                     return;
                 }
 
@@ -1685,13 +1733,11 @@ function generateDashboardHtml() {
                         <tr>
                             <td class="mono" style="font-weight: 600; color: var(--accent-cyan);">\${item.date}</td>
                             <td class="mono" style="font-weight: 700;">\${formatNumber(total)}</td>
-                            <td class="mono" style="color: var(--accent-emerald);">\${formatNumber(prompt)}</td>
-                            <td class="mono" style="color: var(--accent-violet);">\${formatNumber(cand)}</td>
-                            <td class="mono" style="color: #059669;">\${formatNumber(cached)}</td>
+                            <td class="mono" style="color: var(--accent-emerald);">\${formatNumber(prompt)}\${cached > 0 ? ' <span style="color: #059669; font-size: 0.85em;">(' + formatNumber(cached) + ' cached)</span>' : ''}</td>
                             <td>
                                 <span class="badge-positive" style="font-size: 0.75rem;">\${cachePct}%</span>
                             </td>
-                            <td>\${item.totalRequests || 0} req</td>
+                            <td class="mono" style="color: var(--accent-violet);">\${formatNumber(cand)}</td>
                             <td>
                                 <span class="badge-info" style="font-size: 0.75rem;">\${item.toolSuccessRate}%</span>
                             </td>
@@ -1702,18 +1748,18 @@ function generateDashboardHtml() {
                         </tr>
                     \`;
                 }).join('');
-            } else {
+            } else if (tableMode === 'models') {
                 titleEl.textContent = 'Model Token Statistics';
-                subtitleEl.textContent = 'Aggregated token distribution, cache performance and share per model (click headers to sort)';
+                subtitleEl.textContent = 'Token stats for each model';
                 searchInput.placeholder = 'Filter by model or provider...';
 
                 thead.innerHTML = \`
                     <tr>
-                        <th class="sortable" onclick="handleSort('model')">Model Name \${getSortIndicator('model', modelSortField, modelSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('model')">Model \${getSortIndicator('model', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('provider')">Provider \${getSortIndicator('provider', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('tokens')">Total Tokens \${getSortIndicator('tokens', modelSortField, modelSortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('promptTokens')">Prompt (In) \${getSortIndicator('promptTokens', modelSortField, modelSortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('candidateTokens')">Candidate (Out) \${getSortIndicator('candidateTokens', modelSortField, modelSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('promptTokens')">INPUT \${getSortIndicator('promptTokens', modelSortField, modelSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('candidateTokens')">OUTPUT \${getSortIndicator('candidateTokens', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('cachedTokens')">Cached Tokens \${getSortIndicator('cachedTokens', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('cachePct')">Cache % \${getSortIndicator('cachePct', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('sharePct')">Token Share \${getSortIndicator('sharePct', modelSortField, modelSortOrder)}</th>
@@ -1798,7 +1844,7 @@ function generateDashboardHtml() {
                             <td class="mono" style="font-weight: 600; color: var(--text-main);">
                                 <span style="display: inline-flex; align-items: center; gap: 8px;">
                                     \${getProviderBrandIcon(m.provider, 16)}
-                                    <span>\${m.model}</span>
+                                    <span title="\${m.model}">\${getModelBaseName(m.model)}</span>
                                 </span>
                             </td>
                             <td>
@@ -1821,6 +1867,93 @@ function generateDashboardHtml() {
                                     <span class="mono" style="font-size: 0.75rem; color: var(--text-muted); min-width: 38px;">\${m.sharePct}%</span>
                                 </div>
                             </td>
+                        </tr>
+                    \`;
+                }).join('');
+            } else if (tableMode === 'timed') {
+                titleEl.textContent = 'Per-Request Timed Log';
+                subtitleEl.textContent = 'Each API Call';
+                searchInput.placeholder = 'Filter by model, provider or time...';
+
+                thead.innerHTML = \`
+                    <tr>
+                        <th class="sortable" onclick="handleSort('time')">Time \${getSortIndicator('time', timedSortField, timedSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('provider')">Provider \${getSortIndicator('provider', timedSortField, timedSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('model')">Model \${getSortIndicator('model', timedSortField, timedSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('input')">Input (Cached) \${getSortIndicator('input', timedSortField, timedSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('cachePct')">Cache % \${getSortIndicator('cachePct', timedSortField, timedSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('output')">Output \${getSortIndicator('output', timedSortField, timedSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('total')">Total \${getSortIndicator('total', timedSortField, timedSortOrder)}</th>
+                    </tr>
+                \`;
+
+                const timed = (rawData && Array.isArray(rawData.timed)) ? rawData.timed : [];
+                let trows = timed.map(e => ({
+                    time: e.time || '',
+                    provider: e.provider || 'unknown',
+                    model: e.model || 'unknown',
+                    input: Number(e.input) || 0,
+                    cached: Number(e.cached) || 0,
+                    output: Number(e.output) || 0,
+                    reasoning: Number(e.reasoning) || 0
+                }));
+
+                trows.forEach(r => {
+                    r.total = r.input + r.output;
+                    r.cachePct = r.input > 0 ? (r.cached / r.input) * 100 : 0;
+                    const _pad = (n) => String(n).padStart(2, '0');
+                    const _d = new Date(r.time);
+                    const _h24 = _d.getHours();
+                    const _am = _h24 >= 12 ? 'PM' : 'AM';
+                    const _h12 = _h24 % 12 || 12;
+                    r.timeDisplay = _d.getFullYear() + '-' + _pad(_d.getMonth() + 1) + '-' + _pad(_d.getDate()) + ' ' + _pad(_h12) + ':' + _pad(_d.getMinutes()) + ' ' + _am;
+                });
+
+                if (filterText) {
+                    trows = trows.filter(r =>
+                        r.time.toLowerCase().includes(filterText) ||
+                        r.model.toLowerCase().includes(filterText) ||
+                        r.provider.toLowerCase().includes(filterText)
+                    );
+                }
+
+                trows.sort((a, b) => {
+                    let valA = a[timedSortField];
+                    let valB = b[timedSortField];
+                    if (timedSortField === 'time') {
+                        valA = new Date(a.time).getTime();
+                        valB = new Date(b.time).getTime();
+                    } else if (timedSortField === 'model' || timedSortField === 'provider') {
+                        valA = (valA || '').toLowerCase();
+                        valB = (valB || '').toLowerCase();
+                        return timedSortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                    } else {
+                        valA = valA || 0;
+                        valB = valB || 0;
+                    }
+                    return timedSortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+                });
+
+                if (trows.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 2rem;">No per-call records yet. Make a request and refresh.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = trows.map(r => {
+                    return \`
+                        <tr>
+                            <td class="mono" style="font-size: 0.75rem; color: var(--text-muted);">\${r.timeDisplay}</td>
+                            <td>
+                                <span class="badge-info" style="font-size: 0.72rem; display: inline-flex; align-items: center; gap: 5px;">
+                                    \${getProviderBrandIcon(r.provider, 14)}
+                                    \${r.provider}
+                                </span>
+                            </td>
+                            <td class="mono" style="font-weight: 600; color: var(--text-main); font-size: 0.8rem;" title="\${r.model}">\${getModelBaseName(r.model)}</td>
+                            <td class="mono" style="color: var(--accent-emerald);">\${formatNumber(r.input)}\${r.cached > 0 ? ' <span style="color: #059669;">(' + formatNumber(r.cached) + ' cached)</span>' : ''}</td>
+                            <td><span class="badge-positive" style="font-size: 0.72rem;">\${r.cachePct.toFixed(1)}%</span></td>
+                            <td class="mono" style="color: var(--accent-violet);">\${formatNumber(r.output)}\${r.reasoning > 0 ? ' <span style="color: #8b5cf6; font-size: 0.75rem;">(' + formatNumber(r.reasoning) + ' thinking)</span>' : ''}</td>
+                            <td class="mono" style="font-weight: 700;">\${formatNumber(r.total)}</td>
                         </tr>
                     \`;
                 }).join('');
@@ -1950,6 +2083,7 @@ export async function startUsageServer(preferredPort = 52140) {
         if (url.pathname === '/api/usage') {
             try {
                 const data = await getAllUsageData();
+                data.timed = await getTimedUsage(30);
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify(data));
             } catch (err) {

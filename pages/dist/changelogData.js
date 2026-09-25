@@ -1,6 +1,15 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.19.0": {
+        "note": "SEPTEMBER 25",
+        "added": [],
+        "changed": [
+            "Added a new \"Timed\" field in Analytics (GUI version). Shows token stats for every single API call FluxFlow makes.",
+            "Improved `CodeSearch` tool accuracy."
+        ],
+        "fixes": []
+    },
     "4.18.0": {
         "note": "SEPTEMBER 25",
         "added": [
