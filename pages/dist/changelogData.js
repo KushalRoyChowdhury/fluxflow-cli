@@ -4,7 +4,7 @@ export const changelogData = {
     "4.21.2": {
         "note": "SEPTEMBER 27",
         "added": [
-            "Added `--run` (alias `-r`) flag support for `fluxflow -p`. Allows executing shell commands directly (e.g. `fluxflow -r \"git diff\" -p \"summarize this\"`) and passes command output with labeled command context (`Stdin Context (<command>):`) to the model. Standard OS pipe still supported, but model will only get raw stdout bytes, not the command/binary that generated it."
+            "Added `--run` (alias `-r`) flag support for `fluxflow -p`. Allows executing shell commands directly (e.g. `fluxflow -r \"git diff\" -p \"summarize this\"`) and passes command output with labeled command context (`Stdin Context (‹command›):`) to the model. Standard OS pipe still supported, but model will only get raw stdout bytes, not the command/binary that generated it.\n--run uses `cmd` on Windows & `/bin/sh` on mac/linux."
         ],
         "changed": [],
         "fixes": []
