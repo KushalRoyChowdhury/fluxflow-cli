@@ -21,7 +21,7 @@ import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory
 import { subagentProgress } from './utils/subagent_state.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
 import { getThemeColors } from './utils/theme.js';
-import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, cleanupOldLogs, saveChatContext, loadChatContext } from './utils/history.js';
+import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, saveChatContext, loadChatContext } from './utils/history.js';
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
@@ -31,7 +31,7 @@ import { GEMINI_QUOTES } from './data/gemini_quotes.js';
 import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
-import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession } from './utils/usage.js';
+import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession, sendUsageHeartbeat, sendUsageFinalize } from './utils/usage.js';
 import { getModels, getDefaultModel, getFallbackValue, setCustomMultimodal, setOllamaMultimodal, isModelMultimodal, saveModelToProvider, removeModelFromProvider, renameModelInProvider, setDefaultModelForProvider, setModelMultimodalInProvider } from './data/model_config.js';
 import { setThinkingLevelMapping, getMappedThinkingLevel, removeThinkingLevelMapping } from './data/thinking_config.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
@@ -2336,7 +2336,7 @@ export default function App({ args = [] }) {
             if (saved.systemSettings?.autoDeleteHistory) {
                 cleanupOldHistory(saved.systemSettings.autoDeleteHistory);
             }
-            cleanupOldLogs(LOGS_DIR);
+            // cleanupOldLogs(LOGS_DIR);
 
             // Purge playground session + folder when starting in normal mode
             if (!parsedArgs.playground) {
@@ -2642,7 +2642,8 @@ export default function App({ args = [] }) {
                     await addToUsage('duration', deltaSecs);
                     lastSavedTimeRef.current += deltaSecs * 1000;
                 }
-                await forceFlushUsage();
+                // Send /finalize to usage daemon to write to disk, lock writes, and cleanly self-terminate
+                await sendUsageFinalize();
 
                 // Optional: Force save chat state to history
                 // saveChat(chatId, null, messages);
@@ -2651,12 +2652,12 @@ export default function App({ args = [] }) {
 
             const timer = setTimeout(() => {
                 process.exit(0);
-            }, 200); // Give user 0.2s to see the final stats dashboard [SAMLL ENOUGH]
+            }, 50); // Give user 0.2s to see the final stats dashboard [SAMLL ENOUGH]
             return () => clearTimeout(timer);
         }
     }, [activeView]);
 
-    // Duration Watcher (Telemetry)
+    // Duration Watcher (Telemetry & Daemon Heartbeat)
     useEffect(() => {
         const interval = setInterval(async () => {
             if (!isInitializing) {
@@ -2666,8 +2667,9 @@ export default function App({ args = [] }) {
                     await addToUsage('duration', deltaSecs);
                     lastSavedTimeRef.current += deltaSecs * 1000;
                 }
+                sendUsageHeartbeat();
             }
-        }, 5000); // 5s "vibe" interval
+        }, 5000); // 5s interval
         return () => clearInterval(interval);
     }, [isInitializing]);
 

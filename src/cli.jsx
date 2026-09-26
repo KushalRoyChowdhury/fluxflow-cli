@@ -126,7 +126,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                 try {
                     const { exportErrorLogs } = await import('./utils/export.js');
                     const result = await exportErrorLogs();
-                    console.log(`[EXPORT LOGS] Exported ${result.entryCount} error log entries (FluxFlow: ${result.fluxflowCount}, Memory: ${result.memoryCount}) to "${result.exportFile}"`);
+                    console.log(`[EXPORT LOGS] Exported ${result.entryCount} error log entries (FluxFlow: ${result.fluxflowCount}, Memory: ${result.memoryCount}, Usage: ${result.usageCount}) to "${result.exportFile}"`);
                     process.exit(0);
                 } catch (err) {
                     console.error(`[EXPORT ERROR] Failed to export error logs: ${err.message}`);
@@ -145,7 +145,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
         if (isHelp) {
             console.log(`FluxFlow CLI Arguments:
-  --mode <flux|flow>                       Set startup mode (flux: Agent / flow: Chat)
+  --mode <flux|flow|icu|omni>              Set startup mode (Agent / Chat / Computer Use / Sentient being)
   --model <model_name>                     Set startup AI model
   --key <key@provider>                     Set API key and provider
   --provider                               Override default provider
@@ -158,7 +158,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --auto-exec <on|off>                     Toggle permission for autonomous command execution
   --yolo <on|off>                          Same as --auto-exec
   --external-access <on|off>               Toggle permission for file reads outside CWD
-  -p, --prompt <text>                      One-shot non-TUI answer (custom system instruction, no loop)
+  -p, --prompt <text> [-n|--new]           One-shot non-TUI answer (-n to start fresh conversation)
   -v, --version                            Show installed version
   --help                                   Show this help menu
   --help commands                          Show available /commands
@@ -433,7 +433,11 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     // 3.5 ONE-SHOT PROMPT: -p/--prompt -> non-TUI, custom system instruction, no loop
     const promptIdx = args.findIndex(a => a === '-p' || a === '--prompt');
     if (promptIdx !== -1) {
-        const promptText = args[promptIdx + 1];
+        const isNewChat = args.includes('--new') || args.includes('-n');
+        // Find the prompt text (the first non-flag argument after -p/--prompt)
+        const postPromptArgs = args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new');
+        const promptText = postPromptArgs[0];
+
         if (!promptText) {
             console.error('[ERROR] -p/--prompt requires a prompt string.');
             process.exit(1);
@@ -445,7 +449,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         const { checkQuotaDetailed } = await import('./utils/usage.js');
 
         const baseSettings = await loadSettings();
-        const scanArgs = args.filter((_, idx) => idx !== promptIdx && idx !== promptIdx + 1);
+        const scanArgs = args.filter(a => a !== '-p' && a !== '--prompt' && a !== promptText && a !== '-n' && a !== '--new');
         const getFlag = (names) => {
             for (const n of names) {
                 const i = scanArgs.indexOf(n);
@@ -485,14 +489,39 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
         const dateTimeStr = `${year}-${month}-${day}, ${timeStr}`;
 
-        const oneShotInstruction = `Identity: FluxFlow. Sassy, friendly, CLI Assistant
-NO markdown, just plain text. Dont ask questions at response end
--- Additional Context --
+        const oneShotInstruction = `Identity: FluxFlow. Sassy, CLI Assistant
+NO markdown, just plain text
+Additional Context:
 - OS: ${osDetected}
 - Model: ${path.basename(oneShotSettings.model).trim().replace(':free', '').replace('-free', '').replace('free/', '').replaceAll('-', ' ').replace(/\b\w/g, char => char.toUpperCase().trim())}
 - Time: ${dateTimeStr}
-- Headless, non interactive mode. No conversation context
-- 'fluxflow' TUI needed for full agentic capability & tools`.trim();
+- Non interactive CLI mode, no agent tools
+- \`fluxflow\` TUI needed for full capability`.trim();
+
+        const { getPromptSessionHistory, savePromptSessionHistory, clearPromptSessionHistory } = await import('./utils/sessionDaemon.js');
+
+        let sessionHistory = [];
+        if (isNewChat) {
+            await clearPromptSessionHistory();
+        } else {
+            sessionHistory = await getPromptSessionHistory();
+        }
+
+        const formattedContents = [];
+        if (Array.isArray(sessionHistory) && sessionHistory.length > 0) {
+            for (const item of sessionHistory) {
+                if (item.text) {
+                    formattedContents.push({
+                        role: item.role === 'model' ? 'model' : 'user',
+                        parts: [{ text: item.text }]
+                    });
+                }
+            }
+        }
+        formattedContents.push({
+            role: 'user',
+            parts: [{ text: promptText }]
+        });
 
         try {
             // ANSI colour codes:
@@ -510,8 +539,14 @@ NO markdown, just plain text. Dont ask questions at response end
                 .replace(/\b\w/g, char => char.toUpperCase().trim());
 
             process.stdout.write(`Responding with ${cyan}${modelName}${reset} from ${magenta}${oneShotSettings.aiProvider}${reset}:\n`);
-            const { text } = await generateSimpleContent(oneShotSettings, model, promptText, oneShotInstruction, oneShotSettings.thinkingLevel);
-            process.stdout.write((text || '').trim() + '\n\n');
+            const { text } = await generateSimpleContent(oneShotSettings, model, formattedContents, oneShotInstruction, oneShotSettings.thinkingLevel);
+            const responseText = (text || '').trim();
+            process.stdout.write(responseText + '\n\n');
+
+            // Persist conversation temporarily into memory daemon (with 10 min idle auto-shutdown)
+            if (responseText) {
+                await savePromptSessionHistory(promptText, responseText);
+            }
         } catch (err) {
             console.error(`[ERROR] Prompt request failed: ${err.message.trim()}\n\n`);
             process.exit(1);

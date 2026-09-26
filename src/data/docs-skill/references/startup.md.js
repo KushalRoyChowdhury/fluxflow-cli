@@ -27,5 +27,5 @@ fluxflow [options]
 * --help → CLI help menu
 * --help commands → In-chat slash commands list
 * --playground → Launch Playground mode
-* --prompt, -p → Headless mode, non interactive run, no agentic tools, no chat context, single turn response
+* --prompt, -p → Non interactive CLI chat, no tools. --new for new chat in CLI. Holds conversation context upto 10m inactivity or 69 turns
 `;

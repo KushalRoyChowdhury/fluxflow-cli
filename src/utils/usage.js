@@ -1,15 +1,28 @@
 import fs from 'fs-extra';
 import path from 'path';
-import { USAGE_FILE, USAGE_FILE_OLD, USAGE_FILE_TIMED } from './paths.js';
+import { USAGE_FILE, USAGE_FILE_OLD, USAGE_FILE_TIMED, LOGS_DIR } from './paths.js';
 import { encryptAes, decryptAes } from './crypto.js';
 import { loadSettings } from './settings.js';
+import { sendUsageWrite, sendUsageHeartbeat, sendUsageFinalize } from './usageDaemon.js';
 
-const generateSaveId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
+export { sendUsageHeartbeat, sendUsageFinalize };
+
+const USAGE_ERROR_LOG_FILE = path.join(LOGS_DIR, 'usage', 'usage_error.txt');
+
+const logUsageError = async (context, err) => {
+    const errorMsg = err?.stack || err?.message || String(err);
+    console.error(`[Usage Error] [${context}]:`, err);
+    try {
+        await fs.ensureDir(path.dirname(USAGE_ERROR_LOG_FILE));
+        const timestamp = new Date().toISOString();
+        const logEntry = `[${timestamp}] [${context}] ${errorMsg}\n-------------------------------------\n\n`;
+        await fs.appendFile(USAGE_ERROR_LOG_FILE, logEntry, 'utf8');
+    } catch (e) {
+        // Silently catch file logging errors to prevent breaking application flow
+    }
+};
 
 let cachedUsage = null;
-let writeTimeout = null;
-let lastWriteTime = 0;
-let isDirty = false;
 
 const defaultStats = {
     agent: 0,
@@ -42,7 +55,7 @@ const purgeOldHistory = (history, todayStr) => {
 };
 
 /**
- * Loads usage from file into memory
+ * Loads usage from file directly (safe read)
  */
 const loadUsageFromFile = async () => {
     const today = new Date().toISOString().split('T')[0];
@@ -55,52 +68,19 @@ const loadUsageFromFile = async () => {
         }
     } catch (err) { }
 
-    const tempFile = USAGE_FILE + '.tmp';
     let primaryData = null;
 
-    // A. Check for pending .tmp write recovery first (Self-Healing Loop)
     try {
-        if (await fs.exists(tempFile)) {
-            const rawContent = (await fs.readFile(tempFile, 'utf8')).trim();
-            let parsed = null;
+        if (await fs.exists(USAGE_FILE)) {
+            const rawContent = (await fs.readFile(USAGE_FILE, 'utf8')).trim();
             if (rawContent.startsWith('{') || rawContent.startsWith('[')) {
-                parsed = JSON.parse(rawContent);
+                primaryData = JSON.parse(rawContent);
             } else {
-                parsed = JSON.parse(decryptAes(rawContent));
-            }
-
-            if (parsed && parsed.date && parsed.stats) {
-                // .tmp is intact and valid - Recover it immediately and complete rename
-                primaryData = parsed;
-                try {
-                    await fs.rename(tempFile, USAGE_FILE);
-                } catch (e) { }
-            } else {
-                // Invalid structure inside .tmp - remove corrupted file safely
-                try {
-                    await fs.remove(tempFile);
-                } catch (e) { }
+                primaryData = JSON.parse(decryptAes(rawContent));
             }
         }
     } catch (err) {
-        // Tmp file parsing or decryption failed (corrupted) - safely clean it up
-        try {
-            await fs.remove(tempFile);
-        } catch (e) { }
-    }
-
-    // 1. Try reading primary usage file (if not already recovered from .tmp)
-    if (!primaryData) {
-        try {
-            if (await fs.exists(USAGE_FILE)) {
-                const rawContent = (await fs.readFile(USAGE_FILE, 'utf8')).trim();
-                if (rawContent.startsWith('{') || rawContent.startsWith('[')) {
-                    primaryData = JSON.parse(rawContent);
-                } else {
-                    primaryData = JSON.parse(decryptAes(rawContent));
-                }
-            }
-        } catch (err) { }
+        await logUsageError('loadUsageFromFile', err);
     }
 
     let resolvedData = primaryData;
@@ -114,10 +94,6 @@ const loadUsageFromFile = async () => {
 
         const history = resolvedData.history || {};
         const purgedHistory = purgeOldHistory(history, today);
-
-        if (Object.keys(history).length !== Object.keys(purgedHistory).length) {
-            isDirty = true;
-        }
 
         if (resolvedData.date === today) {
             return {
@@ -148,137 +124,10 @@ const loadUsageFromFile = async () => {
 };
 
 /**
- * Persists in-memory usage to disk with Read-Merge-Write safety
+ * Force flush: Notifies daemon to write immediately.
  */
-const flushUsage = async () => {
-    if (!isDirty || !cachedUsage) return;
-
-    try {
-        await fs.ensureDir(path.dirname(USAGE_FILE));
-
-        // --- READ-MERGE-WRITE SAFETY (v1.8.5 Protection) ---
-        // Before we overwrite the file, check if disk has data we lost in memory
-        let diskData = null;
-        try {
-            if (await fs.exists(USAGE_FILE)) {
-                const rawContent = (await fs.readFile(USAGE_FILE, 'utf8')).trim();
-                if (rawContent.startsWith('{') || rawContent.startsWith('[')) {
-                    diskData = JSON.parse(rawContent);
-                } else {
-                    diskData = JSON.parse(decryptAes(rawContent));
-                }
-            }
-        } catch (e) { }
-
-        if (diskData && diskData.date === cachedUsage.date && diskData.stats) {
-            // Merge: Take the maximum of memory vs disk to prevent "Zero-Reset"
-            for (const key in cachedUsage.stats) {
-                if (diskData.stats[key] !== undefined) {
-                    if (Array.isArray(cachedUsage.stats[key])) {
-                        const diskArr = Array.isArray(diskData.stats[key]) ? diskData.stats[key] : [];
-                        const memArr = cachedUsage.stats[key];
-                        const uniqueMap = new Map();
-                        for (const item of [...diskArr, ...memArr]) {
-                            if (item && item.timestamp) {
-                                uniqueMap.set(item.timestamp, item);
-                            }
-                        }
-                        cachedUsage.stats[key] = Array.from(uniqueMap.values());
-                    } else if (typeof cachedUsage.stats[key] === 'number') {
-                        cachedUsage.stats[key] = Math.max(cachedUsage.stats[key], Number(diskData.stats[key]) || 0);
-                    } else if (cachedUsage.stats[key] && typeof cachedUsage.stats[key] === 'object') {
-                        // Merge plain objects (like providerRequests, models)
-                        const diskObj = diskData.stats[key] || {};
-                        const memObj = cachedUsage.stats[key];
-                        for (const subKey in diskObj) {
-                            if (typeof diskObj[subKey] === 'number') {
-                                memObj[subKey] = Math.max(memObj[subKey] || 0, diskObj[subKey]);
-                            } else if (diskObj[subKey] && typeof diskObj[subKey] === 'object') {
-                                // For nested objects like models[provider][model]
-                                if (!memObj[subKey]) memObj[subKey] = {};
-                                for (const mKey in diskObj[subKey]) {
-                                    if (typeof diskObj[subKey][mKey] === 'number') {
-                                        memObj[subKey][mKey] = Math.max(memObj[subKey][mKey] || 0, diskObj[subKey][mKey]);
-                                    } else if (diskObj[subKey][mKey] && typeof diskObj[subKey][mKey] === 'object') {
-                                        if (!memObj[subKey][mKey]) memObj[subKey][mKey] = {};
-                                        for (const valKey in diskObj[subKey][mKey]) {
-                                            memObj[subKey][mKey][valKey] = Math.max(memObj[subKey][mKey][valKey] || 0, diskObj[subKey][mKey][valKey]);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (diskData && diskData.history) {
-            const mergedHistory = { ...(cachedUsage.history || {}) };
-            for (const dateKey in diskData.history) {
-                if (mergedHistory[dateKey]) {
-                    for (const key in mergedHistory[dateKey]) {
-                        if (key === 'imageCalls') {
-                            const diskArr = Array.isArray(diskData.history[dateKey].imageCalls) ? diskData.history[dateKey].imageCalls : [];
-                            const memArr = Array.isArray(mergedHistory[dateKey].imageCalls) ? mergedHistory[dateKey].imageCalls : [];
-                            const uniqueMap = new Map();
-                            for (const item of [...diskArr, ...memArr]) {
-                                if (item && item.timestamp) {
-                                    uniqueMap.set(item.timestamp, item);
-                                }
-                            }
-                            mergedHistory[dateKey].imageCalls = Array.from(uniqueMap.values());
-                        } else if (typeof mergedHistory[dateKey][key] === 'number') {
-                            mergedHistory[dateKey][key] = Math.max(mergedHistory[dateKey][key], Number(diskData.history[dateKey][key]) || 0);
-                        }
-                    }
-                } else {
-                    mergedHistory[dateKey] = diskData.history[dateKey];
-                }
-            }
-            cachedUsage.history = purgeOldHistory(mergedHistory, cachedUsage.date || today);
-        } else if (cachedUsage && cachedUsage.history) {
-            const today = new Date().toISOString().split('T')[0];
-            cachedUsage.history = purgeOldHistory(cachedUsage.history, today);
-        }
-
-        // Append unique save ID to verify alignment during boot sequence
-        cachedUsage.saveId = generateSaveId();
-
-        const tempFile = USAGE_FILE + '.tmp';
-        const encryptedStr = encryptAes(JSON.stringify(cachedUsage, null, 2));
-        await fs.writeFile(tempFile, encryptedStr, 'utf8');
-
-        // Physical Flush to ensure durability
-        const fd = await fs.open(tempFile, 'r+');
-        await fs.fsync(fd);
-        await fs.close(fd);
-
-        // Atomic rename to commit change
-        await fs.rename(tempFile, USAGE_FILE);
-
-
-
-        isDirty = false;
-        lastWriteTime = Date.now();
-    } catch (e) { }
-};
-
-/**
- * Queues a debounced write to disk
- */
-const queueFlush = () => {
-    isDirty = true;
-    if (writeTimeout) return;
-
-    const now = Date.now();
-    const delay = Math.max(0, 1500 - (now - lastWriteTime));
-
-    writeTimeout = setTimeout(async () => {
-        await flushUsage();
-        writeTimeout = null;
-    }, delay);
-    if (writeTimeout.unref) writeTimeout.unref();
+export const forceFlushUsage = async () => {
+    // Write handled exclusively via daemon
 };
 
 /**
@@ -354,18 +203,24 @@ const purgeTimedUsage = async () => {
              .sort();
          const recent = files.slice(-Math.max(1, days));
          for (const f of recent) {
-             const raw = await fs.readFile(path.join(USAGE_FILE_TIMED, f), 'utf8');
-             for (const line of raw.split('\n')) {
-                 if (!line.trim()) continue;
-                 try { out.push(JSON.parse(line)); } catch {}
+             try {
+                 const raw = await fs.readFile(path.join(USAGE_FILE_TIMED, f), 'utf8');
+                 for (const line of raw.split('\n')) {
+                     if (!line.trim()) continue;
+                     try {
+                         out.push(JSON.parse(line));
+                     } catch (parseErr) {
+                         await logUsageError(`getTimedUsage:parseLine (${f})`, parseErr);
+                     }
+                 }
+             } catch (readErr) {
+                 await logUsageError(`getTimedUsage:readFile (${f})`, readErr);
              }
          }
-     } catch {}
+     } catch (err) {
+         await logUsageError('getTimedUsage', err);
+     }
      return out;
- };
-
- export const forceFlushUsage = async () => {
-     await flushUsage();
  };
 
  /**
@@ -474,7 +329,7 @@ export const getMonthlyUsage = async () => {
 };
 
 /**
- * Increments a specific usage key in memory
+ * Increments a specific usage key in memory and forwards to daemon
  */
 export const incrementUsage = async (key, provider) => {
     if (key === 'toolSuccess') runtimeSession.toolSuccess++;
@@ -491,7 +346,8 @@ export const incrementUsage = async (key, provider) => {
         }
         stats.providerRequests[provider] = (stats.providerRequests[provider] || 0) + 1;
     }
-    queueFlush();
+
+    await sendUsageWrite({ key, amount: 1, provider });
 };
 
 export const runtimeSession = {
@@ -503,7 +359,7 @@ export const runtimeSession = {
 };
 
 /**
- * Adds a specific amount to a usage key in memory
+ * Adds a specific amount to a usage key in memory and forwards to daemon
  */
 export const addToUsage = async (key, amount, provider, model) => {
     if (key === 'linesAdded') {
@@ -537,7 +393,7 @@ export const addToUsage = async (key, amount, provider, model) => {
         if (key === 'candidateTokens') mObj.candidateTokens += Math.floor(amount);
     }
 
-    queueFlush();
+    await sendUsageWrite({ key, amount, provider, model });
 };
 
 /**

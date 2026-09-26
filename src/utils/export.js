@@ -258,6 +258,8 @@ export const exportErrorLogs = async (targetDir = process.cwd()) => {
                 let defaultSource = 'FluxFlow';
                 if (normPath.includes('/janitor') || normPath.includes('janitor')) {
                     defaultSource = 'Memory';
+                } else if (normPath.includes('/usage') || normPath.includes('usage')) {
+                    defaultSource = 'Usage';
                 } else if (!normPath.includes('/agent') && !normPath.includes('agent')) {
                     defaultSource = 'Other';
                 }
@@ -281,7 +283,8 @@ export const exportErrorLogs = async (targetDir = process.cwd()) => {
 
     const fluxflowEntries = uniqueEntries.filter(e => e.source === 'FluxFlow');
     const memoryEntries = uniqueEntries.filter(e => e.source === 'Memory');
-    const otherEntries = uniqueEntries.filter(e => e.source !== 'FluxFlow' && e.source !== 'Memory');
+    const usageEntries = uniqueEntries.filter(e => e.source === 'Usage');
+    const otherEntries = uniqueEntries.filter(e => !['FluxFlow', 'Memory', 'Usage'].includes(e.source));
 
     const renderSection = (title, entries, categoryName) => {
         const sectionHeader = [
@@ -303,33 +306,53 @@ export const exportErrorLogs = async (targetDir = process.cwd()) => {
         return `${sectionHeader}\n\n` + blocks.join('\n\n--------------------------------------------------------------------------------\n\n');
     };
 
+    const countsBreakdown = [
+        `FluxFlow: ${fluxflowEntries.length}`,
+        `Memory: ${memoryEntries.length}`,
+        `Usage: ${usageEntries.length}`
+    ];
+    if (otherEntries.length > 0) {
+        countsBreakdown.push(`Other: ${otherEntries.length}`);
+    }
+
     const exportHeader = [
         '================================================================================',
         'FLUXFLOW ERROR LOGS EXPORT',
         `Exported At : ${new Date().toLocaleString()}`,
-        `Total Errors: ${uniqueEntries.length} (FluxFlow: ${fluxflowEntries.length} | Memory: ${memoryEntries.length}${otherEntries.length > 0 ? ` | Other: ${otherEntries.length}` : ''})`,
+        `Total Errors: ${uniqueEntries.length} (${countsBreakdown.join(' | ')})`,
         '================================================================================',
         ''
     ].join('\n');
 
+    let sectionNum = 1;
     const sections = [
-        renderSection('SECTION 1: FLUXFLOW ERRORS', fluxflowEntries, 'FluxFlow'),
-        renderSection('SECTION 2: MEMORY ERRORS', memoryEntries, 'Memory')
+        renderSection(`SECTION ${sectionNum++}: FLUXFLOW ERRORS`, fluxflowEntries, 'FluxFlow'),
+        renderSection(`SECTION ${sectionNum++}: MEMORY ERRORS`, memoryEntries, 'Memory'),
+        renderSection(`SECTION ${sectionNum++}: USAGE ERRORS`, usageEntries, 'Usage')
     ];
 
     if (otherEntries.length > 0) {
-        sections.push(renderSection('SECTION 3: OTHER SYSTEM ERRORS', otherEntries, 'Other'));
+        sections.push(renderSection(`SECTION ${sectionNum++}: OTHER SYSTEM ERRORS`, otherEntries, 'Other'));
     }
 
     const fileContent = exportHeader + sections.join('\n\n\n') + '\n';
 
     await fs.writeFile(exportPath, fileContent, 'utf8');
+
+    // Recursively clear all logs inside LOGS_DIR after exporting
+    try {
+        if (await fs.pathExists(LOGS_DIR)) {
+            await fs.emptyDir(LOGS_DIR);
+        }
+    } catch (e) {}
+
     return {
         exportFile,
         exportPath,
         entryCount: uniqueEntries.length,
         fluxflowCount: fluxflowEntries.length,
-        memoryCount: memoryEntries.length
+        memoryCount: memoryEntries.length,
+        usageCount: usageEntries.length
     };
 };
 

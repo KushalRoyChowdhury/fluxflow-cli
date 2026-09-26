@@ -5255,7 +5255,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     } catch (err) {
         const causeStr = err?.cause ? ` (Cause: ${err.cause?.message || String(err.cause)})` : '';
         const rawErrStr = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return (err.message ? `${err.message}${causeStr}` : '') || String(err); } })() : String(err);
-        const errLog = rawErrStr.replace(/^(Error:\s*)+/i, '');
+        let errLog = rawErrStr.replace(/^(Error:\s*)+/i, '');
+
+        if (aiProvider === 'Google' && !/^[A-Z0-9_\-\s]+ ERROR:/i.test(errLog)) {
+            errLog = `GEMINI ERROR: ${errLog}`;
+        }
+
         const date = new Date().toLocaleString();
         const agentErrDir = path.join(LOGS_DIR, 'agent');
         yield { type: 'text', content: `\n\n✦ CRITICAL ERROR: ${errLog.includes('fetch failed') ? 'Failed to Connect. Check your Internet Connection or Wait a moment' : errLog}\n⠀` };

@@ -614,9 +614,32 @@ function generateDashboardHtml() {
 
         th:first-child,
         td:first-child {
-            width: 300px;
-            min-width: 300px;
-            max-width: 300px;
+            width: auto;
+            min-width: 140px;
+        }
+
+        .table-daily th:first-child,
+        .table-daily td:first-child {
+            min-width: 130px;
+            width: 140px;
+        }
+
+        .table-models th:first-child,
+        .table-models td:first-child {
+            min-width: 220px;
+        }
+
+        .table-timed th:first-child,
+        .table-timed td:first-child {
+            min-width: 160px;
+            width: 165px;
+            white-space: nowrap;
+        }
+
+        .table-timed td,
+        .table-daily td,
+        .table-models td {
+            white-space: nowrap;
         }
 
         th.col-code,
@@ -1671,12 +1694,17 @@ function generateDashboardHtml() {
         };
 
         function renderTable(timeline) {
+            const tableEl = document.getElementById('usage-table');
             const thead = document.getElementById('usage-table-head');
             const tbody = document.getElementById('usage-table-body');
             const titleEl = document.getElementById('table-view-title');
             const subtitleEl = document.getElementById('table-view-subtitle');
             const searchInput = document.getElementById('table-search');
             const filterText = (searchInput.value || '').toLowerCase();
+
+            if (tableEl) {
+                tableEl.className = 'table-' + tableMode;
+            }
 
             if (tableMode === 'daily') {
                 titleEl.textContent = 'Daily Detailed Token Records';
