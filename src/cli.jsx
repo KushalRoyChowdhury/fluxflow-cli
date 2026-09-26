@@ -159,6 +159,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --yolo <on|off>                          Same as --auto-exec
   --external-access <on|off>               Toggle permission for file reads outside CWD
   -p, --prompt <text> [-n|--new]           One-shot non-TUI answer (-n to start fresh conversation)
+  -r, --run <command>                      Execute shell command and pass output as context to -p/--prompt
   -v, --version                            Show installed version
   --help                                   Show this help menu
   --help commands                          Show available /commands
@@ -438,6 +439,29 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         const postPromptArgs = args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new');
         let promptText = postPromptArgs[0];
 
+        // Support -r / --run <cmd>: execute command and feed output as context
+        const runIdx = args.findIndex(a => a === '-r' || a === '--run');
+        let runCommand = null;
+        let runOutput = null;
+        if (runIdx !== -1 && runIdx + 1 < args.length) {
+            runCommand = args[runIdx + 1];
+            try {
+                const { execSync } = await import('child_process');
+                runOutput = execSync(runCommand, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+            } catch (err) {
+                // If the command failed, capture available stdout/stderr or the error message
+                runOutput = (err.stdout ? err.stdout.toString().trim() : '') || (err.stderr ? err.stderr.toString().trim() : '') || err.message;
+            }
+        }
+
+        if (runOutput) {
+            if (promptText) {
+                promptText = `Stdin Context (${runCommand}):\n${runOutput}\n---\n\n${promptText}`;
+            } else {
+                promptText = runOutput;
+            }
+        }
+
         // Support stdin piping: read piped stdin and merge with prompt (if any)
         // e.g. `cat file.js | fluxflow -p "review this code"` merges file content + prompt
         //      `echo "hi" | fluxflow -p` uses stdin as the prompt itself
@@ -515,8 +539,8 @@ Additional Context:
 - OS: ${osDetected}
 - Model: ${path.basename(oneShotSettings.model).trim().replace(':free', '').replace('-free', '').replace('/free', '').replace('_free', '').replace('free_', '').replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase().trim())}
 - Approx time: ${dateTimeStr}
-- Non interactive CLI, no tools
-- \`fluxflow\` TUI for full capability`.trim();
+- Non interactive CLI, support piped inputs
+- 'fluxflow' TUI has full agentic tools & capabilities`.trim();
 
         const { getPromptSessionHistory, savePromptSessionHistory, clearPromptSessionHistory } = await import('./utils/sessionDaemon.js');
 

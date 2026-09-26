@@ -27,5 +27,5 @@ fluxflow [options]
 * --help → CLI help menu
 * --help commands → In-chat slash commands list
 * --playground → Launch Playground mode
-* --prompt, -p → Non interactive CLI chat, no tools. --new for new chat in CLI. Holds conversation context upto 10m inactivity or 69 turns
+* --prompt, -p → Non interactive CLI chat, no tools. --new for new headless chat. Holds conversation context upto 10m inactivity or 69 turns. Supports piping from shell, --run if want the command to visible in context. eg \`fluxflow --run "git diff" -p "summarize this" --new\`
 `;
