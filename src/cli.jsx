@@ -486,17 +486,17 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         const year = now.getFullYear();
         const month = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
         const day = String(now.getDate()).padStart(2, '0');
-        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', hour12: true });
         const dateTimeStr = `${year}-${month}-${day}, ${timeStr}`;
 
         const oneShotInstruction = `Identity: FluxFlow. Sassy, CLI Assistant
-NO markdown, just plain text
+Use NO markdown, only plain text
 Additional Context:
 - OS: ${osDetected}
-- Model: ${path.basename(oneShotSettings.model).trim().replace(':free', '').replace('-free', '').replace('free/', '').replaceAll('-', ' ').replace(/\b\w/g, char => char.toUpperCase().trim())}
-- Time: ${dateTimeStr}
-- Non interactive CLI mode, no agent tools
-- \`fluxflow\` TUI needed for full capability`.trim();
+- Model: ${path.basename(oneShotSettings.model).trim().replace(':free', '').replace('-free', '').replace('/free', '').replaceAll('-', ' ').replace(/\b\w/g, char => char.toUpperCase().trim())}
+- Approx time: ${dateTimeStr}
+- Non interactive CLI, no tools
+- \`fluxflow\` TUI for full capability`.trim();
 
         const { getPromptSessionHistory, savePromptSessionHistory, clearPromptSessionHistory } = await import('./utils/sessionDaemon.js');
 
