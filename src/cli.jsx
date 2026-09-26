@@ -493,7 +493,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 Use NO markdown, only plain text
 Additional Context:
 - OS: ${osDetected}
-- Model: ${path.basename(oneShotSettings.model).trim().replace(':free', '').replace('-free', '').replace('/free', '').replaceAll('-', ' ').replace(/\b\w/g, char => char.toUpperCase().trim())}
+- Model: ${path.basename(oneShotSettings.model).trim().replace(':free', '').replace('-free', '').replace('/free', '').replace('_free', '').replace('free_', '').replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase().trim())}
 - Approx time: ${dateTimeStr}
 - Non interactive CLI, no tools
 - \`fluxflow\` TUI for full capability`.trim();
