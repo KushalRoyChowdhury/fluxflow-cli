@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.21.0": {
+        "note": "SEPTEMBER 27",
+        "added": [
+            "Added stdin piping support for `fluxflow -p`. You can now pipe any command output directly into `--prompt` via `cat file.txt | fluxflow -p \"summarize this\"` or use `echo \"text\" | fluxflow -p -n` to send piped data without a prompt string. Piped context is clearly separated from the prompt question."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "4.20.0": {
         "note": "SEPTEMBER 26",
         "added": [

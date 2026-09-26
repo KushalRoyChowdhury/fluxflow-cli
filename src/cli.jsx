@@ -436,10 +436,30 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         const isNewChat = args.includes('--new') || args.includes('-n');
         // Find the prompt text (the first non-flag argument after -p/--prompt)
         const postPromptArgs = args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new');
-        const promptText = postPromptArgs[0];
+        let promptText = postPromptArgs[0];
+
+        // Support stdin piping: read piped stdin and merge with prompt (if any)
+        // e.g. `cat file.js | fluxflow -p "review this code"` merges file content + prompt
+        //      `echo "hi" | fluxflow -p` uses stdin as the prompt itself
+        if (!process.stdin.isTTY) {
+            // Read all stdin data
+            const chunks = [];
+            for await (const chunk of process.stdin) {
+                chunks.push(chunk);
+            }
+            const stdinText = Buffer.concat(chunks).toString('utf8').trim();
+            if (stdinText) {
+                if (promptText) {
+                    // Merge: piped context + prompt question
+                    promptText = `Stdin Context:\n${stdinText}\n---\n\n${promptText}`;
+                } else {
+                    promptText = stdinText;
+                }
+            }
+        }
 
         if (!promptText) {
-            console.error('[ERROR] -p/--prompt requires a prompt string.');
+            console.error('[ERROR] -p/--prompt requires a prompt string (or piped stdin input).');
             process.exit(1);
         }
         const { loadSettings } = await import('./utils/settings.js');

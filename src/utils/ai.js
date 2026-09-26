@@ -4678,6 +4678,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         terminalWidth = process.stdout.columns - 5 || 120;
                                     }
                                     const safeWidth = Math.max(10, (terminalWidth + 5) / 3);
+                                    const safeWidthPath = Math.max(10, (terminalWidth + 5) / 4);
                                     if (isDocSearch) {
                                         postLabel = `${keyword ? '✔' : '✘'}  Searched Documentation`;
                                     } else {
@@ -4685,7 +4686,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         const displayPath = _sp && _sp !== '.'
                                             ? `"${_isGlob ? rawPath : (_isDir ? `${_sp}/*` : _sp)}"`
                                             : './';
-                                        postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword.length > terminalWidth/2 ? `${keyword.slice(safeWidth)}...` : keyword : ''}" in ${displayPath.replaceAll('\\', '/')} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                        const truncatedPath = displayPath.length > safeWidthPath ? `${displayPath.slice(0, safeWidthPath)}...` : displayPath;
+                                        postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword.length > terminalWidth/2 ? `${keyword.slice(safeWidth)}...` : keyword : ''}" in ${truncatedPath.replaceAll('\\', '/')} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
                                     }
 
                                     const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
