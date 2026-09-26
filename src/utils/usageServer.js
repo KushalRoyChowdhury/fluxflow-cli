@@ -659,6 +659,65 @@ function generateDashboardHtml() {
             background: rgba(255, 255, 255, 0.02);
         }
 
+        .table-pagination {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.85rem 0.25rem 0.25rem 0.25rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            margin-top: 0.75rem;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .pagination-info {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .page-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            padding: 4px 10px;
+            border-radius: var(--radius-sm);
+            font-size: 0.78rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 30px;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            background: rgba(56, 189, 248, 0.12);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .page-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .page-btn.active {
+            background: var(--accent-cyan);
+            color: #0b0f17;
+            font-weight: 700;
+            border-color: var(--accent-cyan);
+        }
+
         .breakdown-list {
             display: flex;
             flex-direction: column;
@@ -926,6 +985,10 @@ function generateDashboardHtml() {
                     </tbody>
                 </table>
             </div>
+            <div class="table-pagination" id="table-pagination-container" style="display: none;">
+                <div class="pagination-info" id="pagination-info"></div>
+                <div class="pagination-controls" id="pagination-controls"></div>
+            </div>
         </div>
     </div>
 
@@ -945,6 +1008,8 @@ function generateDashboardHtml() {
         let modelSortOrder = 'desc';
         let timedSortField = 'time';
         let timedSortOrder = 'desc';
+        let timedCurrentPage = 1;
+        const timedPageSize = 69;
         let timelineChart = null;
         let providerPieChart = null;
         let toolChart = null;
@@ -1706,7 +1771,12 @@ function generateDashboardHtml() {
                 tableEl.className = 'table-' + tableMode;
             }
 
+            const paginationContainer = document.getElementById('table-pagination-container');
+            const paginationInfo = document.getElementById('pagination-info');
+            const paginationControls = document.getElementById('pagination-controls');
+
             if (tableMode === 'daily') {
+                if (paginationContainer) paginationContainer.style.display = 'none';
                 titleEl.textContent = 'Daily Detailed Token Records';
                 subtitleEl.textContent = 'Itemized log of daily token stats';
                 searchInput.placeholder = 'Filter by date...';
@@ -1714,10 +1784,10 @@ function generateDashboardHtml() {
                 thead.innerHTML = \`
                     <tr>
                         <th class="sortable" onclick="handleSort('date')">Date \${getSortIndicator('date', dailySortField, dailySortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('tokens')">Total Tokens \${getSortIndicator('tokens', dailySortField, dailySortOrder)}</th>
                         <th class="sortable" onclick="handleSort('promptTokens')">INPUT \${getSortIndicator('promptTokens', dailySortField, dailySortOrder)}</th>
                         <th class="sortable" onclick="handleSort('cachePct')">Cache % \${getSortIndicator('cachePct', dailySortField, dailySortOrder)}</th>
                         <th class="sortable" onclick="handleSort('candidateTokens')">OUTPUT \${getSortIndicator('candidateTokens', dailySortField, dailySortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('tokens')">Total Tokens \${getSortIndicator('tokens', dailySortField, dailySortOrder)}</th>
                         <th class="sortable" onclick="handleSort('toolSuccessRate')">Tool Success \${getSortIndicator('toolSuccessRate', dailySortField, dailySortOrder)}</th>
                         <th class="sortable col-code" onclick="handleSort('linesAdded')">Code Lines \${getSortIndicator('linesAdded', dailySortField, dailySortOrder)}</th>
                     </tr>
@@ -1760,12 +1830,12 @@ function generateDashboardHtml() {
                     return \`
                         <tr>
                             <td class="mono" style="font-weight: 600; color: var(--accent-cyan);">\${item.date}</td>
-                            <td class="mono" style="font-weight: 700;">\${formatNumber(total)}</td>
                             <td class="mono" style="color: var(--accent-emerald);">\${formatNumber(prompt)}\${cached > 0 ? ' <span style="color: #059669; font-size: 0.85em;">(' + formatNumber(cached) + ' cached)</span>' : ''}</td>
                             <td>
                                 <span class="badge-positive" style="font-size: 0.75rem;">\${cachePct}%</span>
                             </td>
                             <td class="mono" style="color: var(--accent-violet);">\${formatNumber(cand)}</td>
+                            <td class="mono" style="font-weight: 700;">\${formatNumber(total)}</td>
                             <td>
                                 <span class="badge-info" style="font-size: 0.75rem;">\${item.toolSuccessRate}%</span>
                             </td>
@@ -1777,6 +1847,7 @@ function generateDashboardHtml() {
                     \`;
                 }).join('');
             } else if (tableMode === 'models') {
+                if (paginationContainer) paginationContainer.style.display = 'none';
                 titleEl.textContent = 'Model Token Statistics';
                 subtitleEl.textContent = 'Token stats for each model';
                 searchInput.placeholder = 'Filter by model or provider...';
@@ -1785,11 +1856,10 @@ function generateDashboardHtml() {
                     <tr>
                         <th class="sortable" onclick="handleSort('model')">Model \${getSortIndicator('model', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('provider')">Provider \${getSortIndicator('provider', modelSortField, modelSortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('tokens')">Total Tokens \${getSortIndicator('tokens', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('promptTokens')">INPUT \${getSortIndicator('promptTokens', modelSortField, modelSortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('candidateTokens')">OUTPUT \${getSortIndicator('candidateTokens', modelSortField, modelSortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('cachedTokens')">Cached Tokens \${getSortIndicator('cachedTokens', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('cachePct')">Cache % \${getSortIndicator('cachePct', modelSortField, modelSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('candidateTokens')">OUTPUT \${getSortIndicator('candidateTokens', modelSortField, modelSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('tokens')">Total Tokens \${getSortIndicator('tokens', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('sharePct')">Token Share \${getSortIndicator('sharePct', modelSortField, modelSortOrder)}</th>
                     </tr>
                 \`;
@@ -1862,7 +1932,7 @@ function generateDashboardHtml() {
                 }
 
                 if (modelList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 2rem;">No matching models found.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 2rem;">No matching models found.</td></tr>';
                     return;
                 }
 
@@ -1880,13 +1950,12 @@ function generateDashboardHtml() {
                                     \${m.provider}
                                 </span>
                             </td>
-                            <td class="mono" style="font-weight: 700; color: var(--text-main);">\${formatNumber(m.tokens)}</td>
-                            <td class="mono" style="color: var(--accent-emerald);">\${formatNumber(m.promptTokens)}</td>
-                            <td class="mono" style="color: var(--accent-violet);">\${formatNumber(m.candidateTokens)}</td>
-                            <td class="mono" style="color: #059669;">\${formatNumber(m.cachedTokens)}</td>
+                            <td class="mono" style="color: var(--accent-emerald);">\${formatNumber(m.promptTokens)}\${m.cachedTokens > 0 ? ' <span style="color: #059669; font-size: 0.85em;">(' + formatNumber(m.cachedTokens) + ' cached)</span>' : ''}</td>
                             <td>
                                 <span class="badge-positive" style="font-size: 0.75rem;">\${m.cachePct}%</span>
                             </td>
+                            <td class="mono" style="color: var(--accent-violet);">\${formatNumber(m.candidateTokens)}</td>
+                            <td class="mono" style="font-weight: 700; color: var(--text-main);">\${formatNumber(m.tokens)}</td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <div style="flex: 1; min-width: 60px; height: 6px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden;">
@@ -1964,10 +2033,20 @@ function generateDashboardHtml() {
 
                 if (trows.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 2rem;">No per-call records yet. Make a request and refresh.</td></tr>';
+                    if (paginationContainer) paginationContainer.style.display = 'none';
                     return;
                 }
 
-                tbody.innerHTML = trows.map(r => {
+                const totalItems = trows.length;
+                const totalPages = Math.ceil(totalItems / timedPageSize);
+                if (timedCurrentPage > totalPages) timedCurrentPage = totalPages;
+                if (timedCurrentPage < 1) timedCurrentPage = 1;
+
+                const startIdx = (timedCurrentPage - 1) * timedPageSize;
+                const endIdx = Math.min(startIdx + timedPageSize, totalItems);
+                const pageRows = trows.slice(startIdx, endIdx);
+
+                tbody.innerHTML = pageRows.map(r => {
                     return \`
                         <tr>
                             <td class="mono" style="font-size: 0.75rem; color: var(--text-muted);">\${r.timeDisplay}</td>
@@ -1985,8 +2064,43 @@ function generateDashboardHtml() {
                         </tr>
                     \`;
                 }).join('');
+
+                if (paginationContainer && paginationInfo && paginationControls) {
+                    paginationContainer.style.display = 'flex';
+                    paginationInfo.innerHTML = \`Showing <strong>\${startIdx + 1}–\${endIdx}</strong> of <strong>\${totalItems}</strong> calls (<strong>\${timedPageSize}</strong> per page)\`;
+
+                    if (totalPages <= 1) {
+                        paginationControls.innerHTML = '';
+                    } else {
+                        let btnsHtml = '';
+                        btnsHtml += \`<button class="page-btn" onclick="goToTimedPage(1)" \${timedCurrentPage === 1 ? 'disabled' : ''} title="First Page">«</button>\`;
+                        btnsHtml += \`<button class="page-btn" onclick="goToTimedPage(\${timedCurrentPage - 1})" \${timedCurrentPage === 1 ? 'disabled' : ''} title="Previous Page">‹</button>\`;
+
+                        let startP = Math.max(1, timedCurrentPage - 2);
+                        let endP = Math.min(totalPages, startP + 4);
+                        if (endP - startP < 4) {
+                            startP = Math.max(1, endP - 4);
+                        }
+
+                        for (let p = startP; p <= endP; p++) {
+                            btnsHtml += \`<button class="page-btn \${p === timedCurrentPage ? 'active' : ''}" onclick="goToTimedPage(\${p})">\${p}</button>\`;
+                        }
+
+                        btnsHtml += \`<button class="page-btn" onclick="goToTimedPage(\${timedCurrentPage + 1})" \${timedCurrentPage === totalPages ? 'disabled' : ''} title="Next Page">›</button>\`;
+                        btnsHtml += \`<button class="page-btn" onclick="goToTimedPage(\${totalPages})" \${timedCurrentPage === totalPages ? 'disabled' : ''} title="Last Page">»</button>\`;
+
+                        paginationControls.innerHTML = btnsHtml;
+                    }
+                }
             }
         }
+
+        window.goToTimedPage = function(page) {
+            timedCurrentPage = page;
+            if (rawData && rawData.timeline) {
+                renderTable(filterTimelineByRange(rawData.timeline, activeRange));
+            }
+        };
 
         function exportJson() {
             if (!rawData) return;
@@ -2071,6 +2185,7 @@ function generateDashboardHtml() {
         document.getElementById('btn-export-json').addEventListener('click', exportJson);
         document.getElementById('btn-export-csv').addEventListener('click', exportCsv);
         document.getElementById('table-search').addEventListener('input', () => {
+            timedCurrentPage = 1;
             if (rawData && rawData.timeline) {
                 renderTable(filterTimelineByRange(rawData.timeline, activeRange));
             }

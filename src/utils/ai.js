@@ -4687,7 +4687,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             ? `"${_isGlob ? rawPath : (_isDir ? `${_sp}/*` : _sp)}"`
                                             : './';
                                         const truncatedPath = displayPath.length > safeWidthPath ? `${displayPath.slice(0, safeWidthPath)}...` : displayPath;
-                                        postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword.length > terminalWidth/2 ? `${keyword.slice(safeWidth)}...` : keyword : ''}" in ${truncatedPath.replaceAll('\\', '/')} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                        postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword.length > terminalWidth/2 ? `${keyword.slice(0, safeWidth)}...` : keyword : ''}" in ${truncatedPath.replaceAll('\\', '/')} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
                                     }
 
                                     const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
