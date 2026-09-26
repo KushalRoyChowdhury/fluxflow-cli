@@ -4,7 +4,7 @@ export const changelogData = {
     "4.20.0": {
         "note": "SEPTEMBER 26",
         "added": [
-            "Added conversation context for `fluxflow -p ‹prompt›`. Context will be retained till 10m of inactivity. To start a clean turn without context, use `--new` (alias `-n`) flag."
+            "Added conversation context for `fluxflow -p ‹prompt›`. Context will be retained till 10m of inactivity or 69 turns. To start a clean turn without context, use `--new` (alias `-n`) flag."
         ],
         "changed": [],
         "fixes": [
