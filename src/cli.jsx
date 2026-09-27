@@ -593,7 +593,7 @@ Additional Context:
             }
             const { text } = await generateSimpleContent(oneShotSettings, model, formattedContents, oneShotInstruction, oneShotSettings.thinkingLevel);
             const responseText = (text || '').trim();
-            process.stdout.write(responseText + '\n');
+            process.stdout.write(responseText + `\n${!isRaw ? '\n' : ''}`);
 
             // Persist conversation temporarily into memory daemon (with 10 min idle auto-shutdown)
             if (responseText) {
