@@ -3108,7 +3108,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     let activeBufferType = null; // 'tool', 'agent', 'end', 'kimi_section', 'kimi_call'
                     let emittedToolCallInTurn = false;
                     let isToolCallInBacktick = false; // true when the buffered tool format is inside a backtick/code-fence (visible example, not a real call)
+                    let isToolCallInThink = false;    // true when the buffered tool format is inside <think>...</think>
                     let isInsideCodeFence = false;   // persistent across chunks: true while inside a ```...``` fence
+                    let isInsideThinking = false;    // persistent across chunks: true while inside <think>...</think>
 
                     // Count triple-backtick sequences in `text` and toggle isInsideCodeFence for each one found.
                     // Must be called with every segment of text that is "consumed" (emitted or skipped over)
@@ -3125,6 +3127,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                     };
 
+                    const updateThinkingState = (text) => {
+                        if (!text) return;
+                        const tagRegex = /(?:<(\/?)(?:think|thought|thoughts)[^>]*>|\[(\/?)(?:think|thought|thoughts)\]|<\/?channel\|?>|<\|channel>thought)/gi;
+                        let match;
+                        while ((match = tagRegex.exec(text)) !== null) {
+                            const full = match[0].toLowerCase();
+                            if (full.startsWith('</') || full.startsWith('[/') || full === '<channel|>') {
+                                isInsideThinking = false;
+                            } else {
+                                isInsideThinking = true;
+                            }
+                        }
+                    };
+
                     const BUFFER_TYPES = {
                         tool: { startPrefix: '[tool', fullPrefix: '[tool:', endTag: ']' },
                         agent: { startPrefix: '[agent', fullPrefix: '[agent:generalist.', endTag: ']' },
@@ -3136,6 +3152,52 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const getBufferedMessages = (text) => {
                         const msgs = [];
                         let remaining = text;
+
+                        const emitTextChunk = (chunkToEmit) => {
+                            if (!chunkToEmit) return;
+                            if (!emittedToolCallInTurn) {
+                                msgs.push({ type: 'text', content: chunkToEmit });
+                                toggleFenceState(chunkToEmit);
+                                updateThinkingState(chunkToEmit);
+                                return;
+                            }
+                            const tagRegex = /(?:<(\/?)(?:think|thought|thoughts)[^>]*>|\[(\/?)(?:think|thought|thoughts)\]|<\/?channel\|?>|<\|channel>thought)/gi;
+                            let lastIndex = 0;
+                            let match;
+                            while ((match = tagRegex.exec(chunkToEmit)) !== null) {
+                                const seg = chunkToEmit.substring(lastIndex, match.index);
+                                if (seg) {
+                                    toggleFenceState(seg);
+                                    if (isInsideThinking) {
+                                        msgs.push({ type: 'text', content: seg });
+                                    } else {
+                                        const lfOnly = seg.replace(/[^\n]/g, '');
+                                        if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
+                                    }
+                                }
+                                const tag = match[0];
+                                toggleFenceState(tag);
+                                const full = tag.toLowerCase();
+                                if (full.startsWith('</') || full.startsWith('[/') || full === '<channel|>') {
+                                    isInsideThinking = false;
+                                } else {
+                                    isInsideThinking = true;
+                                }
+                                msgs.push({ type: 'text', content: tag });
+                                lastIndex = tagRegex.lastIndex;
+                            }
+                            const rest = chunkToEmit.substring(lastIndex);
+                            if (rest) {
+                                toggleFenceState(rest);
+                                if (isInsideThinking) {
+                                    msgs.push({ type: 'text', content: rest });
+                                } else {
+                                    const lfOnly = rest.replace(/[^\n]/g, '');
+                                    if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
+                                }
+                            }
+                        };
+
                         while (remaining.length > 0) {
                             if (!isBufferingToolCall) {
                                 // Match the actual protocol starts: [tool:functions., [agent:generalist. or [[END]]
@@ -3158,20 +3220,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const match = indices[0];
                                     const textBefore = remaining.substring(0, match.idx);
 
-                                    // Update fence state for the text BEFORE [tool so we know if we're inside a fence at that position
-                                    toggleFenceState(textBefore);
-                                    const charBefore = match.idx > 0 ? remaining[match.idx - 1] : '';
-                                    // Treat as a visible example (not a real call) if inside a code fence OR preceded by a backtick
-                                    isToolCallInBacktick = isInsideCodeFence || charBefore === '`';
-
                                     if (match.idx > 0) {
-                                        if (!emittedToolCallInTurn) {
-                                            msgs.push({ type: 'text', content: textBefore });
-                                        } else {
-                                            const lfOnly = textBefore.replace(/[^\n]/g, '');
-                                            if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
-                                        }
+                                        emitTextChunk(textBefore);
                                     }
+
+                                    const charBefore = match.idx > 0 ? remaining[match.idx - 1] : '';
+                                    // Treat as a visible example (not a real call) if inside a code fence, preceded by a backtick, or inside think
+                                    isToolCallInBacktick = isInsideCodeFence || charBefore === '`';
+                                    isToolCallInThink = isInsideThinking;
 
                                     isBufferingToolCall = true;
                                     activeBufferType = match.type;
@@ -3201,28 +3257,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (splitPoint !== -1) {
                                         if (splitPoint > 0) {
                                             const textBeforeSplit = remaining.substring(0, splitPoint);
-                                            toggleFenceState(textBeforeSplit);
-                                            if (!emittedToolCallInTurn) {
-                                                msgs.push({ type: 'text', content: textBeforeSplit });
-                                            } else {
-                                                const lfOnly = textBeforeSplit.replace(/[^\n]/g, '');
-                                                if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
-                                            }
+                                            emitTextChunk(textBeforeSplit);
                                         }
-                                        // At the split point, check fence state for the pending tag start
+                                        // At the split point, check fence state and thinking state for the pending tag start
                                         const splitCharBefore = splitPoint > 0 ? remaining[splitPoint - 1] : '';
                                         isToolCallInBacktick = isInsideCodeFence || splitCharBefore === '`';
+                                        isToolCallInThink = isInsideThinking;
                                         isBufferingToolCall = true;
                                         toolCallBuffer = remaining.substring(splitPoint);
                                         remaining = '';
                                     } else {
-                                        if (!emittedToolCallInTurn) {
-                                            msgs.push({ type: 'text', content: remaining });
-                                        } else {
-                                            const lfOnly = remaining.replace(/[^\n]/g, '');
-                                            if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
-                                        }
-                                        toggleFenceState(remaining);
+                                        emitTextChunk(remaining);
                                         break;
                                     }
                                 }
@@ -3247,17 +3292,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
 
                                     if (isMismatch) {
-                                        if (!emittedToolCallInTurn) {
-                                            msgs.push({ type: 'text', content: combined });
-                                        } else {
-                                            const lfOnly = combined.replace(/[^\n]/g, '');
-                                            if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
-                                        }
-                                        toggleFenceState(combined);
+                                        emitTextChunk(combined);
                                         toolCallBuffer = '';
                                         isBufferingToolCall = false;
                                         activeBufferType = null;
                                         isToolCallInBacktick = false;
+                                        isToolCallInThink = false;
                                         remaining = '';
                                         break;
                                     }
@@ -3313,12 +3353,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         // Standard tools are outputted to frontend (app.jsx intercepts standard ones)
                                         msgs.push({ type: 'text', content: fullMatch });
                                     }
-                                    // Update fence state for the entire tool call text (it may contain ``` inside args)
+                                    // Update fence & thinking state for the entire tool call text (it may contain ``` or tags inside args)
                                     toggleFenceState(fullMatch);
-                                    if ((activeBufferType === 'tool' || activeBufferType === 'agent' || activeBufferType?.startsWith('kimi')) && !isToolCallInBacktick) {
+                                    updateThinkingState(fullMatch);
+                                    if ((activeBufferType === 'tool' || activeBufferType === 'agent' || activeBufferType?.startsWith('kimi')) && !isToolCallInBacktick && !isToolCallInThink) {
                                         emittedToolCallInTurn = true;
                                     }
                                     isToolCallInBacktick = false; // reset for next tool call
+                                    isToolCallInThink = false;
                                     toolCallBuffer = '';
                                     isBufferingToolCall = false;
                                     activeBufferType = null;
@@ -3328,17 +3370,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     // Flush buffer if it exceeds limits
                                     const MAX_BUFFER = activeBufferType?.startsWith('kimi') ? 8192 : 512;
                                     if (combined.length > MAX_BUFFER) {
-                                        if (!emittedToolCallInTurn) {
-                                            msgs.push({ type: 'text', content: combined });
-                                        } else {
-                                            const lfOnly = combined.replace(/[^\n]/g, '');
-                                            if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
-                                        }
-                                        toggleFenceState(combined);
+                                        emitTextChunk(combined);
                                         toolCallBuffer = '';
                                         isBufferingToolCall = false; // Give up on this
                                         activeBufferType = null;
                                         isToolCallInBacktick = false;
+                                        isToolCallInThink = false;
                                     } else {
                                         toolCallBuffer = combined;
                                     }
@@ -5391,7 +5428,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
 You cant execute tools. Instead output in chat the exact string [tool:ToolName(arg1="value1")] ← mandatory
 Tool Rules:
-- Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n, quote: \\\")
+- Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n)
 - Same file, multiple edits? ONE PatchFile (≤15 blocks)
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads

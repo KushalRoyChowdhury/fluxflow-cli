@@ -40,7 +40,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
         _cachedAdvanceRollback = advanceRollback;
     }
 
-    const fluxInstructions = `- Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n, quote: \\\")
+    const fluxInstructions = `- Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n)
 - Same file, multiple edits? One PatchFile (≤15 blocks)${autoExec ? '' : '\n- Tool denied? Ask for guidance'}
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
