@@ -174,7 +174,100 @@ export const dispatchTool = async (toolName, args, context = {}) => {
     const loader = TOOL_MAP[toolName];
 
     if (!loader) {
-        return `ERROR: Tool [${toolName}] not found in registry.`;
+        // Canonical PascalCase names as exposed to the model in the system prompt
+        const CANONICAL_TOOLS = [
+            'ReadFile', 'ReadFolder', 'PatchFile', 'WriteFile', 'CodeSearch', 'Run', 'Goal',
+            'AskUser', 'WebSearch', 'WebScrape', 'WritePDF', 'WriteDoc',
+            'Click', 'Drag', 'Scroll', 'KeyboardTyping', 'KeyPress', 'RecaptureScreen',
+            'Invoke', 'InvokeSync', 'Await', 'GetProgress', 'Steer', 'Cancel', 'EmergencyRollback', 'Chat', 'Memory'
+        ];
+
+        // Semantic / common shorthand mappings for smarter suggestions
+        const ALIAS_MAP = {
+            'read': 'ReadFile',
+            'view': 'ReadFile',
+            'viewfile': 'ReadFile',
+            'write': 'WriteFile',
+            'edit': 'PatchFile',
+            'patch': 'PatchFile',
+            'update': 'PatchFile',
+            'updatefile': 'PatchFile',
+            'exec': 'Run',
+            'command': 'Run',
+            'bash': 'Run',
+            'shell': 'Run',
+            'powershell': 'Run',
+            'search': 'CodeSearch',
+            'grep': 'CodeSearch',
+            'find': 'CodeSearch',
+            'searchkeyword': 'CodeSearch',
+            'folder': 'ReadFolder',
+            'ls': 'ReadFolder',
+            'dir': 'ReadFolder',
+            'list': 'ReadFolder',
+            'ask': 'AskUser',
+            'question': 'AskUser',
+            'pdf': 'WritePDF',
+            'docx': 'WriteDoc',
+            'doc': 'WriteDoc',
+            'word': 'WriteDoc',
+            'screenshot': 'RecaptureScreen',
+            'screen': 'RecaptureScreen',
+            'recapture': 'RecaptureScreen',
+            'type': 'KeyboardTyping',
+            'typing': 'KeyboardTyping',
+            'keyboard': 'KeyboardTyping',
+            'press': 'KeyPress',
+            'key': 'KeyPress',
+            'todo': 'Goal',
+            'task': 'Goal',
+            'subagent': 'Invoke',
+            'agent': 'Invoke'
+        };
+
+        const cleanInput = normalized.replace(/[^a-z0-9]/g, '');
+        let bestMatch = ALIAS_MAP[cleanInput] || null;
+
+        if (!bestMatch) {
+            let highestScore = 0;
+            const getBigrams = (str) => {
+                const s = new Set();
+                for (let i = 0; i < str.length - 1; i++) s.add(str.slice(i, i + 2));
+                return s;
+            };
+
+            const bg1 = getBigrams(cleanInput);
+
+            for (const candidate of CANONICAL_TOOLS) {
+                const cleanCandidate = candidate.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (cleanInput === cleanCandidate) {
+                    bestMatch = candidate;
+                    break;
+                }
+
+                let score = 0;
+                if (cleanCandidate.includes(cleanInput) || cleanInput.includes(cleanCandidate)) {
+                    score += 0.6;
+                }
+
+                const bg2 = getBigrams(cleanCandidate);
+                let intersection = 0;
+                for (const bg of bg1) {
+                    if (bg2.has(bg)) intersection++;
+                }
+
+                const dice = (2 * intersection) / ((bg1.size + bg2.size) || 1);
+                score = Math.max(score, dice);
+
+                if (score > highestScore && score >= 0.35) {
+                    highestScore = score;
+                    bestMatch = candidate;
+                }
+            }
+        }
+
+        const suggestion = bestMatch ? ` Do you mean '${bestMatch}'?` : '';
+        return `ERROR: Tool [${toolName}] not found in registry.${suggestion}`;
     }
 
     try {
