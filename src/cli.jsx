@@ -455,6 +455,8 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         }
 
         if (runOutput) {
+            const { stripAnsi } = await import('./tools/exec_command.js');
+            runOutput = stripAnsi(runOutput).trim();
             if (promptText) {
                 promptText = `Stdin Context (${runCommand}):\n${runOutput}\n---\n\n${promptText}`;
             } else {
@@ -471,8 +473,10 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
             for await (const chunk of process.stdin) {
                 chunks.push(chunk);
             }
-            const stdinText = Buffer.concat(chunks).toString('utf8').trim();
+            let stdinText = Buffer.concat(chunks).toString('utf8').trim();
             if (stdinText) {
+                const { stripAnsi } = await import('./tools/exec_command.js');
+                stdinText = stripAnsi(stdinText).trim();
                 if (promptText) {
                     // Merge: piped context + prompt question
                     promptText = `Stdin Context:\n${stdinText}\n---\n\n${promptText}`;
@@ -494,6 +498,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
         const baseSettings = await loadSettings();
         const scanArgs = args.filter(a => a !== '-p' && a !== '--prompt' && a !== promptText && a !== '-n' && a !== '--new');
+        const isRaw = scanArgs.includes('--raw') || args.includes('--raw');
         const getFlag = (names) => {
             for (const n of names) {
                 const i = scanArgs.indexOf(n);
@@ -568,24 +573,26 @@ Additional Context:
         });
 
         try {
-            // ANSI colour codes:
-            // \x1b[36m = Cyan, \x1b[35m = Magenta, \x1b[0m = Reset
-            const cyan = '\x1b[36m';
-            const magenta = '\x1b[35m';
-            const reset = '\x1b[0m';
+            if (!isRaw) {
+                // ANSI colour codes:
+                // \x1b[36m = Cyan, \x1b[35m = Magenta, \x1b[0m = Reset
+                const cyan = '\x1b[36m';
+                const magenta = '\x1b[35m';
+                const reset = '\x1b[0m';
 
-            const modelName = path.basename(oneShotSettings.model)
-                .trim()
-                .replace(':free', '')
-                .replace('-free', '')
-                .replace('free/', '')
-                .replaceAll('-', ' ')
-                .replace(/\b\w/g, char => char.toUpperCase().trim());
+                const modelName = path.basename(oneShotSettings.model)
+                    .trim()
+                    .replace(':free', '')
+                    .replace('-free', '')
+                    .replace('free/', '')
+                    .replaceAll('-', ' ')
+                    .replace(/\b\w/g, char => char.toUpperCase().trim());
 
-            process.stdout.write(`Responding with ${cyan}${modelName}${reset} from ${magenta}${oneShotSettings.aiProvider}${reset}:\n`);
+                process.stdout.write(`Responding with ${cyan}${modelName}${reset} from ${magenta}${oneShotSettings.aiProvider}${reset}:\n`);
+            }
             const { text } = await generateSimpleContent(oneShotSettings, model, formattedContents, oneShotInstruction, oneShotSettings.thinkingLevel);
             const responseText = (text || '').trim();
-            process.stdout.write(responseText + '\n\n');
+            process.stdout.write(responseText + '\n');
 
             // Persist conversation temporarily into memory daemon (with 10 min idle auto-shutdown)
             if (responseText) {

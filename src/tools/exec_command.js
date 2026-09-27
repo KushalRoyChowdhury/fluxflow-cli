@@ -14,7 +14,7 @@ try {
 
 export const isPtyAvailable = !!pty;
 
-const stripAnsi = (str) => {
+export const stripAnsi = (str) => {
     if (typeof str !== 'string') return str;
     // eslint-disable-next-line no-control-regex
     return str.replace(/(?:\u001b][\s\S]*?(?:\u0007|\u001b\\))|(?:[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><])/g, '');

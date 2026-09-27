@@ -35,7 +35,7 @@ export const getPreferredWindowsShell = () => {
 let _cachedAdvanceRollback = null;
 
 
-export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true, autoExec) => {
+export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true, autoExec, disableTodo = false) => {
     if (_cachedAdvanceRollback === null) {
         _cachedAdvanceRollback = advanceRollback;
     }
@@ -56,8 +56,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchor: ^LINE:...$ syntax, must for large blocks &  escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
 - CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", regex?=bool:auto). Find relevant code, standard junk excluded
-- Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user
-- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. get + markDone marks complete
+- Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user${!disableTodo ? `\n- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. get + markDone marks complete` : ''}
 ${_cachedAdvanceRollback ? `
 **Emergency Tools**
 Info: initial = current task prompt. Revert id = turn before disaster (eg. disaster: turn_3 → revert: turn_2). Reason explicitly

@@ -51,6 +51,7 @@ Open in chat via /settings
 * Image History for CU → Number of images to keep in context for Computer Use. Low (1 image, Low Context Accuracy, Token Efficient) / Standard (3 images, Better Accuracy, Higher Token Usage) / Extended (5 images, Better for complex tasks, Highest Token Usage)
 * Keep Reasoning Content → Keeps the exact reasoning of model in context for next turns. Uses more tokens. Might improve planning accuracy for very few models
 * Auto Exclude Metadata → Removes Metadata Block when no external Metadata is needed. Will effect agent's Temporal Reasoning Capabilities. Might save Cache Hit & Tokens in specific cases
+* Disable Todo → Disables Todo/Goal tool for Agent. Doesnt necessarily affect modern models
 
 -- Recomended Settings Preset --
 - Best for Cost Saving: Subagents (off), dynamic directory awareness (off), directory tree design (modern), compact large results (on), auto exclue metadata (on), Image History (Low), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (on), Memory (off), No FluxFlow IDE Companion

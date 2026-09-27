@@ -58,7 +58,8 @@ const DEFAULT_SETTINGS = {
         imageHistoryCU: 'Standard',
         contextLength: '256k',
         keepReasoningContext: false,
-        autoExcludeMetadata: false
+        autoExcludeMetadata: false,
+        disableTodo: false
     },
     profileData: {
         name: null,

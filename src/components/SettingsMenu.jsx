@@ -327,6 +327,7 @@ export default function SettingsMenu({
                     { label: 'Context Length', value: 'contextLength', status: systemSettings.contextLength || '256k' },
                     { label: 'Keep Reasoning Context', value: 'keepReasoningContext', status: systemSettings.keepReasoningContext ? 'ON' : 'OFF' },
                     { label: 'Auto Exclude Metadata', value: 'autoExcludeMetadata', status: systemSettings.autoExcludeMetadata ? 'ON' : 'OFF' },
+                    { label: 'Disable Todo', value: 'disableTodo', status: systemSettings.disableTodo ? 'ON' : 'OFF' },
                     // { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' } // Dont remove this comment
                 ];
             default:
@@ -637,6 +638,12 @@ export default function SettingsMenu({
         } else if (item.value === 'autoExcludeMetadata') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, autoExcludeMetadata: !s.autoExcludeMetadata };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'disableTodo') {
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, disableTodo: !s.disableTodo };
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });

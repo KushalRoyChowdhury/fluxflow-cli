@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.21.5": {
+        "note": "SEPTEMBER 28",
+        "added": [
+            "Added `Disable Todo` setting to toggle the availability of the Todo/Goal tool. Defaulted to on, can be turned OFF to save tokens. (It doesn't affect modern models much)",
+            "Piped inputs in `-p` headless mode will get ANSI stripped correct IF any exists.",
+            "Added `--raw` flag in headless mode to disable default model intro text & print clean model response to stdout."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "4.21.2": {
         "note": "SEPTEMBER 27",
         "added": [

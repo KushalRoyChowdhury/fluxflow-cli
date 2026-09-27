@@ -348,29 +348,33 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
                     );
                 }
 
-                // 🌐 Harmonized Link System (Markdown Standard: [text](url) -> url)
+                // 🌐 Harmonized Link System with OSC 8 Terminal Hyperlinks: [text](url) -> \x1b]8;;url\x07text\x1b]8;;\x07
                 if (part.startsWith('[') && (part.includes('](') || part.includes('] ('))) {
                     const match = part.match(REGEX_MD_LINK_PAREN);
                     if (match) {
+                        const linkText = match[1] || match[2];
                         const linkUrl = match[2] || match[1];
+                        const osc8Link = `\x1b]8;;${linkUrl}\x07${linkText}\x1b]8;;\x07`;
                         return (
                             <Text key={j} color={highlightColor} underline italic>
-                                {linkUrl}
+                                {osc8Link}
                             </Text>
                         );
                     }
                 }
-                // if (part.startsWith('[') && (part.includes('][') || part.includes('] ['))) {
-                //     const match = part.match(REGEX_MD_LINK_BRACKET);
-                //     if (match) {
-                //         const linkUrl = match[2] || match[1];
-                //         return (
-                //             <Text key={j} color={highlightColor} underline italic>
-                //                 {linkUrl}
-                //             </Text>
-                //         );
-                //     }
-                // }
+                if (part.startsWith('[') && (part.includes('][') || part.includes('] ['))) {
+                    const match = part.match(REGEX_MD_LINK_BRACKET);
+                    if (match) {
+                        const linkText = match[1] || match[2];
+                        const linkUrl = match[2] || match[1];
+                        const osc8Link = `\x1b]8;;${linkUrl}\x07${linkText}\x1b]8;;\x07`;
+                        return (
+                            <Text key={j} color={highlightColor} underline italic>
+                                {osc8Link}
+                            </Text>
+                        );
+                    }
+                }
                 if (part.startsWith('http')) {
                     return <Text key={j} color={highlightColor} underline italic>{part}</Text>;
                 }
