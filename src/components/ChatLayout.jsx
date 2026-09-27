@@ -1260,6 +1260,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/thinking', desc: 'Set AI reasoning depth' },
             { cmd: '/model', desc: 'Switch AI model' },
             { cmd: '/wildcard-tooling', desc: 'Use if the model lacks Tooling Capability' },
+            { cmd: '/wildercard-tooling', desc: 'Extended version of /wildcard-tooling' },
             { cmd: '/provider', desc: 'Select AI Provider' },
             { cmd: '/settings', desc: 'Configure system prefs' },
             { cmd: '/theme', desc: 'Customize UI color theme' },

@@ -67,7 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
         const editor = vscode.window.activeTextEditor;
         const allDiags = vscode.languages.getDiagnostics();
         const brokenFiles = allDiags.filter(([uri, diags]) => diags.some(d => d.severity === vscode.DiagnosticSeverity.Error));
-        
+
         let command = "";
         if (brokenFiles.length === 1) {
             const fileName = path.basename(brokenFiles[0][0].fsPath);
@@ -106,7 +106,7 @@ export function activate(context: vscode.ExtensionContext) {
         const editor = vscode.window.activeTextEditor;
         const allDiags = vscode.languages.getDiagnostics();
         const warningFiles = allDiags.filter(([uri, diags]) => diags.some(d => d.severity === vscode.DiagnosticSeverity.Warning));
-        
+
         let command = "";
         if (warningFiles.length === 1) {
             const fileName = path.basename(warningFiles[0][0].fsPath);
@@ -191,8 +191,8 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Update Diff Visibility Context
         const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
-        const isDiff = activeTab?.input instanceof vscode.TabInputTextDiff && 
-                       activeTab.input.original.scheme === 'fluxflow-diff';
+        const isDiff = activeTab?.input instanceof vscode.TabInputTextDiff &&
+            activeTab.input.original.scheme === 'fluxflow-diff';
         vscode.commands.executeCommand('setContext', 'fluxflow.isDiffVisible', isDiff);
     };
 
@@ -246,7 +246,7 @@ export function activate(context: vscode.ExtensionContext) {
         ws.on('message', async (data: string) => {
             try {
                 const message = JSON.parse(data.toString());
-                
+
                 // When receiving PID, find and link the terminal
                 if (message.pid) {
                     let found = false;
@@ -260,7 +260,7 @@ export function activate(context: vscode.ExtensionContext) {
                         }
                     }
 
-                    // If still not found and there's an active terminal, 
+                    // If still not found and there's an active terminal,
                     // assume it's the one that just connected (high probability)
                     if (!found && vscode.window.activeTerminal) {
                         fluxFlowTerminal = vscode.window.activeTerminal;
@@ -314,7 +314,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (Date.now() - lastDiffTimestamp < 1500) {
             return;
         }
-        while(activeDecs.length > 0) {
+        while (activeDecs.length > 0) {
             const d = activeDecs.pop();
             if (d) d.dispose();
         }
@@ -356,7 +356,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (lastContent !== undefined && lastContent !== currentContent) {
             const currentLines = currentContent.split(/\r?\n/);
             const lastLines = lastContent.split(/\r?\n/);
-            
+
             // Capture baseline content if not already present
             if (!manualEditBaseContents.has(docPath)) {
                 manualEditBaseContents.set(docPath, lastLines);
@@ -394,16 +394,16 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.window.registerTerminalLinkProvider({
         provideTerminalLinks: (context: vscode.TerminalLinkContext, token: vscode.CancellationToken) => {
             const links: (vscode.TerminalLink & { path: string, line?: number })[] = [];
-            
+
             // Match paths like src/app.js:42 or D:\path\file.ts:10
             // Also matches simple paths like src/app.js
             const regex = /((?:[a-zA-Z]:\\|[./\\])[^ \n\r\t:"']+\.[a-zA-Z0-9]+)(?::(\d+))?/g;
-            
+
             let match;
             while ((match = regex.exec(context.line)) !== null) {
                 const fullPath = match[1];
                 const lineNumber = match[2] ? parseInt(match[2]) : undefined;
-                
+
                 links.push({
                     startIndex: match.index,
                     length: match[0].length,
@@ -417,7 +417,7 @@ export function activate(context: vscode.ExtensionContext) {
         handleTerminalLink: async (link: any) => {
             const workspaceFolders = vscode.workspace.workspaceFolders;
             let absolutePath = link.path;
-            
+
             if (!path.isAbsolute(absolutePath) && workspaceFolders) {
                 absolutePath = path.resolve(workspaceFolders[0].uri.fsPath, absolutePath);
             }
@@ -425,7 +425,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (fs.existsSync(absolutePath)) {
                 const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absolutePath));
                 const editor = await vscode.window.showTextDocument(doc);
-                
+
                 if (link.line) {
                     const pos = new vscode.Position(link.line - 1, 0);
                     editor.selection = new vscode.Selection(pos, pos);
@@ -489,7 +489,7 @@ async function getIDEContext() {
         }
 
         const filePath = activeEditor.document.fileName;
-        
+
         // Aggregated Workspace Diagnostics (Errors & Warnings)
         const allDiags = vscode.languages.getDiagnostics();
         const workspaceErrors: string[] = [];
@@ -499,13 +499,13 @@ async function getIDEContext() {
 
         for (const [uri, diags] of allDiags) {
             const relPath = vscode.workspace.asRelativePath(uri);
-            
+
             // Collect Errors
             if (errorFileCount < 10) {
                 const errors = diags
                     .filter(d => d.severity === vscode.DiagnosticSeverity.Error)
                     .map(d => `  Line ${d.range.start.line + 1}: ${d.message}`);
-                
+
                 if (errors.length > 0) {
                     workspaceErrors.push(`File: ${relPath}\n${errors.join('\n')}`);
                     errorFileCount++;
@@ -517,7 +517,7 @@ async function getIDEContext() {
                 const warnings = diags
                     .filter(d => d.severity === vscode.DiagnosticSeverity.Warning)
                     .map(d => `  Line ${d.range.start.line + 1}: ${d.message}`);
-                
+
                 if (warnings.length > 0) {
                     workspaceWarnings.push(`File: ${relPath}\n${warnings.join('\n')}`);
                     warningFileCount++;
@@ -598,7 +598,7 @@ async function handleMessage(message: any, ws?: WebSocket) {
             const doc = await vscode.workspace.openTextDocument(uri);
             // Store original state for robust denial/revert
             originalStates.set(uri.fsPath.toLowerCase(), originalContent !== undefined ? originalContent : doc.getText());
-            
+
             // Open doc with preserveFocus: true
             const editor = await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
 
@@ -664,19 +664,19 @@ async function handleMessage(message: any, ws?: WebSocket) {
                         // Fallback revert
                         await vscode.commands.executeCommand('workbench.action.files.revert', uri);
                     }
-                    
+
                     // If it was a new file created by us, delete it from disk
                     if (newFilesCreatedByBridge.has(targetPath)) {
                         if (fs.existsSync(targetPath)) {
                             fs.unlinkSync(targetPath);
                         }
                     }
-                } catch (e) {}
+                } catch (e) { }
             } else if (result === 'allow') {
                 try {
                     const doc = await vscode.workspace.openTextDocument(uri);
                     await doc.save();
-                } catch (e) {}
+                } catch (e) { }
             }
 
             // 3. Cleanup state
@@ -687,7 +687,7 @@ async function handleMessage(message: any, ws?: WebSocket) {
             for (const tab of tabsToClose) {
                 try {
                     await vscode.window.tabGroups.close(tab);
-                } catch (e) {}
+                } catch (e) { }
             }
         }
     } catch (err: any) {

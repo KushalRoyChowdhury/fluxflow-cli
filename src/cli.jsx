@@ -193,6 +193,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /thinking <level> [--map <target>]       Set AI reasoning depth or map thinking levels
   /model <model_id> [-sv|-rm|-rn|-df]      Switch or manage models for active provider
   /wildcard-tooling                        Use if the model lacks Tooling Capability
+  /wildercard-tooling                      Extended version of /wildcard-tooling
   /provider                                Select AI Provider
   /settings                                Configure system preferences
   /theme                                   Customize UI color theme

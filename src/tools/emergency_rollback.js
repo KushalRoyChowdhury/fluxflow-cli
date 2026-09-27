@@ -13,7 +13,7 @@ export const emergency_rollback = async (args, context = {}) => {
     const systemSettings = context.systemSettings;
 
     if (!systemSettings?.advanceRollback) {
-        return "ERROR: Advance Rollback feature is currently disabled in settings under Security. Tell user to enable it.";
+        return "ERROR: Advance Rollback feature is currently disabled in settings under Security. Tell user to enable it if needed.";
     }
 
     if (!chatId) {

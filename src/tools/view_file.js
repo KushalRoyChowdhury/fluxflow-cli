@@ -262,7 +262,7 @@ export const view_file = async (args, context = {}) => {
 
         const stats = fs.statSync(absolutePath);
         if (stats.isDirectory()) {
-            return `ERROR: Path [${targetPath}] is a directory. Use list_files instead.`;
+            return `ERROR: Path [${targetPath}] is a directory. Use ReadFolder instead.`;
         }
 
         // --- MULTIMODAL DETECTION ---

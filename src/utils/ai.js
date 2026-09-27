@@ -1675,7 +1675,7 @@ export const deleteChatSummary = (chatId) => {
  * Executes a streaming request using the new SDK
  */
 export const getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow) {
-    const { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings, sessionStats, aiProvider = 'Google', apiTier, wildcardTooling } = settings;
+    const { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings, sessionStats, aiProvider = 'Google', apiTier, wildcardTooling, wildercardTooling } = settings;
     const isMultiModal = isModelMultimodal(modelName);
     if (!client && aiProvider === 'Google') throw new Error('AI not initialized');
 
@@ -2291,7 +2291,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
 
-        const wildcardToolingPrompt = wildcardTooling ? '[system] exact tool string format [tool:ToolName(arg="value")] in chat [/system]\nYou cannot execute tools\nInstead, output in chat the exact string you WOULD have produced & wait for system response\n' : '';
+        const wildcardToolingPrompt = wildcardTooling || wildercardTooling ? `You cannot execute tools\nInstead output the exact string you WOULD have produced\n${wildercardTooling ? 'tool string format [tool:ToolName(arg="value")]\n' : ''}` : '';
 
         const isForceReasoning = process.env.forcedReasoning || false;
 
@@ -5426,7 +5426,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-You cant execute tools. Instead output in chat the exact string [tool:ToolName(arg1="value1")] ← mandatory
+You cant execute tools. In chat output the format [tool:ToolName(arg1="value1")] ← mandatory
 Tool Rules:
 - Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n)
 - Same file, multiple edits? ONE PatchFile (≤15 blocks)
@@ -5446,7 +5446,7 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 - WebScrape(url=string). Proactive use for specific webpage/docs
 
 **Workspace Tools**
-- CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", regex?=bool:auto). Find definitions, logic, relevant code, standard junk auto-excluded
+- CodeSearch(keyword=string, path?="dir/file/glob, inclusion/exclusion ;-separated", regex?=bool:auto). Find relevant code
 - ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
 - ReadFile(path=string, startLine?=int, endLine?=int)
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchors: ^LINE:...$ syntax, must for large blocks & escape sequences

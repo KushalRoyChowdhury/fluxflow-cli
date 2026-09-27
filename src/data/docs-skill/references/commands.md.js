@@ -28,6 +28,7 @@ Trigger in chat via /command
 * /provider → Select/switch AI provider
 * /thinking effort → Set reasoning effort. Can be mapped based on provider & model support (/thinking effort --map provider-effort-value/'rm' to unmap). Changes the Translation Table only for the currently selected provider and model
 * /wildcard-tooling → Tool compatibility mode for non-tooling models
+* /wildercard-tooling → Extended version of /wildcard-tooling
 * /key → Manage saved API keys
 * /profile → Edit user persona, nickname, and custom instructions
 * /theme → Select UI color theme

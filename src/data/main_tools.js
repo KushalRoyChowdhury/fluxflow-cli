@@ -55,7 +55,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
 - ReadFolder(path=string, recurse?=int[1..3])
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchor: ^LINE:...$ syntax, must for large blocks &  escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
-- CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", regex?=bool:auto). Find relevant code, standard junk excluded
+- CodeSearch(keyword=string, path?="dir/file/glob, inclusion/exclusion ;-separated", regex?=bool:auto). Find relevant code
 - Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user${!disableTodo ? `\n- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. get + markDone marks complete` : ''}
 ${_cachedAdvanceRollback ? `
 **Emergency Tools**
@@ -92,10 +92,9 @@ Invocations:
 
     return `
 -- TOOLS --
-You cant execute tools. Instead output in chat the exact string [tool:ToolName(arg1="value1")] ← mandatory, in NEW line
-
+You cant execute tools. In chat output the format [tool:ToolName(arg1="value1")] ← mandatory, NEW line
 Tool Rules:
-- Max 5 tools/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? ' (Goal: 5+)' : ''}
+- Max 5 tools/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' && !disableTodo ? ' (Goal: 5+)' : ''}
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 **User Communication**
 - AskUser(question=string, optionA?="title::description", ...MAX4). Ambiguity, path divergence, security risk
@@ -108,5 +107,3 @@ ${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n${com
 };
 // [DEPRICATED] - GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1").. Mockups, PDF thumbnails, any visual content
 // [DEPRICATED] - FileMap(path="..."). Shows file's code structure
-
-// \n${flowTools.replace('**Creative Tools (path = relative; first argument, path separator: ' / ')**', '**Creative Tools**')}

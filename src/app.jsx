@@ -1144,6 +1144,7 @@ export default function App({ args = [] }) {
     const [showFullThinking, setShowFullThinking] = useState(false);
     const [activeModel, setActiveModel] = useState(getDefaultModel('Google', 'Free') || 'gemma-4-31b-it');
     const [wildcardTooling, setWildcardTooling] = useState(false);
+    const [wildercardTooling, setWildercardTooling] = useState(false);
     const [janitorModel, setJanitorModel] = useState(getFallbackValue('gemma_janitor_fallback_google') || 'gemma-4-26b-a4b-it');
     const [isInitializing, setIsInitializing] = useState(true);
     const [isAppFocused, setIsAppFocused] = useState(true);
@@ -1291,9 +1292,10 @@ export default function App({ args = [] }) {
     const originalMemoryRef = useRef(true);
 
     useEffect(() => {
-        if (wildcardTooling) {
+        if (wildcardTooling || wildercardTooling) {
+            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Wild${wildercardTooling ? 'er' : ''}Card Tooling:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
             setWildcardTooling(false);
-            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Wildcard Tooling:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
+            setWildercardTooling(false);
         }
         if (process.env.forcedReasoning) {
             setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Forced Reasoning:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
@@ -2714,6 +2716,10 @@ export default function App({ args = [] }) {
             desc: 'Use if the model lacks Tooling Capability'
         },
         {
+            cmd: '/wildercard-tooling',
+            desc: 'Extended version of /wildcard-tooling'
+        },
+        {
             cmd: '/provider',
             desc: 'Select AI Provider'
         },
@@ -3525,6 +3531,14 @@ export default function App({ args = [] }) {
                     });
                     break;
                 }
+                case '/wildercard-tooling': {
+                    setWildercardTooling(prev => {
+                        const next = !prev;
+                        setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Wildercard Tooling:\n⠀⠀\x1b[2m└─\x1b[22m Status: ${next ? 'Enabled' : 'Disabled'}\n⠀`, isMeta: true }]; });
+                        return next;
+                    });
+                    break;
+                }
                 case '/settings': {
                     setActiveView('settings');
                     break;
@@ -4004,13 +4018,13 @@ export default function App({ args = [] }) {
                             if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Results Truncated by System on User Command')) {
+                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Success result truncated to save tokens')) {
                                 return m;
                             }
                             truncatedCount++;
                             return {
                                 ...m,
-                                fullText: '[TOOL RESULT]: ...Results Truncated by System on User Command'
+                                fullText: '[TOOL RESULT]: ...Success result truncated to save tokens'
                             };
                         });
 
@@ -4223,6 +4237,7 @@ export default function App({ args = [] }) {
                             apiKey,
                             apiTier,
                             wildcardTooling,
+                            wildercardTooling,
                             cols: terminalSize.columns - 6,
                             rows: 30,
                             onTokenChunk: (chunkText, wordCount) => {
@@ -4563,12 +4578,12 @@ export default function App({ args = [] }) {
                                         if (m.toolName && String(m.toolName).toLowerCase() === 'search_keyword') {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Results Truncated by System on User Command') || fullTextStr.startsWith('[TOOL RESULT]: Skill:') || fullTextStr.includes('Skill: [') || fullTextStr.startsWith('[TOOL RESULT]: DOCs:') || fullTextStr.includes('DOCs: [')) {
+                                        if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[TOOL RESULT]: Skill:') || fullTextStr.includes('Skill: [') || fullTextStr.startsWith('[TOOL RESULT]: DOCs:') || fullTextStr.includes('DOCs: [')) {
                                             return m;
                                         }
                                         return {
                                             ...m,
-                                            fullText: '[TOOL RESULT]: ...Results Truncated by System on User Command'
+                                            fullText: '[TOOL RESULT]: ...Success result truncated to save tokens'
                                         };
                                     });
                                     saveChat(chatId, null, updatedMessages);

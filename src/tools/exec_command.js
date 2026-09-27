@@ -535,7 +535,7 @@ export const exec_command = async (args, options = {}) => {
     const { command: rawCommand } = parseArgs(args);
     const { onChunk } = options;
 
-    if (!rawCommand) return 'ERROR: Missing "command" argument for exec_command.';
+    if (!rawCommand) return 'ERROR: Missing "command" argument for Run.';
 
     const isWin = process.platform === 'win32';
     const systemSettings = options.systemSettings || {};

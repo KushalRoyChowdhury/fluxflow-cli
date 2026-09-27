@@ -1,12 +1,13 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-    "4.21.5": {
+    "4.22.0": {
         "note": "SEPTEMBER 28",
         "added": [
             "Added `Disable Todo` setting to toggle the availability of the Todo/Goal tool. Defaulted to on, can be turned OFF to save tokens. (It doesn't affect modern models much)",
             "Piped inputs in `-p` headless mode will get ANSI stripped correct IF any exists.",
-            "Added `--raw` flag in headless mode to disable default model intro text & print clean model response to stdout."
+            "Added `--raw` flag in headless mode to disable default model intro text & print clean model response to stdout.",
+            "Added a new slash command: `/wildercard-tooling`. And extended version of `/wildcard-tooling`. Useful for braindead models."
         ],
         "changed": [],
         "fixes": []
