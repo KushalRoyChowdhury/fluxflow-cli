@@ -482,7 +482,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         // Support stdin piping: read piped stdin and merge with prompt (if any)
         // e.g. `cat file.js | fluxflow -p "review this code"` merges file content + prompt
         //      `echo "hi" | fluxflow -p` uses stdin as the prompt itself
-        if (!process.stdin.isTTY) {
+        if (!isCommitFlag && !process.stdin.isTTY) {
             // Read all stdin data
             const chunks = [];
             for await (const chunk of process.stdin) {
