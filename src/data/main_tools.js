@@ -40,7 +40,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
         _cachedAdvanceRollback = advanceRollback;
     }
 
-    const fluxInstructions = `- Mandatorily JSON escape literal sequences, backslash: \\\\, newLine: \\ n
+    const fluxInstructions = `- JSON escape literal sequences, backslash: \\\\, newLine: \\ n
 - Same file, multiple edits? One PatchFile (≤15 blocks)${autoExec ? '' : '\n- Tool denied? Ask for guidance'}
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
@@ -92,8 +92,8 @@ Invocations:
 
     return `
 -- TOOLS --
-To use tools in chat output the format [tool:ToolName(arg1="value1")] ← mandatory, NEW line
-Tool Rules:
+In chat output the format \`[tool:ToolName(arg1="value1")]\` in NEW line
+Rules:
 - Max 5 tools/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' && !disableTodo ? ' (Goal: 5+)' : ''}
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 **User Communication**

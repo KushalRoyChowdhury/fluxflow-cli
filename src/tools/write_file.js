@@ -11,8 +11,8 @@ import { loadSettings } from '../utils/settings.js';
 export const write_file = async (args, context = {}) => {
     let { path: targetPath, content } = parseArgs(args);
 
-    if (!targetPath) return 'ERROR: Missing "path" argument for write_file.';
-    if (content === undefined) return 'ERROR: Missing "content" argument for write_file.';
+    if (!targetPath) return 'ERROR: Missing "path" argument for WriteFile.';
+    if (content === undefined) return 'ERROR: Missing "content" argument for WriteFile.';
 
     // Strip markdown code blocks if the LLM accidentally included them and normalize to LF
     content = content.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');

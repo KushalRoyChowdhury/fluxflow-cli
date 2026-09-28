@@ -14,7 +14,7 @@ export default function ProfileForm({ initialData, onSave, onCancel, theme = 'Da
     }));
 
     const steps = [
-        { key: 'name', label: 'Enter your Name: ', maxLength: 20 },
+        // { key: 'name', label: 'Enter your Name: ', maxLength: 20 }, // Depricated
         { key: 'nickname', label: 'Enter a Nickname: ', maxLength: 20 },
         { key: 'instructions', label: 'System Instructions: ', maxLength: 200 }
     ];

@@ -18,8 +18,8 @@ const xorTransform = (data) => {
 const AES_ALGORITHM = 'aes-256-cbc';
 const AES_KEY = crypto.createHash('sha256').update('fluxflow-cli-sanctuary-key').digest();
 
-export const encryptAes = (text) => {
-    if (bypass) return text;
+export const encryptAes = (text, shouldEncrypt = false) => {
+    if (bypass && !shouldEncrypt) return text;
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(AES_ALGORITHM, AES_KEY, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
@@ -27,8 +27,8 @@ export const encryptAes = (text) => {
     return iv.toString('hex') + ':' + encrypted;
 };
 
-export const decryptAes = (encryptedText) => {
-    if (bypass) return encryptedText;
+export const decryptAes = (encryptedText, shouldDecrypt = false) => {
+    if (bypass && !shouldDecrypt) return encryptedText;
     const parts = encryptedText.split(':');
     if (parts.length !== 2) {
         throw new Error('Invalid AES format');
@@ -60,7 +60,7 @@ export const readEncryptedJson = (filePath, defaultValue = {}) => {
 
         // 2. Try AES decryption
         try {
-            const decrypted = decryptAes(fileContent);
+            const decrypted = decryptAes(fileContent, true); // Forced: readable even if written with shouldEncrypt under bypass
             return JSON.parse(decrypted);
         } catch (aesErr) {
             // Not AES or AES failed, fallback to XOR.
@@ -83,14 +83,15 @@ export const readEncryptedJson = (filePath, defaultValue = {}) => {
  * Writes a JSON object to a file with AES encryption.
  * @param {string} filePath - Absolute path to the file.
  * @param {any} data - The object to encrypt and save.
+ * @param {boolean} [shouldEncrypt=false] - When true, forces AES encryption regardless of the global bypass flag; when false, follows bypass.
  */
-export const writeEncryptedJson = (filePath, data) => {
+export const writeEncryptedJson = (filePath, data, shouldEncrypt = false) => {
     try {
         const dir = path.dirname(filePath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
         const jsonData = JSON.stringify(data, null, 2);
-        const encrypted = encryptAes(jsonData);
+        const encrypted = encryptAes(jsonData, shouldEncrypt);
         fs.writeFileSync(filePath, encrypted, 'utf8');
     } catch (err) {
         console.error(`Vault Write Error [${path.basename(filePath)}]:`, err.message);

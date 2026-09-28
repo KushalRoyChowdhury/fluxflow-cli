@@ -536,6 +536,12 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
             process.exit(1);
         }
 
+        const {
+            name = '',
+            nickname = '',
+            instructions = ''
+        } = baseSettings?.profileData ?? {};
+
         const oneShotSettings = {
             aiProvider: provider,
             apiKey,
@@ -560,7 +566,7 @@ Additional Context:
 - Model: ${path.basename(oneShotSettings.model).trim().replace(':free', '').replace('-free', '').replace('/free', '').replace('_free', '').replace('free_', '').replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase().trim())}
 - Approx time: ${dateTimeStr}
 - Non interactive CLI, support piped inputs
-- 'fluxflow' TUI has full agentic tools & capabilities`.trim();
+- 'fluxflow' TUI has full agentic tools & capabilities${nickname.trim().length > 0 ? `\nUser Nickname: ${nickname.trim()}` : ''}${instructions.trim().length > 0 ? `\nUser Preferences: ${instructions.trim()}` : ''}`.trim();
 
         const { getPromptSessionHistory, savePromptSessionHistory, clearPromptSessionHistory } = await import('./utils/sessionDaemon.js');
 

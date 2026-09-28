@@ -91,7 +91,7 @@ export const saveSecret = async (key, value) => {
     await fs.ensureDir(SECRET_DIR);
     let current = readEncryptedJson(SECRET_FILE, {});
     current[key] = value;
-    writeEncryptedJson(SECRET_FILE, current);
+    writeEncryptedJson(SECRET_FILE, current, true);
 };
 
 export const getSearchSecrets = async () => {
@@ -113,7 +113,7 @@ export const removeSecret = async (key) => {
     try {
         const secrets = readEncryptedJson(SECRET_FILE, {});
         delete secrets[key];
-        writeEncryptedJson(SECRET_FILE, secrets);
+        writeEncryptedJson(SECRET_FILE, secrets, true);
     } catch (e) {}
 };
 
