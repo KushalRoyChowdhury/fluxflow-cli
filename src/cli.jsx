@@ -565,9 +565,9 @@ Additional Context:
         const { getPromptSessionHistory, savePromptSessionHistory, clearPromptSessionHistory } = await import('./utils/sessionDaemon.js');
 
         let sessionHistory = [];
-        if (isNewChat) {
+        if (isNewChat && !isCommitFlag) {
             await clearPromptSessionHistory();
-        } else {
+        } else if (!isNewChat) {
             sessionHistory = await getPromptSessionHistory();
         }
 
