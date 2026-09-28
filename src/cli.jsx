@@ -448,7 +448,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                 if (!diffOutput) {
                     process.exit(0);
                 }
-                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nSummarize this in clean commit msg`;
+                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nSummarize as neutral conventional commit message. No markdown, emojis, or fluff`;
             } catch (err) {
                 process.exit(0);
             }
@@ -599,7 +599,7 @@ Additional Context:
                     .trim()
                     .replace(':free', '')
                     .replace('-free', '')
-                    .replace('free/', '')
+                    .replace('/free', '')
                     .replaceAll('-', ' ')
                     .replace(/\b\w/g, char => char.toUpperCase().trim());
 

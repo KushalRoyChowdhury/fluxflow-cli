@@ -67,8 +67,6 @@ export const getNVIDIAStream = async function* (apiKey, model, contents, systemI
 
     const skipModels = isLlama3;
 
-    const rpModels = null;
-
     const GPT_THINKING_LEVELS = {
         'Fast': 'low',
         'Low': 'low',
@@ -98,7 +96,6 @@ export const getNVIDIAStream = async function* (apiKey, model, contents, systemI
 
     let maxTokens = (isMinimax || isDeepSeek || isPoolside || isThinkingmachines) ? 16384 : 32768;
     maxTokens = process.env.NVIDIA_BASE_URL ? 1024 : maxTokens;
-    maxTokens = rpModels ? 1024 : maxTokens;
 
     const body = {
         model: model,
@@ -110,7 +107,7 @@ export const getNVIDIAStream = async function* (apiKey, model, contents, systemI
         ...(isGPT && { thinking: GPT_THINKING_LEVELS[thinkingLevel] || 'high' })
     };
 
-    if (process.env.NVIDIA_BASE_URL || skipModels || rpModels) {
+    if (process.env.NVIDIA_BASE_URL || skipModels) {
         // Skip extra reasoning/thinking parameters for custom NVIDIA endpoints or skipable models
     } else if (isKimi) {
         body.chat_template_kwargs = { thinking: isThinking };
@@ -308,23 +305,29 @@ export const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName
         }
     };
 
-    let cleanModelId = modelName.split('/').pop();
+    // Generate variations for model IDs containing dots (e.g. glm-5.3, glm-5-3, glm-5_3)
+    const rawId = modelName.split('/').pop();
+    const modelVariations = Array.from(new Set([
+        rawId,
+        rawId.replace(/\./g, '-'),
+        rawId.replace(/\./g, '_')
+    ]));
 
-    // Llama 3.3 uses . while the API craves _
-    cleanModelId = cleanModelId.replace('llama-3.3', 'llama-3_3');
+    const baseUrls = [
+        'https://buildapi.ngc.nvidia.com/v2/predict/queues/models/qc69jvmznzxy',
+        'https://api.ngc.nvidia.com/v2/predict/queues/models/qc69jvmznzxy'
+    ];
 
-
-    const pollUrlNew = `https://buildapi.ngc.nvidia.com/v2/predict/queues/models/qc69jvmznzxy/${cleanModelId}`;
-    const pollUrl = `https://api.ngc.nvidia.com/v2/predict/queues/models/qc69jvmznzxy/${cleanModelId}`;
+    const pollUrls = baseUrls.flatMap(base => modelVariations.map(id => `${base}/${id}`));
 
     let isStreamingStarted = false;
     let pollInterval = null;
 
     const poll = async () => {
         try {
-            // Fire both endpoints in parallel; use whichever returns a valid (ok) response first
+            // Fire all variations against both endpoints in parallel; use whichever responds with 200 first
             const res = await Promise.any(
-                [pollUrlNew, pollUrl].map(async (url) => {
+                pollUrls.map(async (url) => {
                     const attempt = await fetch(url);
                     if (!attempt.ok) throw new Error(`HTTP ${attempt.status}`);
                     return attempt;
