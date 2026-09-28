@@ -26,12 +26,13 @@ const connect = () => {
         ws = socket;
         isConnecting = false;
 
-        // Handshake: Send current CLI version, PID, and PPID
+        // Handshake: Send current CLI version, PID, PPID, and default commit command template
         ws.send(JSON.stringify({
             command: 'version',
             version: cliVersion,
             pid: process.pid,
-            ppid: process.ppid
+            ppid: process.ppid,
+            commitMsgCommand: 'fluxflow --commit_8f4a2b9c'
         }));
 
         while (messageQueue.length > 0) {

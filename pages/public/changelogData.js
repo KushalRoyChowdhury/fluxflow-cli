@@ -1,6 +1,19 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.23.0": {
+        "note": "SEPTEMBER 28",
+        "added": [
+            "Source Control (SCM) Commit Message Generator: Direct 1-click FluxFlow commit message generation from your IDE's Source Control tab.",
+            "Session context supported. Give instruction to the AI via `-p` mode in terminal. 3-dot in Source Control → Enable Headless Context. Next Commit Message will have context of instruction given in `-p` for next 10 minutes.",
+            "FluxFlow CLI Companion extension updated to v1.5.0.",
+            "Dedicated headless commit summarization flag with automatic ANSI stripping and optimized prompt formatting for clean, conventional commit messages."
+        ],
+        "changed": [
+            "Prompt Optimization."
+        ],
+        "fixes": []
+    },
     "4.22.0": {
         "note": "SEPTEMBER 28",
         "added": [

@@ -40,11 +40,11 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
         _cachedAdvanceRollback = advanceRollback;
     }
 
-    const fluxInstructions = `- Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n)
+    const fluxInstructions = `- Mandatorily JSON escape literal sequences, backslash: \\\\, newLine: \\ n
 - Same file, multiple edits? One PatchFile (≤15 blocks)${autoExec ? '' : '\n- Tool denied? Ask for guidance'}
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
-- Dont hallucinate tool results, verify, fix errors
+- Dont hallucinate tool results
 - Stuck on syntax error? Tell user > waste time
 `;
 
@@ -62,14 +62,14 @@ ${_cachedAdvanceRollback ? `
 Info: initial = current task prompt. Revert id = turn before disaster (eg. disaster: turn_3 → revert: turn_2). Reason explicitly
 - EmergencyRollback(method="getCheckpoint/forceRevert", id=string). Rollback workspace in this agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. getCheckpoint: id excluded\n` : ''}${enableSubAgents ? `
 **Sub Agent Tools**
-Default to always using subagents whenever helpful, no user nudge needed
+Default to using subagents whenever helpful, no user nudge needed
 Invocations:
-• Invoke (async/background, ≤7 parallel). Parallelize long tasks. May take time
+• Invoke (async/background, ≤7 parallel). Parallelize tasks. May take time
 • InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
-- InvokeSync/Invoke(title=string, task=string). Task must be detailed: exact file paths, imports/exports, dependencies
-- Await(id=string, timeout=int[..=180]). Event-driven wait
+- InvokeSync/Invoke(title=string, task=string). Task must be detailed: file paths, imports/exports, dependencies
+- Await(id=string, timeout=int[..=180]). Event driven wait
 - GetProgress(id=string). Poll sparingly; NO initial poll. Work or await. Never end while subagent runs
-- Steer(id=string, message=string). Inject additional instruction or redirection into active async subagent
+- Steer(id=string, message=string). Inject additional instruction into active async subagent
 - Cancel(id=string). Cancel async task ONLY if stalled (2m+) or incorrect` : ''}`;
 
     // =====================================================================================================
@@ -92,7 +92,7 @@ Invocations:
 
     return `
 -- TOOLS --
-You cant execute tools. In chat output the format [tool:ToolName(arg1="value1")] ← mandatory, NEW line
+To use tools in chat output the format [tool:ToolName(arg1="value1")] ← mandatory, NEW line
 Tool Rules:
 - Max 5 tools/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' && !disableTodo ? ' (Goal: 5+)' : ''}
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}

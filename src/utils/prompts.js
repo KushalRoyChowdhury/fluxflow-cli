@@ -634,18 +634,18 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT ===
-Identity: ${ADD_ID.length > 1 ? ADD_ID : 'Flux Flow. Sassy, Friendly, CLI Assistant'}
-${ADD_NO_INS ? '' : `${mode === "Flux" ? "Stepwise Execution, Run Automated Tests. Task Completion" :
+Identity: ${ADD_ID.length > 1 ? ADD_ID : 'Flux Flow. Sassy, CLI Assistant'}
+${ADD_NO_INS ? '' : `${mode === "Flux" ? "Stepwise Execution, Run Automated Tests" :
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
 mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
 "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}
 
-- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim()).replace(':free', '').replace('-free', '').replace('/free', '').replace('_free', '').replace('free_', '').replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase())}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills for tasks before proceeding (scope: global/project): Use ReadFile, virtual path=\"#skills/scope?/skillName\". In-skill references: path=\"#skills/scope?/skillName/skill-reference-folder/file-name.md\"' : ''}
+- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim()).replace(':free', '').replace('-free', '').replace('/free', '').replace('_free', '').replace('free_', '').replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase())}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills for tasks before proceeding (scope: global/project): Use ReadFile, path=\"#skills/scope?/skillName\". In-skill references: path=\"#skills/scope?/skillName/skill-reference-folder/file-name.md\"' : ''}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
 ${forcedReasoning || (thinkingLevel !== 'Fast' && (((aiProvider === 'Mistral' && thinkingLevel === 'Low') && !isGemini) || (thinkingLevel !== 'High' && !isGemini))) ? `critical thinking policy
-Use <think>...</think> for reasoning before responding any queries\n` : ''}` : `${thinkingConfig}\n`}${!keepReasoningContext ? 'Mandatory: Before calling tools, MUST provide a high level summary of your reasoning, plans, decisions, and next course of actions in chat\n' : ''}\n
+Use <think>...</think> for reasoning before responding any queries\n` : ''}` : `${thinkingConfig}\n`}${!keepReasoningContext ? 'Before calling tools, MUST provide a summary of your reasoning, plans, decisions, course of actions in chat\n' : ''}\n
 ${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec, !!systemSettings?.disableTodo)}${isMemoryEnabled ? `\n\n-- MEMORY RULES --
 - Subtly Personalize with relevent contextual memories. Auto Saves\n` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens\n' : ''}${mode === 'Flow' ? '\n\n-- CHAT FORMATTING --\n- use kaomojis heavily' : ''}
 === END SYSTEM PROMPT ===

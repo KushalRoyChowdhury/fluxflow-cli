@@ -432,13 +432,27 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         }
     }
 
-    // 3.5 ONE-SHOT PROMPT: -p/--prompt -> non-TUI, custom system instruction, no loop
+    // 3.5 ONE-SHOT PROMPT: -p/--prompt or --commit_8f4a2b9c -> non-TUI, custom system instruction, no loop
+    const isCommitFlag = args.includes('--commit_8f4a2b9c');
     const promptIdx = args.findIndex(a => a === '-p' || a === '--prompt');
-    if (promptIdx !== -1) {
+    if (promptIdx !== -1 || isCommitFlag) {
         const isNewChat = args.includes('--new') || args.includes('-n');
         // Find the prompt text (the first non-flag argument after -p/--prompt)
-        const postPromptArgs = args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new');
+        const postPromptArgs = promptIdx !== -1 ? args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new') : [];
         let promptText = postPromptArgs[0];
+
+        if (isCommitFlag) {
+            try {
+                const { execSync } = await import('child_process');
+                const diffOutput = execSync('git diff --cached', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+                if (!diffOutput) {
+                    process.exit(0);
+                }
+                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nSummarize this in clean commit msg`;
+            } catch (err) {
+                process.exit(0);
+            }
+        }
 
         // Support -r / --run <cmd>: execute command and feed output as context
         const runIdx = args.findIndex(a => a === '-r' || a === '--run');
@@ -499,7 +513,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
         const baseSettings = await loadSettings();
         const scanArgs = args.filter(a => a !== '-p' && a !== '--prompt' && a !== promptText && a !== '-n' && a !== '--new');
-        const isRaw = scanArgs.includes('--raw') || args.includes('--raw');
+        const isRaw = isCommitFlag || scanArgs.includes('--raw') || args.includes('--raw');
         const getFlag = (names) => {
             for (const n of names) {
                 const i = scanArgs.indexOf(n);

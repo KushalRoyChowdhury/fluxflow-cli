@@ -2291,7 +2291,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
 
-        const wildcardToolingPrompt = wildcardTooling || wildercardTooling ? `You cannot execute tools\nInstead output the exact string you WOULD have produced\n${wildercardTooling ? 'tool string format [tool:ToolName(arg="value")]\n' : ''}` : '';
+        const wildcardToolingPrompt = wildcardTooling || wildercardTooling ? `You cannot execute tools. Instead output the string in chat you WOULD have produced to call\n${wildercardTooling ? 'tool string format [tool:ToolName(arg="value")]\n' : ''}` : '';
 
         const isForceReasoning = process.env.forcedReasoning || false;
 
@@ -5426,15 +5426,14 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-You cant execute tools. In chat output the format [tool:ToolName(arg1="value1")] ← mandatory
+To use tools in chat output the format [tool:ToolName(arg1="value1")] ← mandatory
 Tool Rules:
-- Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n)
+- Mandatorily JSON escape literal sequences, backslash: \\\\, newLine: \\ n
 - Same file, multiple edits? ONE PatchFile (≤15 blocks)
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
-- Dont hallucinate tool results, verify, fix errors
+- Dont hallucinate tool results
 - Stuck on syntax error? Tell user > waste time
-- ONLY valid tools defined below are allowed
 
 # Provided Tools
 **Communication Tools**

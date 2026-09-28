@@ -10,3 +10,4 @@ src/utils/fallback_key.js
 .VSCodeCounter
 /providers_to_add.txt
 /dist/
+fluxflow-editorex/dist/

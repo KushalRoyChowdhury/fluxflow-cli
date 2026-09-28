@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as path from 'path';
 import * as fs from 'fs';
+import { exec } from 'child_process';
 
 let wss: WebSocketServer | undefined;
 let lastDiffTimestamp = 0;
@@ -10,6 +11,7 @@ const activeDecs: vscode.TextEditorDecorationType[] = [];
 let statusBarItem: vscode.StatusBarItem;
 let isCliConnected = false;
 let fluxFlowTerminal: vscode.Terminal | undefined;
+let cliCommitCommand: string = 'fluxflow --commit_8f4a2b9c';
 
 const lastKnownStates = new Map<string, string>();
 const originalStates = new Map<string, string>();
@@ -157,6 +159,117 @@ export function activate(context: vscode.ExtensionContext) {
         });
     }));
 
+    // Headless session context toggle state (persisted across sessions)
+    let useHeadlessContext = context.globalState.get<boolean>('fluxflow.useHeadlessContext', false);
+    vscode.commands.executeCommand('setContext', 'fluxflow.isHeadlessContextEnabled', useHeadlessContext);
+
+    // Register Enable command
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.enableHeadlessContext', async () => {
+        useHeadlessContext = true;
+        await context.globalState.update('fluxflow.useHeadlessContext', true);
+        vscode.commands.executeCommand('setContext', 'fluxflow.isHeadlessContextEnabled', true);
+        vscode.window.showInformationMessage('FluxFlow: Headless Session Context is now ENABLED (inherits active terminal sessions).');
+    }));
+
+    // Register Disable command
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.disableHeadlessContext', async () => {
+        useHeadlessContext = false;
+        await context.globalState.update('fluxflow.useHeadlessContext', false);
+        vscode.commands.executeCommand('setContext', 'fluxflow.isHeadlessContextEnabled', false);
+        vscode.window.showInformationMessage('FluxFlow: Headless Session Context is now DISABLED (isolated clean commits).');
+    }));
+
+    // Helper function to generate commit messages with or without session flag
+    const generateCommit = async (scmContext?: any) => {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+            vscode.window.showWarningMessage('No workspace folder is open.');
+            return;
+        }
+
+        let repoCwd = workspaceFolders[0].uri.fsPath;
+        if (scmContext?.rootUri?.fsPath) {
+            repoCwd = scmContext.rootUri.fsPath;
+        }
+
+        const notificationTitle = useHeadlessContext
+            ? "Generating commit message with FluxFlow (using headless session context)..."
+            : "Generating commit message with FluxFlow...";
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: notificationTitle,
+            cancellable: false
+        }, async () => {
+            return new Promise<void>((resolve) => {
+                let finalCmd = cliCommitCommand;
+                if (!useHeadlessContext) {
+                    // Append -n flag right after 'fluxflow' executable call
+                    if (finalCmd.includes('fluxflow')) {
+                        finalCmd = finalCmd.replace('fluxflow', 'fluxflow -n');
+                    } else {
+                        finalCmd = `${finalCmd} -n`;
+                    }
+                }
+
+                exec(finalCmd, { cwd: repoCwd }, (error, stdout, stderr) => {
+                    if (error) {
+                        const errMsg = (stderr || error.message || '').toLowerCase();
+                        if (
+                            errMsg.includes('not recognized') ||
+                            errMsg.includes('command not found') ||
+                            errMsg.includes('enoent') ||
+                            error.code === 127 ||
+                            (error as any).code === 'ENOENT'
+                        ) {
+                            vscode.window.showErrorMessage(
+                                'FluxFlow CLI is not installed globally or is outdated. Please install or update to v4.23.0 or later to use this feature (`npm i -g fluxflow-cli@latest`).'
+                            );
+                        } else {
+                            vscode.window.showErrorMessage(`FluxFlow Error: ${stderr || error.message}`);
+                        }
+                        resolve();
+                        return;
+                    }
+
+                    const commitMsg = stdout.trim();
+                    if (!commitMsg) {
+                        vscode.window.showInformationMessage('FluxFlow: No changes detected to summarize.');
+                        resolve();
+                        return;
+                    }
+
+                    // Look for VS Code built-in Git extension API to populate commit message box directly
+                    try {
+                        const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+                        const git = gitExtension?.getAPI(1);
+                        if (git && git.repositories && git.repositories.length > 0) {
+                            const repo = git.repositories.find((r: any) => r.rootUri.fsPath.toLowerCase() === repoCwd.toLowerCase()) || git.repositories[0];
+                            if (repo?.inputBox) {
+                                repo.inputBox.value = commitMsg;
+                                resolve();
+                                return;
+                            }
+                        }
+                    } catch (e) {
+                        // Fallback below
+                    }
+
+                    // Fallback to scmContext if available
+                    if (scmContext?.inputBox) {
+                        scmContext.inputBox.value = commitMsg;
+                    }
+                    resolve();
+                });
+            });
+        });
+    };
+
+    // Register command for commit generation button
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.generateCommitMessage', async (scmContext?: any) => {
+        await generateCommit(scmContext);
+    }));
+
     // Cleanup reference if terminal is closed manually
     context.subscriptions.push(vscode.window.onDidCloseTerminal((terminal) => {
         if (terminal === fluxFlowTerminal) {
@@ -275,6 +388,9 @@ export function activate(context: vscode.ExtensionContext) {
                 } else if (message.command === 'status') {
                     updateStatusBar(message.status);
                 } else if (message.command === 'version') {
+                    if (message.commitMsgCommand) {
+                        cliCommitCommand = message.commitMsgCommand;
+                    }
                     const majorVersion = parseInt(message.version?.split('.')[0] || '0');
                     if (majorVersion < 2) {
                         vscode.window.showErrorMessage(`FluxFlow Companion Error: CLI version ${message.version} is not supported. Please update FluxFlow CLI to 2.0.0 or later.`);

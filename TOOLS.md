@@ -26,8 +26,7 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 ## Tool Protocol
 
 FluxFlow uses a transparent, string-based protocol for tool dispatching:
-`[tool:functions.ToolName(arg1="value", arg2=123)]`
-`[agent:generalist.Method(args)]`
+`[tool:ToolName(arg1="value", arg2=123)]`
 
 ---
 

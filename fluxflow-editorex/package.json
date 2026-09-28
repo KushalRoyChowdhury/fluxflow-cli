@@ -4,7 +4,7 @@
     "publisher": "fluxflow-cli",
     "icon": "fluxflow-cli-companion.png",
     "description": "Enable FluxFlow CLI with direct access to your IDE workspace.",
-    "version": "1.4.2",
+    "version": "1.5.0",
     "engines": {
         "vscode": "^1.90.0"
     },
@@ -48,6 +48,22 @@
                 "command": "fluxflow-editorex.denyDiff",
                 "title": "Deny (FluxFlow)",
                 "icon": "$(close)"
+            },
+            {
+                "command": "fluxflow-editorex.generateCommitMessage",
+                "title": "Generate Commit Message with FluxFlow",
+                "icon": {
+                    "light": "resources/fluxflow-icon-light.svg",
+                    "dark": "resources/fluxflow-icon-dark.svg"
+                }
+            },
+            {
+                "command": "fluxflow-editorex.enableHeadlessContext",
+                "title": "FluxFlow: Enable Headless Session Context"
+            },
+            {
+                "command": "fluxflow-editorex.disableHeadlessContext",
+                "title": "FluxFlow: Disable Headless Session Context"
             }
         ],
         "submenus": [
@@ -118,6 +134,22 @@
                     "command": "fluxflow-editorex.denyDiff",
                     "group": "navigation",
                     "when": "fluxflow.isDiffVisible"
+                }
+            ],
+            "scm/title": [
+                {
+                    "command": "fluxflow-editorex.generateCommitMessage",
+                    "group": "navigation"
+                },
+                {
+                    "command": "fluxflow-editorex.enableHeadlessContext",
+                    "group": "9_fluxflow",
+                    "when": "!fluxflow.isHeadlessContextEnabled"
+                },
+                {
+                    "command": "fluxflow-editorex.disableHeadlessContext",
+                    "group": "9_fluxflow",
+                    "when": "fluxflow.isHeadlessContextEnabled"
                 }
             ]
         }
