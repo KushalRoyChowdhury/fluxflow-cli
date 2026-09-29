@@ -91,7 +91,7 @@ Invocations:
     // =====================================================================================================
 
     return `
--- TOOLS --
+-- TOOLS -- Priority
 In chat output the format \`[tool:ToolName(arg1="value1")]\` in NEW line
 Rules:
 - Max 5 tools/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' && !disableTodo ? ' (Goal: 5+)' : ''}

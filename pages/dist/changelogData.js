@@ -1,6 +1,23 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.23.5": {
+        "note": "SEPTEMBER 29",
+        "added": [
+            "Nickname and custom instructions support in one-shot headless mode.",
+            "Parallel model ID polling with auto-generated variant formats (dots to dashes/underscores) for NVIDIA API compatibility."
+        ],
+        "changed": [
+            "Renamed environment variables: `9ROUTER_BASE_URL` to `NINEROUTER_URL` and `9ROUTER_API_KEY` to `NINEROUTER_KEY` across codebase and documentation.",
+            "Deprecated `name` field in ProfileForm.",
+            "Softened prompt phrasing by replacing 'Mandatorily' and 'Critical' with neutral guidance in tool and thinking prompts.",
+            "Reworded tool protocol and subagent instructions for clarity and consistency.",
+            "Updated commit message prompts to request bullet style and neutral conventional format.",
+        ],
+        "fixes": [
+            "Headless Session history no longer wiped when not using Headless Context with commit generation."
+        ]
+    },
     "4.23.0": {
         "note": "SEPTEMBER 28",
         "added": [

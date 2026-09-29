@@ -71,7 +71,7 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
         'Content-Type': 'application/json'
     };
 
-    const effectiveKey = (apiKey && apiKey !== 'LOCAL') ? apiKey : (process.env['9ROUTER_API_KEY'] || 'dummy-key');
+    const effectiveKey = (apiKey && apiKey !== 'LOCAL') ? apiKey : (process.env.NINEROUTER_KEY || 'dummy-key');
     headers['Authorization'] = `Bearer ${effectiveKey}`;
 
     const response = await fetchWithBackoff(baseUrl, {
