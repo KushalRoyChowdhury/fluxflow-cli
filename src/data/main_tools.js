@@ -64,11 +64,11 @@ Info: initial = current task prompt. Revert id = turn before disaster (eg. disas
 **Sub Agent**
 Default to using subagents whenever helpful, no user nudge needed
 Invocations:
-• Invoke (async/background, ≤7 parallel). Parallelize tasks. May take time
-• InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
-- InvokeSync/Invoke(title=string, task=string). Task must be detailed: file paths, imports/exports, dependencies
+• Invoke (async/background, ≤7 parallel). Parallelize tasks
+• InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens
+- InvokeSync/Invoke(title=string, task=string). Detailed task, file paths, dependencies
 - Await(id=string, timeout=int[..=180]). Event driven wait
-- GetProgress(id=string). Poll sparingly; NO initial poll. Work or await. Never end while subagent runs
+- GetProgress(id=string). Poll sparingly; NO initial poll. Work or await
 - Steer(id=string, message=string). Inject additional instruction into active async subagent
 - Cancel(id=string). Cancel async task ONLY if stalled (2m+) or incorrect` : ''}`;
 
@@ -92,15 +92,15 @@ Invocations:
 
     return `
 -- ACTIONS --
-In chat output the format \`[action:ActionName(arg1="value1")]\` in NEW line. Only valid syntax
+In chat output the format \`[action:ActionName(arg1="value1")]\` in NEW line
 Rules:
-- Max 5 actions/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' && !disableTodo ? ' (Goal: 5+)' : ''}
+- Max 5 actions/turn
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 **User Communication**
-- AskUser(question=string, optionA?="title::description", ...MAX4). Ambiguity, path divergence, security risk
+- AskUser(question=string, optionA?="title::description", ...MAX4). Any Ambiguity
 
 **Web**
-- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: slower, exclude limit
+- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: exclude limit
 - WebScrape(url=string). Proactive use for specific webpage/docs
 
 ${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();

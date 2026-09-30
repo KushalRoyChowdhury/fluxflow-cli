@@ -1926,7 +1926,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const dynamicDirAwareness = !!systemSettings?.dynamicDirAwareness;
         const sysInstructionCacheKey = `${chatId}|${aiProvider}|${thinkingLevel}|${modelName}|${profile}|${dynamicDirAwareness}`;
         const isSysInstructionCached = !dynamicDirAwareness && systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
-        let dirStructure = isSysInstructionCached ? '' : ('\n**Directory Structure**\nCWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}` + '\n' + getDirTree(process.cwd(), 4));
+        let dirStructure = isSysInstructionCached ? '' : ('\n**Directory**\nCWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}` + '\n' + getDirTree(process.cwd(), 4));
 
         const ideCtx = await getIDEContext();
         let ideBlock = "";
@@ -2257,7 +2257,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (shouldCheckExclude && !hasMovingParts) {
             firstUserMsg = cleanPromptForModel.trim();
         } else {
-            firstUserMsg = `[System Metadata]\nTime: ${shouldCheckExclude ? dateTimeStrExclude : dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${ideBlock}\nAction format: [action:ActionName(...)]\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+            firstUserMsg = `[System Metadata]\nTime: ${shouldCheckExclude ? dateTimeStrExclude : dateTimeStr}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${ideBlock}\nAction format: [action:ActionName(...)]\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
         }
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
@@ -2687,7 +2687,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, isGeminiOrReasoning, chatId, !!systemSettings?.keepReasoningContext, targetModel);
 
                         if (!systemSettings?.dynamicDirAwareness) {
-                            currentSystemInstruction += `\n${dirStructure.replace('\n**Directory Structure**', '\n-- Directory Structure --')}`;
+                            currentSystemInstruction += `\n${dirStructure.replace('\n**Directory**', '\n-- Directory --')}`;
                         }
                         systemInstructionCache.key = sysInstructionCacheKey;
                         systemInstructionCache.value = currentSystemInstruction;
@@ -5388,11 +5388,11 @@ Rules:
 
 # Provided Actions
 **Communication**
-- AskUser(question=string, optionA?="title::description", ...MAX4). Ambiguity, path divergence, security risk
+- AskUser(question=string, optionA?="title::description", ...MAX4). Any Ambiguity
 ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web**
-- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: slower, exclude limit
+- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: exclude limit
 - WebScrape(url=string). Proactive use for specific webpage/docs
 
 **Workspace**

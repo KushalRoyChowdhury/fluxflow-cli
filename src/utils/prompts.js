@@ -25,7 +25,7 @@ export const getCaseInsensitiveFilePath = (dir, fileNames) => {
                 }
             }
         }
-    } catch (e) {}
+    } catch (e) { }
     return null;
 };
 
@@ -34,7 +34,7 @@ const readCaseInsensitiveFile = (dir, fileNames) => {
     if (filePath) {
         try {
             return fs.readFileSync(filePath, 'utf8');
-        } catch (e) {}
+        } catch (e) { }
     }
     return '';
 };
@@ -95,7 +95,7 @@ export const findLocalAgentsFiles = (dir = process.cwd(), currentDepth = 0, maxD
                 }
             }
         }
-    } catch (e) {}
+    } catch (e) { }
 
     return results;
 };
@@ -190,7 +190,7 @@ export const readLocalAgentsInstruction = () => {
                 const dirHeader = path.dirname(relPath) + '/:';
                 blocks.push(`${dirHeader}\n${indentText(rawContent, 2)}`);
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     return blocks.join('\n\n').trim();
@@ -345,7 +345,7 @@ const findSkillFiles = (baseDir) => {
                     }
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
     };
 
     traverse(baseDir, 0);
@@ -362,7 +362,7 @@ const loadSkillsFromDir = (dir) => {
             if (meta) {
                 skills.push({ ...meta, filePath });
             }
-        } catch (e) {}
+        } catch (e) { }
     }
     return skills;
 };
@@ -475,7 +475,7 @@ let isSecondary = false;
                 isSecondary = true;
             }
         }
-    } catch (e) {}
+    } catch (e) { }
 })();
 
 let cachedChatId = null;
@@ -552,7 +552,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         if (thinkingLevel === 'Fast') {
             thinkingConfig = "Effort: Lowest\nNo thinking. Immediate response\nVerify imports, tool results & system stability; avoid syntax errors"
         } else if (thinkingLevel === 'Low') {
-            thinkingConfig = "Effort: Low\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nDont waste tokens, be efficient, use least thinking tokens, focus on result\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors"
+            thinkingConfig = "Effort: Low\nQuick, focused thinking, required tools/files/actions\nDont waste tokens, be efficient, use least thinking tokens, focus on result\nVerify imports, tool results & system stability; avoid syntax errors"
         }
     }
 
@@ -636,9 +636,9 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     })()}` : ''}=== SYSTEM PROMPT ===
 Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : 'Flux Flow. Sassy, CLI Assistant'}. Expert in DSL Actions
 ${ADD_NO_INS ? '' : `${mode === "Flux" ? "Stepwise Execution, Run Automated Tests" :
-mode === "Flow" ? `Concise, Humorous, Sarcastic` :
-mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
-"Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}
+            mode === "Flow" ? `Concise, Humorous, Sarcastic` :
+                mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
+                    "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}
 
 - OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim()).replace(':free', '').replace('-free', '').replace('/free', '').replace('_free', '').replace('free_', '').replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase())}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled && false ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}
 

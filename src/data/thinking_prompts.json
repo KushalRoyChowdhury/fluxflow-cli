@@ -1,7 +1,7 @@
 {
-    "xHigh": "Effort: High\nThink before complex tasks\nPrefer simplest correct solution, assess architecture, performance & maintainability, verify error handling, assumptions, edge cases, dependencies & regressions, plan: files, functions, logic & interactions\nVerify from first principles, seek failure paths, verify imports, system stability\nDirect deduction only. No exploratory branching. Output solution immediately",
+    "xHigh": "Effort: High\nThink before complex tasks\nPrefer simplest correct solution, verify from first principles\nDirect deduction only. No exploratory branching",
 
-    "High": "Effort: High\nThink before complex tasks\nPrefer simplest correct solution, assess architecture, performance & maintainability, verify error handling, assumptions, edge cases, dependencies & regressions, plan: files, functions, logic & interactions\nContinuous analysis, verify from first principles, seek failure paths, verify imports, system stability\nDont waste tokens, be efficient, use less thinking tokens, focus on result\nGather useful context",
+    "High": "Effort: High\nThink before complex tasks\nPrefer simplest correct solution, \nContinuous analysis\nDont waste tokens, be efficient, use less thinking tokens, focus on result\nGather useful context",
 
     "Medium": "Effort: Medium\nThink before complex tasks\nFocused, technical thinking, find the simplest solution meeting requirements, check error handling, assumptions, edge cases & dependencies, verify cohesive, modular changes, outline: files, functions & key logic\nLogical, implementation-focused, efficient, deliberate, verify imports, system stability\nDont waste tokens, be efficient, use least thinking tokens, focus on result\nGather useful context",
 
