@@ -288,7 +288,8 @@ export default function SettingsMenu({
                     { label: 'Theme', value: 'theme', status: systemSettings.theme || 'Dark' },
                     { label: 'Loading Phrases', value: 'loadingPhrases', status: systemSettings.loadingPhrases !== false ? 'ON' : 'OFF' },
                     { label: 'Progressive Rendering [EXPERIMENTAL]', value: 'progressiveRendering', status: systemSettings.progressiveRendering ? 'ON' : 'OFF' },
-                    { label: 'Show TPM Estimate', value: 'showTPMEstimate', status: systemSettings.showTPMEstimate ? 'ON' : 'OFF' }
+                    { label: 'Show TPM Estimate', value: 'showTPMEstimate', status: systemSettings.showTPMEstimate ? 'ON' : 'OFF' },
+                    { label: 'Verbose Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' }
                 ];
             case 'memory':
                 return [
@@ -318,7 +319,6 @@ export default function SettingsMenu({
                 return [
                     { label: 'Sub-Agents', value: 'subAgents', status: systemSettings.subAgents !== false ? 'ON' : 'OFF' },
                     { label: 'Sub-Agent Model', value: 'subAgentModel', status: (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default' },
-                    { label: 'Verbose Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
                     { label: 'Directory Tree Design', value: 'indentationTree', status: systemSettings.indentationTree !== false ? 'Modern' : 'Legacy' },
                     { label: 'Compact Large Tool Results', value: 'compressToolResults', status: systemSettings.compressToolResults ? 'ON' : 'OFF' },
                     { label: 'Auto Truncate Results', value: 'autoTruncateResults', status: systemSettings.autoTruncateResults ? 'ON' : 'OFF' },
