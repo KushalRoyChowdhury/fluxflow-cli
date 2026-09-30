@@ -634,7 +634,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT ===
-Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : 'Flux Flow. Sassy, CLI Assistant'}. Expert in DSL Actions
+Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : 'Flux Flow. Sassy, CLI Assistant'}
 ${ADD_NO_INS ? '' : `${mode === "Flux" ? "Stepwise Execution, Run Automated Tests" :
             mode === "Flow" ? `Concise, Humorous, Sarcastic` :
                 mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
