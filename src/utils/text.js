@@ -1267,7 +1267,7 @@ export const TOOL_LABELS = {
 // PRE-COMPILED REGEXES
 // Hoisted out of cleanSignals to prevent V8 from re-compiling during stream GC
 // ============================================================================
-const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:(?:functions\.)?|tool\.functions|agent:generalist|agent\.generalist|\s*turn\s*:))/gi;
+const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:(?:functions\.)?|tool\.functions|action:(?:functions\.)?|action:|action\.functions|\s*turn\s*:))/gi;
 // Helper: returns true when `idx` in `str` falls inside a backtick code block or inline code span
 const isInsideBacktick = (str, idx) => {
     let inInlineCode = false;
@@ -1286,7 +1286,7 @@ const isInsideBacktick = (str, idx) => {
     }
     return inFence || inInlineCode;
 };
-const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gm;
+const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[(?:TOOL|ACTION) RESULTS?\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL|ACTION).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gm;
 const REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
 const REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
 
@@ -1322,14 +1322,14 @@ export const cleanSignals = (text, role = 'agent') => {
             (!bypassBacktick && isInsideBacktick(str, offset)) ? match : '');
 
         // Strip XML/YAML/code fence wrappers around tool calls so raw wrappers are not shown in UI
-        if (result && result.includes('[tool:')) {
-            result = result.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match, tagName, innerContent) => {
-                if (innerContent && innerContent.includes('[tool:')) return innerContent.trim();
+        if (result && (result.includes('[tool:') || result.includes('[action:'))) {
+            result = result.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[(?:tool|action):[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match, tagName, innerContent) => {
+                if (innerContent && (innerContent.includes('[tool:') || innerContent.includes('[action:'))) return innerContent.trim();
                 return match;
             });
             if (bypassBacktick) {
-                result = result.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match, inner) => {
-                    if (inner.includes('[tool:')) return inner.trim();
+                result = result.replace(/```(?:tool|action|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match, inner) => {
+                    if (inner.includes('[tool:') || inner.includes('[action:')) return inner.trim();
                     return match;
                 });
             }
@@ -1337,21 +1337,21 @@ export const cleanSignals = (text, role = 'agent') => {
     }
 
     const trigger = 'tool:';
-    const subagentTrigger = 'agent:generalist.';
+    const actionTrigger = 'action:';
 
     // FAST PATH: Bypass the heavy while-loop entirely if the tool trigger isn't present or not agent role
-    if (isAgentRole && (result.toLowerCase().includes(trigger) || result.toLowerCase().includes(subagentTrigger))) {
+    if (isAgentRole && (result.toLowerCase().includes(trigger) || result.toLowerCase().includes(actionTrigger))) {
         // Greedy loop to strip all tool calls
         while (true) {
             const lowerResult = result.toLowerCase();
             let triggerIdx = lowerResult.indexOf(trigger);
-            let subagentIdx = lowerResult.indexOf(subagentTrigger);
+            let actionIdx = lowerResult.indexOf(actionTrigger);
 
             let currentTrigger = trigger;
             let triggerIdxToUse = triggerIdx;
-            if (triggerIdx === -1 || (subagentIdx !== -1 && subagentIdx < triggerIdx)) {
-                currentTrigger = subagentTrigger;
-                triggerIdxToUse = subagentIdx;
+            if (triggerIdx === -1 || (actionIdx !== -1 && actionIdx < triggerIdx)) {
+                currentTrigger = actionTrigger;
+                triggerIdxToUse = actionIdx;
             }
             if (triggerIdxToUse === -1) break;
 
@@ -1362,11 +1362,11 @@ export const cleanSignals = (text, role = 'agent') => {
                 let searchPos = 0;
                 while (true) {
                     const tIdx = lowerResult.indexOf(trigger, searchPos);
-                    const aIdx = lowerResult.indexOf(subagentTrigger, searchPos);
+                    const aIdx = lowerResult.indexOf(actionTrigger, searchPos);
                     let candidate = -1;
                     let candidateTrigger = trigger;
                     if (tIdx === -1 && aIdx === -1) break;
-                    if (tIdx === -1 || (aIdx !== -1 && aIdx < tIdx)) { candidate = aIdx; candidateTrigger = subagentTrigger; }
+                    if (tIdx === -1 || (aIdx !== -1 && aIdx < tIdx)) { candidate = aIdx; candidateTrigger = actionTrigger; }
                     else { candidate = tIdx; }
                     if (!isInsideBacktick(result, candidate)) { safeIdx = candidate; currentTrigger = candidateTrigger; break; }
                     searchPos = candidate + candidateTrigger.length;

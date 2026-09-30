@@ -74,9 +74,9 @@ export const exportCurrentChat = async (chatId, messages, targetDir = process.cw
             const cleanThinkText = (msg.text || '')
                 .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
                 .replace(/\[\[END\]\]/gi, '')
-                .replace(/\[\[TOOL RESULTS\]\]/gi, '')
-                .replace(/\[TOOL RESULTS\]/gi, '')
-                .replace(/\[TOOL RESULT\]/gi, '')
+                .replace(/\[\[(?:TOOL|ACTION) RESULTS\]\]/gi, '')
+                .replace(/\[(?:TOOL|ACTION) RESULTS\]/gi, '')
+                .replace(/\[(?:TOOL|ACTION) RESULT\]/gi, '')
                 .trim();
             if (cleanThinkText) {
                 exportLines.push('[thoughts]');
@@ -95,9 +95,9 @@ export const exportCurrentChat = async (chatId, messages, targetDir = process.cw
                     const cleanContent = block.content
                         .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
                         .replace(/\[\[END\]\]/gi, '')
-                        .replace(/\[\[TOOL RESULTS\]\]/gi, '')
-                        .replace(/\[TOOL RESULTS\]/gi, '')
-                        .replace(/\[TOOL RESULT\]/gi, '')
+                        .replace(/\[\[(?:TOOL|ACTION) RESULTS\]\]/gi, '')
+                        .replace(/\[(?:TOOL|ACTION) RESULTS\]/gi, '')
+                        .replace(/\[(?:TOOL|ACTION) RESULT\]/gi, '')
                         .trim();
                     if (cleanContent) {
                         exportLines.push('[output]');

@@ -48,6 +48,8 @@ export const getDeepSeekStream = async function* (apiKey, model, contents, syste
         stream: true,
         stream_options: { include_usage: true },
         temperature: temperature,
+        tools: [], // Forcing models not to fallback to API function calls
+        tool_choice: "none"
     };
 
     // DeepSeek Specific Reasoning

@@ -58,7 +58,9 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
         messages: messages,
         stream: true,
         stream_options: { include_usage: true },
-        temperature: temperature
+        temperature: temperature,
+        tools: [], // Forcing models not to fallback to API function calls
+        tool_choice: "none"
     };
 
     if (effort && effort !== 'none' && (customEffort !== null || thinkingLevel !== 'Fast')) {
@@ -68,7 +70,7 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
     const baseUrl = process.env['9ROUTER_URL'] || process.env.NINEROUTER_URL || 'http://127.0.0.1:20128/v1/chat/completions';
 
     const headers = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
     };
 
     const effectiveKey = (apiKey && apiKey !== 'LOCAL') ? apiKey : (process.env.NINEROUTER_KEY || 'dummy-key');

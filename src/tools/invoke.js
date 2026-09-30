@@ -98,7 +98,7 @@ export const invoke = async (args, context = {}) => {
             }
 
             // Nudge main agent with complete Answer tool call syntax (JIT injection saves turn tokens)
-            addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" is WAITING FOR YOUR INPUT: "${questionText}"\nRespond using tool: [tool:Answer(id="${taskId}", answer="...")]\n[/SYSTEM]`);
+            addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" is WAITING FOR YOUR INPUT: "${questionText}"\nRespond using tool: [action:Answer(id="${taskId}", answer="...")]\n[/SYSTEM]`);
 
             const answer = await qPromise;
             return answer;
@@ -161,7 +161,7 @@ export const invoke = async (args, context = {}) => {
         }
 
         let displayLog = logMessage;
-        if (displayLog.startsWith('[Tool Result]')) {
+        if (displayLog.startsWith('[Tool Result]') || displayLog.startsWith('[Action Result]')) {
             const lines = displayLog.split('\n');
             if (lines.length > 5) {
                 displayLog = lines.slice(0, 4).join('\n') + '\n... [Content/Diff Truncated from Logs] ...';

@@ -49,7 +49,9 @@ export const getPoolsideStream = async function* (apiKey, model, contents, syste
         messages: messages,
         stream: true,
         stream_options: { include_usage: true },
-        temperature: temperature
+        temperature: temperature,
+        tools: [], // Forcing models not to fallback to API function calls
+        tool_choice: "none"
     };
 
     if (isThinkingDisabled) {

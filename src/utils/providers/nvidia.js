@@ -104,6 +104,8 @@ export const getNVIDIAStream = async function* (apiKey, model, contents, systemI
         stream: true,
         stream_options: { include_usage: true },
         temperature: temperature,
+        tools: [], // Forcing models not to fallback to API function calls
+        tool_choice: "none",
         ...(isGPT && { thinking: GPT_THINKING_LEVELS[thinkingLevel] || 'high' })
     };
 

@@ -1,9 +1,8 @@
 export const JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = true) => `
-To use tools, must output exactly '[tool:ToolName(arg1="value1")]' structured string in chat response ← no exception
+To use tools, must output exactly '[action:ActionName(arg1="value1")]' structured string in chat response ← no exception
 
 -- Chat Management Tools --
 - Chat(title="<short creative title of FULL conversation in 3 or 4 words>"). Consider full chat context to generate title NOT just latest message
-- Memory(action="temp", content="<summary of the user prompt & model responses only from latest prompt under 40 words>. [Talked on: <date> <hour>]"). Time format: YYYY-MM-DD HH am/pm
 
 ${isMemoryEnabled ? `-- User-specific long-term/permanent memory (use based on conversation context, do not re-save memory which is already saved) --
 - Add: Memory(action="user", method="add", content="<string to add>. [Saved on: <date ONLY>]", score=2). (Set score=2 ONLY if the user explicitly asked to "remember" or "save" this information, else omit this parameter entirely)
@@ -27,3 +26,5 @@ Usage Rules:
 - Temporary memory is mandatory
 - When called user memory, still use Temporary Memory
 - Must not ignore any tool calls in given context of chat between user & agent` : ''}`.trim();
+
+// - Memory(action="temp", content="<summary of the user prompt & model responses only from latest prompt under 40 words>. [Talked on: <date> <hour>]"). Time format: YYYY-MM-DD HH am/pm

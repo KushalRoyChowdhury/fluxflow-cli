@@ -331,7 +331,7 @@ const ResolutionModal = ({ data, onResolve, onEdit, theme = 'Dark' }) => {
 
 const parseAgentText = (text) => {
     const blocks = [];
-    const toolRegex = /\[\s*(?:tool:(?:functions\.)?|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\s*(?:tool:(?:functions\.)?|action:(?:functions\.)?|action:)([a-z0-9_]+)\s*\(/gi;
 
     let lastIdx = 0;
     let match;
@@ -2715,10 +2715,10 @@ export default function App({ args = [] }) {
             cmd: '/wildcard-tooling',
             desc: 'Use if the model lacks Tooling Capability'
         },
-        {
-            cmd: '/wildercard-tooling',
-            desc: 'Extended version of /wildcard-tooling'
-        },
+        // {
+        //     cmd: '/wildercard-tooling', // Removed
+        //     desc: 'Extended version of /wildcard-tooling'
+        // },
         {
             cmd: '/provider',
             desc: 'Select AI Provider'
@@ -4015,16 +4015,16 @@ export default function App({ args = [] }) {
                     setMessages(prev => {
                         const updatedMessages = prev.map(m => {
                             const fullTextStr = m.fullText || m.text || '';
-                            if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
+                            if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Success result truncated to save tokens')) {
+                            if (fullTextStr.startsWith('[ACTION RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[ACTION RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[ACTION RESULT]: SUCCESS: Goal') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Success result truncated to save tokens')) {
                                 return m;
                             }
                             truncatedCount++;
                             return {
                                 ...m,
-                                fullText: '[TOOL RESULT]: ...Success result truncated to save tokens'
+                                fullText: '[ACTION RESULT]: ...Success result truncated to save tokens'
                             };
                         });
 
@@ -4171,9 +4171,11 @@ export default function App({ args = [] }) {
                             for (let tmIdx = 0; tmIdx < turnMessages.length; tmIdx++) {
                                 const tm = turnMessages[tmIdx];
                                 const isResult = tm.role === 'system' && (
+                                    tm.text?.startsWith('[ACTION RESULT]') ||
                                     tm.text?.startsWith('[TOOL RESULT]') ||
                                     tm.text?.startsWith('SUCCESS:') ||
                                     tm.text?.startsWith('ERROR:') ||
+                                    tm.fullText?.startsWith('[ACTION RESULT]') ||
                                     tm.fullText?.startsWith('[TOOL RESULT]') ||
                                     tm.fullText?.startsWith('SUCCESS:') ||
                                     tm.fullText?.startsWith('ERROR:')
@@ -4183,7 +4185,7 @@ export default function App({ args = [] }) {
                                 if (!rawTrimmedText && !tm.binaryPart) continue;
 
                                 if (isResult) {
-                                    const emitText = !rawTrimmedText.startsWith('[TOOL RESULT]') ? `[TOOL RESULT]: ${rawTrimmedText}` : rawTrimmedText;
+                                    const emitText = (!rawTrimmedText.startsWith('[ACTION RESULT]') && !rawTrimmedText.startsWith('[TOOL RESULT]')) ? `[ACTION RESULT]: ${rawTrimmedText}` : rawTrimmedText;
                                     turnSystemResults.push(emitText);
                                     if (tm.binaryPart) {
                                         turnBinaryPart = tm.binaryPart;
@@ -4194,7 +4196,7 @@ export default function App({ args = [] }) {
                                     }
 
                                     const endsWithNewline = rawOriginalText.endsWith('\n');
-                                    const hasToolCall = rawTrimmedText.toLowerCase().includes('tool:') || rawTrimmedText.toLowerCase().includes('agent:generalist.');
+                                    const hasToolCall = rawTrimmedText.toLowerCase().includes('tool:') || rawTrimmedText.toLowerCase().includes('action:');
 
                                     // Find next agent message text to verify if it starts with '['
                                     let nextAgentStartsWithBracket = false;
@@ -4571,19 +4573,15 @@ export default function App({ args = [] }) {
                                 setMessages(prev => {
                                     const updatedMessages = prev.map(m => {
                                         const fullTextStr = m.fullText || m.text || '';
-                                        if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
+                                        if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                             return m;
                                         }
-                                        // Whitelist: preserve search_keyword results (large, high-value code matches)
-                                        if (m.toolName && String(m.toolName).toLowerCase() === 'search_keyword') {
-                                            return m;
-                                        }
-                                        if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[TOOL RESULT]: Skill:') || fullTextStr.includes('Skill: [') || fullTextStr.startsWith('[TOOL RESULT]: DOCs:') || fullTextStr.includes('DOCs: [')) {
+                                        if (fullTextStr.startsWith('[ACTION RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[ACTION RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[ACTION RESULT]: SUCCESS: Goal') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[TOOL RESULT]: Skill:') || fullTextStr.includes('Skill: [') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[TOOL RESULT]: DOCs:') || fullTextStr.includes('DOCs: [')) {
                                             return m;
                                         }
                                         return {
                                             ...m,
-                                            fullText: '[TOOL RESULT]: ...Success result truncated to save tokens'
+                                            fullText: '[ACTION RESULT]: ...Success result truncated to save tokens'
                                         };
                                     });
                                     saveChat(chatId, null, updatedMessages);
@@ -4764,12 +4762,12 @@ export default function App({ args = [] }) {
                         // [CONTEXT TRACKING] Update state based on chunk content
                         if (chunkText.includes('```')) inCodeBlock = !inCodeBlock;
 
-                        if (chunkLower.includes('tool:') || chunkLower.includes('agent:generalist.')) {
+                        if (chunkLower.includes('tool:') || chunkLower.includes('action:')) {
                             inToolCall = true;
                             // [HARDENING] Reset balance and look for outer bracket in context
                             toolCallBalance = 0;
                             inToolCallString = null;
-                            if (chunkText.includes('[tool:') || chunkText.includes('[agent:generalist.')) toolCallBalance = 0; // The '[' will be counted in the loop
+                            if (chunkText.includes('[tool:') || chunkText.includes('[action:')) toolCallBalance = 0; // The '[' will be counted in the loop
                         }
 
                         if (inToolCall) {
@@ -4888,7 +4886,7 @@ export default function App({ args = [] }) {
                         } else if (!inThinkMode) {
                             // [SIGNAL MONITOR] Mark turn state if tool call encountered
                             const chunkLower = chunkText.toLowerCase();
-                            if (!toolCallEncounteredInTurn && (chunkLower.includes('tool:') || chunkLower.includes('agent:generalist.'))) {
+                            if (!toolCallEncounteredInTurn && (chunkLower.includes('tool:') || chunkLower.includes('action:'))) {
                                 toolCallEncounteredInTurn = true;
                             }
 

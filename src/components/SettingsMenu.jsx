@@ -319,8 +319,7 @@ export default function SettingsMenu({
                     { label: 'Sub-Agents', value: 'subAgents', status: systemSettings.subAgents !== false ? 'ON' : 'OFF' },
                     { label: 'Sub-Agent Model', value: 'subAgentModel', status: (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default' },
                     { label: 'Verbose Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
-                    { label: 'Dynamic Directory Awareness', value: 'dynamicDirAwareness', status: systemSettings.dynamicDirAwareness ? 'ON' : 'OFF' },
-                    { label: 'Directory Tree Design', value: 'indentationTree', status: systemSettings.indentationTree !== false ? 'Modern' : 'Classic (deprecated)' },
+                    { label: 'Directory Tree Design', value: 'indentationTree', status: systemSettings.indentationTree !== false ? 'Modern' : 'Legacy' },
                     { label: 'Compact Large Tool Results', value: 'compressToolResults', status: systemSettings.compressToolResults ? 'ON' : 'OFF' },
                     { label: 'Auto Truncate Results', value: 'autoTruncateResults', status: systemSettings.autoTruncateResults ? 'ON' : 'OFF' },
                     { label: 'Image History for CU', value: 'imageHistoryCU', status: systemSettings.imageHistoryCU || 'Standard' },
@@ -453,12 +452,6 @@ export default function SettingsMenu({
                 setActiveView('chat');
             }
         } else if (activeColumn === 'items') {
-            const currentItem = currentItems[selectedItemIndex];
-            if (input === '?' && currentItem?.value === 'dynamicDirAwareness') {
-                setActiveView('dynamicDirHelp');
-                return;
-            }
-
             if (key.upArrow) {
                 setSelectedItemIndex(prev => (prev - 1 + currentItems.length) % currentItems.length);
             } else if (key.downArrow) {
@@ -665,16 +658,6 @@ export default function SettingsMenu({
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });
-        } else if (item.value === 'dynamicDirAwareness') {
-            if (!systemSettings.dynamicDirAwareness) {
-                setActiveView('dynamicDirDanger');
-            } else {
-                setSystemSettings(s => {
-                    const newSysSettings = { ...s, dynamicDirAwareness: false };
-                    saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
-                    return newSysSettings;
-                });
-            }
         } else if (item.value === 'loadingPhrases') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, loadingPhrases: s.loadingPhrases === false ? true : false };
@@ -1154,9 +1137,7 @@ export default function SettingsMenu({
                 <Text color="gray" italic>
                     {activeColumn === 'categories'
                         ? '▲▼ Select Category • Enter/► to configure'
-                        : (currentItems[selectedItemIndex]?.value === 'dynamicDirAwareness'
-                            ? '▲▼ Select Option • Enter to Toggle • ? HELP • ◄/ESC to go back'
-                            : '▲▼ Select Option • Enter to Toggle • ◄/ESC to go back')}
+                        : '▲▼ Select Option • Enter to Toggle • ◄/ESC to go back'}
                 </Text>
                 {activeColumn === 'categories' && (
                     <Text color="gray">

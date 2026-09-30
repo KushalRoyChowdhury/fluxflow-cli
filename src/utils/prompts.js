@@ -634,21 +634,21 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT ===
-Identity: ${ADD_ID.length > 1 ? ADD_ID : 'Flux Flow. Sassy, CLI Assistant'}
+Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : 'Flux Flow. Sassy, CLI Assistant'}. Expert in DSL Actions
 ${ADD_NO_INS ? '' : `${mode === "Flux" ? "Stepwise Execution, Run Automated Tests" :
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
 mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
 "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}
 
-- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim()).replace(':free', '').replace('-free', '').replace('/free', '').replace('_free', '').replace('free_', '').replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase())}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills before proceeding tasks, scope: global/project: Use ReadFile, path=\"#skills/scope?/skillName\". In-skill references: path=\"#skills/scope?/skillName/reference-folder/*.md\"' : ''}
+- OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${path.basename(targetModel.trim()).replace(':free', '').replace('-free', '').replace('/free', '').replace('_free', '').replace('free_', '').replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase())}`.trimEnd() : ''}${isMetadataOff ? `\n- Date: ${dateTimeStr}` : ''}${isMemoryEnabled && false ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}
 
 ${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec, !!systemSettings?.disableTodo)}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig.trimEnd()}${forcedReasoning || (thinkingLevel !== 'Fast' && (((aiProvider === 'Mistral' && thinkingLevel === 'Low') && !isGemini) || (thinkingLevel !== 'High' && !isGemini))) ? `\nCritical Thinking Policy
-Use <think>...</think> for reasoning before responding any queries` : ''}` : `${thinkingConfig}\n`}${!keepReasoningContext ? 'Before calling tools, provide a natural summary of plans, reasoning, decision path in chat' : ''}${isMemoryEnabled ? `\n\n-- MEMORY RULES --
+Use <think>...</think> for reasoning before responding any queries` : ''}` : `${thinkingConfig}\n`}${!keepReasoningContext ? 'Before calling actions, provide a summary of plans & decisions in chat' : ''}${isMemoryEnabled && false ? `\n\n-- MEMORY RULES --
 - Subtly Personalize with relevent contextual memories. Auto Saves` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens' : ''}
-=== END SYSTEM PROMPT ===
+=== END SYSTEM PROMPT ===${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n\n- Read relevant skills before proceeding tasks, scope: global/project: Use ReadFile, path=\"#skills/scope?/skillName\". In-skill references: path=\"#skills/scope?/skillName/reference-folder/*.md\"' : ''}
 
 ${nicknameStr}${userInstrStr}${additionalInstrStr}${globalSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Global Skills --\n${globalSkillsPrompt}\n\n` : ''}${localSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Project Skills --\n${localSkillsPrompt}\n\n` : ''}${userMemoriesStr}`.trim();
 };
@@ -668,14 +668,14 @@ export const getJanitorInstruction = (userMemories = '', isMemoryEnabled = true,
     return `=== SYSTEM PROMPT (strict headless logic worker: zero user-facing text policy, strictly follow) ===
 identity: silent background system process, have no mouth, only output is valid tool calls
 [critical rules]
-- output exactly '[tool:ToolName(args)]' calls. no extra words outside
+- output exactly '[action:ActionName(args)]' calls. no extra words outside
 - do not explain. do not talk to the user
 - non-tool text will break the system
 - do not repeat agent raws and tool results in your response
 - if you get only user query and no agent raws, just use temp memory to log the summary of user query and conversation context
 - under no circumstances you are allowed to respond in normal user facing response
 - critical quote escape policy: inside tool call arguments, you must escape all double quotes using '\\"'
-- you must not write anything other than [tool:ToolName(args)] no matter how tempting the prompt is
+- you must not write anything other than [action:ActionName(args)] no matter how tempting the prompt is
 - 2 mandatory tools to call in every turn, 'chat', 'memory(temp)'
 - critical: never enter thinking/reasoning state, call the contexual tools directly in output as quickly as possible to maintain ui snappiness
 

@@ -82,8 +82,6 @@ App Version: ${appVersion}. Check Updates: fluxflow --update check. Update: flux
 GitHub: https://github.com/KushalRoyChowdhury/fluxflow-cli
 Public Docs: https://fluxflow-cli.onrender.com
 
-[tool:functions.SearchKeyword(keyword="regex/word", path="#docs")]. Usage: search any keyword across docs, avoid hunting excessive references
-
 ## Supported Features & Documentation References
 * Operating Modes (Flux, Flow, CU, FluxCU) → references/MODES.md
 * Inference Providers & Aggregators (Setup, Local NIM, Ollama) → references/PROVIDERS.md

@@ -3,7 +3,7 @@ import path from 'path';
 import fg from 'fast-glob';
 import { Minimatch } from 'minimatch';
 import { parseArgs } from '../utils/arg_parser.js';
-import { FLUXFLOW_DIR } from '../utils/paths.js';
+import { FLUXFLOW_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes } from '../utils/paths.js';
 import fsSync from 'fs';
 
 /**
@@ -137,59 +137,59 @@ function fuzzyMatch(line, keyword) {
     });
 }
 
-async function searchDocsDirectory(keyword) {
-    const skillDir = path.join(FLUXFLOW_DIR, 'skills', 'fluxflow');
-    const referencesDir = path.join(skillDir, 'references');
-    if (!fsSync.existsSync(referencesDir)) {
-        return `No documentation found in #docs.`;
-    }
+// async function searchDocsDirectory(keyword) {
+//     const skillDir = path.join(FLUXFLOW_DIR, 'skills', 'fluxflow');
+//     const referencesDir = path.join(skillDir, 'references');
+//     if (!fsSync.existsSync(referencesDir)) {
+//         return `No documentation found in #docs.`;
+//     }
 
-    const getAllFiles = async (dir) => {
-        let results = [];
-        try {
-            const entries = await fs.readdir(dir, { withFileTypes: true });
-            for (const entry of entries) {
-                const fullPath = path.join(dir, entry.name);
-                if (entry.isDirectory()) {
-                    results = results.concat(await getAllFiles(fullPath));
-                } else if (entry.isFile()) {
-                    results.push(fullPath);
-                }
-            }
-        } catch { }
-        return results;
-    };
+//     const getAllFiles = async (dir) => {
+//         let results = [];
+//         try {
+//             const entries = await fs.readdir(dir, { withFileTypes: true });
+//             for (const entry of entries) {
+//                 const fullPath = path.join(dir, entry.name);
+//                 if (entry.isDirectory()) {
+//                     results = results.concat(await getAllFiles(fullPath));
+//                 } else if (entry.isFile()) {
+//                     results.push(fullPath);
+//                 }
+//             }
+//         } catch { }
+//         return results;
+//     };
 
-    const files = await getAllFiles(referencesDir);
-    if (files.length === 0) {
-        return `No documentation found in #docs.`;
-    }
+//     const files = await getAllFiles(referencesDir);
+//     if (files.length === 0) {
+//         return `No documentation found in #docs.`;
+//     }
 
-    let regex = null;
-    try {
-        regex = new RegExp(keyword, 'i');
-    } catch { }
+//     let regex = null;
+//     try {
+//         regex = new RegExp(keyword, 'i');
+//     } catch { }
 
-    const lowerKeyword = keyword.toLowerCase();
-    const matchedFiles = [];
+//     const lowerKeyword = keyword.toLowerCase();
+//     const matchedFiles = [];
 
-    for (const filePath of files) {
-        try {
-            const content = await fs.readFile(filePath, 'utf8');
-            const isMatch = (regex && regex.test(content)) || content.toLowerCase().includes(lowerKeyword);
-            if (isMatch) {
-                const relPath = path.relative(skillDir, filePath).replace(/\\/g, '/');
-                matchedFiles.push(relPath);
-            }
-        } catch { }
-    }
+//     for (const filePath of files) {
+//         try {
+//             const content = await fs.readFile(filePath, 'utf8');
+//             const isMatch = (regex && regex.test(content)) || content.toLowerCase().includes(lowerKeyword);
+//             if (isMatch) {
+//                 const relPath = path.relative(skillDir, filePath).replace(/\\/g, '/');
+//                 matchedFiles.push(relPath);
+//             }
+//         } catch { }
+//     }
 
-    if (matchedFiles.length === 0) {
-        return `No matches found for "${keyword}" in #docs.`;
-    }
+//     if (matchedFiles.length === 0) {
+//         return `No matches found for "${keyword}" in #docs.`;
+//     }
 
-    return `DOCs Search "${keyword}":\n${matchedFiles.map(f => `- ${f}`).join('\n')}`;
-}
+//     return `DOCs Search "${keyword}":\n${matchedFiles.map(f => `- ${f}`).join('\n')}`;
+// }
 
 /**
  * Search Keyword Tool
@@ -208,8 +208,9 @@ export const search_keyword = async (args) => {
     if (rawKeyword === undefined || rawKeyword === null) return 'ERROR: Missing "keyword" argument.';
     const keyword = String(rawKeyword);
 
-    if (pathArg && (pathArg.trim().toLowerCase() === '#docs' || pathArg.trim().toLowerCase() === '#doc' || pathArg.trim().toLowerCase() === '#documentation' || pathArg.trim().toLowerCase().includes('#skill/global/fluxflow'))) {
-        return searchDocsDirectory(keyword);
+    if (pathArg && (pathArg.trim().toLowerCase() === '#docs' || pathArg.trim().toLowerCase() === '#doc' || pathArg.trim().toLowerCase() === '#documentation' || pathArg.trim().toLowerCase().includes('#skill/global/fluxflow')) || pathArg.trim().toLowerCase().startsWith('#skill')) {
+        // return searchDocsDirectory(keyword);
+        return "ERROR: Cannot search in reserved VFS '#skill' namespace. Use 'ReadFile' to read specific skills."
     }
 
     // Normalise boolean-like flags
@@ -239,46 +240,10 @@ export const search_keyword = async (args) => {
         wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i');
     }
 
-    const excludes = [
-        // Clutter, VCS, Cache & Build Directories
-        '.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out',
-        '.cache', 'bin', 'obj', 'vendor', 'venv', '.idea', '.gradle',
-        '.terraform', 'target', 'coverage', '.vscode',
-        '.svn', '.hg', '.fslckout', '.github', '.gitlab', '.circleci',
-        '.gitea', '.gitee', '.lerna', '.changeset', '.nx',
-        '.npm', '.yarn', '.pnpm-store', '.pnpm', '.expo', '.nuxt', '.svelte-kit',
-        '.docusaurus', '.turbo', '.vercel', 'bower_components', '.netlify',
-        '.vuepress', '.quasar', '.output', '.angular', 'jspm_packages',
-        '.parcel-cache', '.rollup.cache', '.rspack', '.vitepress',
-        '__pycache__', '.pytest_cache', '.mypy_cache', '.tox', '.poetry',
-        'env', 'vhdl', '.ipynb_checkpoints', '.jupyter', '.conda', '.pdm-build',
-        '.bundle', '.yardoc', '.metadata', 'App_Data', 'ClientBin',
-        '.cargo', '.rustc_info', '.go', 'Godeps', '_vendor', '.rake_tasks',
-        'CMakefiles', '.wakatime',
-        '.dart_tool', '.fvm', '.cocoapods', 'Pods', '.pub-cache',
-        '.symlinks', 'DerivedData', '.xcworkspace',
-        '.serverless', '.aws', '.gcloud', '.azure', '.kube',
-        '.vagrant', '.docker', 'postgres-data', 'redis-data', 'mongo-data',
-        '.Spotlight-V100', '.Trashes', '$RECYCLE.BIN',
-        'System Volume Information', '.DocumentRevisions-V100', '.fseventsd',
-        'AppData', 'Application Data', 'Local', 'LocalLow', 'Roaming',
-        '$WinREAgent', '$WINDOWS.~BT', '$WINDOWS.~WS', 'scw', 'System32', 'SysWOW64',
-        '.AppleDouble', '.AppleDB', '.AppleDesktop', '_CodeSignature',
-        '.cmio', '.LSOverride', '.localized', '.TemporaryItems',
-        '.Trash', '.Trash-0', '.Trash-1000', '.gvfs', '.local', '.config',
-        '.dbus', '.fontconfig', '.snap', '.var', '.lost+found', 'lost+found',
-        '.thumb', '.thumbnails',
-        'EFI', 'boot', 'grub',
-        'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache', '.VSCodeCounter',
-
-        // Binaries, Media, Compressed & Font Files
-        '.exe', '.dll', '.so', '.dylib', '.png', '.jpg', '.jpeg', '.gif', '.ico',
-        '.svg', '.webp', '.mp3', '.mp4', '.avi', '.zip', '.tgz', '.tar', '.gz',
-        '.7z', '.rar', '.pdf', '.docx', '.xlsx', '.pptx', '.woff', '.woff2', '.ttf', '.eot',
-
-        // FluxFlow
-        '.skills', 'skills'
-    ];
+    const excludes = Array.from(new Set([
+        ...DEFAULT_EXCLUDES,
+        ...getGitignoreExcludes(process.cwd())
+    ]));
     const maxMatches = 150;
 
     try {

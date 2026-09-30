@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
+import { start } from 'repl';
 
 const EXCLUDED_DIRS = new Set([
     // Version control, package managers & build clutter
@@ -59,6 +60,10 @@ export const read_folder = async (args) => {
 
     if (!targetPath) {
         return "ERROR: No directory path provided.";
+    }
+
+    if (targetPath.trim().toLowerCase().startsWith('#skills')) {
+        return "ERROR: '#skill' is reserved VFS namespace, not folder. Use 'ReadFile' to read specific skills."
     }
 
     let recurseDepth = 1;

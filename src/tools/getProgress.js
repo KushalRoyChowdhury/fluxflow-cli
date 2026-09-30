@@ -129,7 +129,7 @@ export const getProgress = async (args, context = {}) => {
         .replace(/\r\n/g, '\n')
         .replace(/\n{3,}/g, '\n\n')
         .trim()
-        .replace(/\[TOOL RESULT\]/gi, 'TOOL RESULT:');
+        .replace(/\[(?:TOOL|ACTION) RESULT\]/gi, 'ACTION RESULT:');
 
     return sanitized;
 };

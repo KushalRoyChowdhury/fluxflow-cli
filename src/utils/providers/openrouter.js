@@ -108,6 +108,8 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
         stream: true,
         temperature: temperature,
         cache_control: { type: 'ephemeral' },
+        tools: [], // Forcing models not to fallback to API function calls
+        tool_choice: "none",
         session_id: sessionId
     };
 

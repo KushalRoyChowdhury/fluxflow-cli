@@ -41,27 +41,27 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     }
 
     const fluxInstructions = `- JSON escape literal sequences, backslash: \\\\, newLine: \\ n
-- Same file, multiple edits? One PatchFile (≤15 blocks)${autoExec ? '' : '\n- Tool denied? Ask for guidance'}
+- Same file, multiple edits? One PatchFile (≤15 blocks)${autoExec ? '' : '\n- Action denied? Ask for guidance'}
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
-- Dont hallucinate tool results
 - Stuck on syntax error? Tell user > waste time
 `;
 
     // =====================================================================================================
 
-    const fluxTools = `**Workspace Tools (path = relative; first argument; separator: '/')**
+    const fluxTools = `**Workspace (path = relative; first argument; separator: '/')**
 - ReadFile(path=string, startLine?=int, endLine?=int)${aiProvider === 'Google' || isMultiModal ? `. Supports images` : ''}
+- FindFile(basename=string). Find file path. Extention optional
 - ReadFolder(path=string, recurse?=int[1..3])
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchor: ^LINE:...$ syntax, must for large blocks &  escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
 - CodeSearch(keyword=string, path?="dir/file/glob, inclusion/exclusion ;-separated", regex?=bool:auto). Find relevant code
 - Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user${!disableTodo ? `\n- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. get + markDone marks complete` : ''}
 ${_cachedAdvanceRollback ? `
-**Emergency Tools**
+**Emergency**
 Info: initial = current task prompt. Revert id = turn before disaster (eg. disaster: turn_3 → revert: turn_2). Reason explicitly
 - EmergencyRollback(method="getCheckpoint/forceRevert", id=string). Rollback workspace in this agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. getCheckpoint: id excluded\n` : ''}${enableSubAgents ? `
-**Sub Agent Tools**
+**Sub Agent**
 Default to using subagents whenever helpful, no user nudge needed
 Invocations:
 • Invoke (async/background, ≤7 parallel). Parallelize tasks. May take time
@@ -74,13 +74,13 @@ Invocations:
 
     // =====================================================================================================
 
-    const flowTools = `**Creative Tools (path = relative; first argument, path separator: '/')**
+    const flowTools = `**Creative Actions (path = relative; first argument, path separator: '/')**
 - WritePDF(path=string, content=string, orientation="landscape/portrait"). Proactive A4 page breaks must in css. HTML/CSS for premium layout, stable margins & headers/footers, no watermarks
 - WriteDoc(path=string, content=string). A4 Word document, no watermarks, stable margins & headers/footers`;
 
     // =====================================================================================================
 
-    const computerTools = `**Computer Use Tools (GUI Desktop Automation)**
+    const computerTools = `**Computer Use (Desktop Automation)**
 - Click(gridId=int, type="single/double", button="left/middle/right", intendedClickText=string). Click target grid number, intendedClickText: literal text/symbol on screen (OCR scannable, upto 3 words). Double click desktop icons
 - Drag(fromGridId=int, toGridId=int). Drag mouse from start grid number to target grid number
 - Scroll(direction="up/down", gridId=int). Scroll viewport vertically
@@ -91,15 +91,15 @@ Invocations:
     // =====================================================================================================
 
     return `
--- TOOLS -- Priority
-In chat output the format \`[tool:ToolName(arg1="value1")]\` in NEW line
+-- ACTIONS --
+In chat output the format \`[action:ActionName(arg1="value1")]\` in NEW line. Only valid syntax
 Rules:
-- Max 5 tools/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' && !disableTodo ? ' (Goal: 5+)' : ''}
+- Max 5 actions/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' && !disableTodo ? ' (Goal: 5+)' : ''}
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 **User Communication**
 - AskUser(question=string, optionA?="title::description", ...MAX4). Ambiguity, path divergence, security risk
 
-**Web Tools**
+**Web**
 - WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: slower, exclude limit
 - WebScrape(url=string). Proactive use for specific webpage/docs
 

@@ -1,6 +1,22 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.24.0": {
+        "note": "SEPTEMBER 30",
+        "added": [
+            "New `FindFile` Tool for the agent: Quickly pinpoint and locate any file across the workspace by name with intelligent fuzzy matching.",
+            "Service Tier Support: Added `:flex` and `:priority` routing options for Google models to optimize latency and wallet management."
+        ],
+        "changed": [
+            "Redesigned Directory Tree: Ultra-compact, token-efficient workspace overview with automatic `.gitignore` awareness, single-path chain collapsing, and glob-style file summaries to save tokens that's always there in context.",
+            "Unified Action Engine: Standardized tool execution into a unified action protocol across all providers for faster, more reliable performance.",
+            "Streamlined Settings Menu: Polished configuration options and keyboard navigation for a cleaner, smoother experience.",
+            "Enhanced VS Code Integration: Progress notifications now seamlessly integrate with your editor's native window status instead of notifications."
+        ],
+        "fixes": [
+            "Optimized file discovery and workspace search performance with centralized project exclusions."
+        ]
+    },
     "4.23.5": {
         "note": "SEPTEMBER 29",
         "added": [

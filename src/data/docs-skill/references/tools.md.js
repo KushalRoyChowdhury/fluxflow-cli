@@ -1,7 +1,7 @@
 // Export tools.md content to string
 export const TOOLS_MD = `# FluxFlow Tool Reference
 
-## Protocol: [tool:functions.ToolName(arg1="val")]
+## Protocol: [tool:ToolName(arg1="val")]
 
 ## 1. Workspace
 * ReadFile(path, startLine?, endLine?) → Read text/code/PDF/image

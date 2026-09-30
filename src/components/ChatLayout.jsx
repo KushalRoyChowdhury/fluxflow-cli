@@ -1027,7 +1027,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     const colors = getThemeColors(theme);
     // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START] or Content Preview
     const isDiffResult = msg.role === 'system' && (msg.text?.includes('[DIFF_START]') || msg.text?.includes('- Content Preview:'));
-    const isPatchError = msg.role === 'system' && msg.text?.includes('[TOOL RESULT]: ERROR:') &&
+    const isPatchError = msg.role === 'system' && (msg.text?.includes('[ACTION RESULT]: ERROR:') || msg.text?.includes('[TOOL RESULT]: ERROR:')) &&
         !msg.text?.includes('[DIFF_START]') &&
         (msg.toolName === 'update_file' || msg.text?.includes('Could not find exact match'));
     const isTerminalRecord = msg.isTerminalRecord;
@@ -1130,7 +1130,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         );
     }
 
-    if (msg.role === 'system' && msg.text?.includes('[TOOL RESULT]') && !isDiffResult && !isTerminalRecord && !isPatchError) return null;
+    if (msg.role === 'system' && (msg.text?.includes('[ACTION RESULT]') || msg.text?.includes('[TOOL RESULT]')) && !isDiffResult && !isTerminalRecord && !isPatchError) return null;
 
     if (msg.isImageStats) {
         return (

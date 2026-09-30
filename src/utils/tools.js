@@ -35,6 +35,7 @@ const loadScroll = () => import('../tools/scroll.js').then(m => m.scroll);
 const loadKeyboardTyping = () => import('../tools/keyboard_typing.js').then(m => m.keyboard_typing);
 const loadKeyPress = () => import('../tools/key_press.js').then(m => m.key_press);
 const loadRecaptureScreen = () => import('../tools/recapture_screen.js').then(m => m.recapture_screen);
+const loadFindFile = () => import('../tools/find_file.js').then(m => m.find_file);
 
 // Alias table → lazy loader (module resolved only when the tool is invoked).
 const TOOL_MAP = {
@@ -129,7 +130,11 @@ const TOOL_MAP = {
     Await: loadAwaitSubagent,
     AwaitSubagent: loadAwaitSubagent,
     EmergencyRollback: loadEmergencyRollback,
-    emergency_rollback: loadEmergencyRollback
+    emergency_rollback: loadEmergencyRollback,
+    find_file: loadFindFile,
+    findFile: loadFindFile,
+    FindFile: loadFindFile,
+    findfile: loadFindFile
 };
 
 /**
@@ -155,18 +160,18 @@ export const dispatchTool = async (toolName, args, context = {}) => {
             // Flow Mode: Only Creative tools allowed beyond common tools
             const isCreative = normalized.includes('write_pdf') || normalized.includes('write_docx') || normalized.includes('generate_image');
             if (!isCreative) {
-                return `ERROR: Tool [${toolName}] is a Workspace Tool and NOT available in Flow mode. Tell user to switch (\`/mode flux\`) to use this tool.`;
+                return `ERROR: Action [${toolName}] is a Workspace Tool and NOT available in Flow mode. Tell user to switch (\`/mode flux\`) to use this tool.`;
             }
         } else if (mode === 'icu') {
             // ICU Mode: Only Computer Use tools allowed
             if (!isCUTool) {
-                return `ERROR: Tool [${toolName}] is not available in Computer Use mode. ICU mode only supports Computer Use tools (Click, Drag, Scroll, KeyboardTyping, KeyPress, RecaptureScreen).`;
+                return `ERROR: Action [${toolName}] is not available in Computer Use mode. ICU mode only supports Computer Use tools (Click, Drag, Scroll, KeyboardTyping, KeyPress, RecaptureScreen).`;
             }
         } else {
             // Flux & FluxCU Mode: Workspace tools allowed, Creative tools restricted
             const isCreative = normalized.includes('write_pdf') || normalized.includes('write_docx') || normalized.includes('generate_image');
             if (isCreative) {
-                return `ERROR: Tool [${toolName}] is not available in ${context.mode || 'Flux'} mode. Tell user to switch (\`/mode flow\`) for document generation.`;
+                return `ERROR: Action [${toolName}] is not available in ${context.mode || 'Flux'} mode. Tell user to switch (\`/mode flow\`) for document generation.`;
             }
         }
     }
@@ -176,7 +181,7 @@ export const dispatchTool = async (toolName, args, context = {}) => {
     if (!loader) {
         // Canonical PascalCase names as exposed to the model in the system prompt
         const CANONICAL_TOOLS = [
-            'ReadFile', 'ReadFolder', 'PatchFile', 'WriteFile', 'CodeSearch', 'Run', 'Goal',
+            'ReadFile', 'ReadFolder', 'FindFile', 'PatchFile', 'WriteFile', 'CodeSearch', 'Run', 'Goal',
             'AskUser', 'WebSearch', 'WebScrape', 'WritePDF', 'WriteDoc',
             'Click', 'Drag', 'Scroll', 'KeyboardTyping', 'KeyPress', 'RecaptureScreen',
             'Invoke', 'InvokeSync', 'Await', 'GetProgress', 'Steer', 'Cancel', 'EmergencyRollback', 'Chat', 'Memory'
@@ -199,7 +204,8 @@ export const dispatchTool = async (toolName, args, context = {}) => {
             'powershell': 'Run',
             'search': 'CodeSearch',
             'grep': 'CodeSearch',
-            'find': 'CodeSearch',
+            'find': 'FindFile',
+            'findfile': 'FindFile',
             'searchkeyword': 'CodeSearch',
             'folder': 'ReadFolder',
             'ls': 'ReadFolder',
@@ -267,7 +273,7 @@ export const dispatchTool = async (toolName, args, context = {}) => {
         }
 
         const suggestion = bestMatch ? ` Do you mean '${bestMatch}'?` : '';
-        return `ERROR: Tool [${toolName}] not found in registry.${suggestion}`;
+        return `ERROR: Action [${toolName}] not found in registry.${suggestion}`;
     }
 
     try {

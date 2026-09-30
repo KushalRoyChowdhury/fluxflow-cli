@@ -67,3 +67,74 @@ export const CONTEXT_FILE = path.join(SECRET_DIR, 'context.json');
 export const PARSER_DIR = path.join(DATA_DIR, 'parsers');
 export const CU_CACHE_DIR = path.join(FLUXFLOW_DIR, '.cache', 'CU');
 export const THINKING_CONFIG_FILE = path.join(FLUXFLOW_DIR, 'thinking_config.json');
+
+export const DEFAULT_EXCLUDES = [
+    // --- The OG Clutter & VCS ---
+    '.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out',
+    '.cache', 'bin', 'obj', 'vendor', 'venv', '.idea', '.gradle',
+    '.terraform', 'target', 'coverage', '.vscode',
+    '.svn', '.hg', '.fslckout', '.github', '.gitlab', '.circleci',
+    '.gitea', '.gitee', '.lerna', '.changeset', '.nx',
+
+    // --- JS / TS / Web Dev Armageddon ---
+    '.npm', '.yarn', '.pnpm-store', '.pnpm', '.expo', '.nuxt', '.svelte-kit',
+    '.docusaurus', '.turbo', '.vercel', 'bower_components', '.netlify',
+    '.vuepress', '.quasar', '.output', '.angular', 'jspm_packages',
+    '.parcel-cache', '.rollup.cache', '.rspack', '.vitepress',
+
+    // --- Python & Data Science Brain Melting ---
+    '__pycache__', '.pytest_cache', '.mypy_cache', '.tox', '.poetry',
+    'env', 'vhdl', '.ipynb_checkpoints', '.jupyter', '.conda', '.pdm-build',
+
+    // --- Ruby / PHP / Go / Rust / Java / C++ / C# ---
+    '.bundle', '.yardoc', '.metadata', 'App_Data', 'ClientBin',
+    '.cargo', '.rustc_info', '.go', 'Godeps', '_vendor', '.rake_tasks',
+    'CMakefiles', '.wakatime',
+
+    // --- Mobile Dev Madness (Android / iOS / Flutter) ---
+    '.dart_tool', '.fvm', '.cocoapods', 'Pods', '.pub-cache',
+    '.symlinks', 'DerivedData', '.xcworkspace',
+
+    // --- Containers, Cloud & Database Dumps ---
+    '.serverless', '.aws', '.gcloud', '.azure', '.kube',
+    '.vagrant', '.docker', 'postgres-data', 'redis-data', 'mongo-data',
+
+    // --- OS & System Trash ---
+    '.Spotlight-V100', '.Trashes', '$RECYCLE.BIN',
+    'System Volume Information', '.DocumentRevisions-V100', '.fseventsd',
+    'AppData', 'Application Data', 'Local', 'LocalLow', 'Roaming',
+    '$WinREAgent', '$WINDOWS.~BT', '$WINDOWS.~WS', 'scw', 'System32', 'SysWOW64',
+    '.AppleDouble', '.AppleDB', '.AppleDesktop', '_CodeSignature',
+    '.cmio', '.LSOverride', '.localized', '.TemporaryItems',
+    '.Trash', '.Trash-0', '.Trash-1000', '.gvfs', '.local', '.config',
+    '.dbus', '.fontconfig', '.snap', '.var', '.lost+found', 'lost+found',
+    '.thumb', '.thumbnails', 'EFI', 'boot', 'grub',
+    'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache', '.VSCodeCounter',
+
+    // Binaries, Media, Compressed & Font Files
+    '.exe', '.dll', '.so', '.dylib', '.png', '.jpg', '.jpeg', '.gif', '.ico',
+    '.svg', '.webp', '.mp3', '.mp4', '.avi', '.zip', '.tgz', '.tar', '.gz',
+    '.7z', '.rar', '.pdf', '.docx', '.xlsx', '.pptx', '.woff', '.woff2', '.ttf', '.eot',
+
+    // FluxFlow
+    '.skills', 'skills'
+];
+
+export const getGitignoreExcludes = (dir = process.cwd()) => {
+    try {
+        const gitignorePath = path.join(dir, '.gitignore');
+        if (fs.existsSync(gitignorePath)) {
+            const content = fs.readFileSync(gitignorePath, 'utf8');
+            return content
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line && !line.startsWith('#') && !line.startsWith('!'))
+                .map(line => line.replace(/^[\/\\]+/, '').replace(/[\/\\]+$/, '').replace(/\/\*+$/, ''))
+                .filter(Boolean);
+        }
+    } catch {
+        // ignore errors
+    }
+    return [];
+};
+

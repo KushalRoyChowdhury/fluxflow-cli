@@ -180,6 +180,9 @@ export const saveSettings = async (settings) => {
         }
 
         const updated = { ...current, ...settings };
+        if (updated.systemSettings) {
+            updated.systemSettings.dynamicDirAwareness = false;
+        }
 
         // Scrub apiKey from imageSettings so it NEVER gets written to settings.json
         if (updated.imageSettings) {

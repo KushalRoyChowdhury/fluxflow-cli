@@ -59,7 +59,9 @@ export const getMistralStream = async function* (apiKey, model, contents, system
         messages: messages,
         stream: true,
         temperature: temperature,
-        prompt_cache_key: promptCacheKey
+        prompt_cache_key: promptCacheKey,
+        tools: [], // Forcing models not to fallback to API function calls
+        tool_choice: "none"
     };
 
     const customEffort = getMappedThinkingLevel('Mistral', model, thinkingLevel);

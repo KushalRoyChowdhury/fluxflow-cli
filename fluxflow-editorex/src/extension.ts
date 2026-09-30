@@ -192,11 +192,11 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         const notificationTitle = useHeadlessContext
-            ? "Generating commit message with FluxFlow (using headless session context)..."
-            : "Generating commit message with FluxFlow...";
+            ? "Generating commit message (Headless Context)"
+            : "Generating commit message";
 
         await vscode.window.withProgress({
-            location: vscode.ProgressLocation.Notification,
+            location: vscode.ProgressLocation.Window,
             title: notificationTitle,
             cancellable: false
         }, async () => {

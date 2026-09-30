@@ -67,6 +67,8 @@ export const getOllamaStream = async function* (apiKey, model, contents, systemI
         stream: true,
         think: thinkParam,
         keep_alive: '10m',
+        tools: [], // Forcing models not to fallback to API function calls
+        tool_choice: "none",
         options: { temperature }
     };
 
