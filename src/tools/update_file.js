@@ -57,9 +57,9 @@ export const update_file = async (args, context = {}) => {
         const { systemSettings } = await loadSettings();
         const diffText = generateHighFidelityDiff(originalContent, finalContent, results, 12, systemSettings?.compressToolResults);
         if (failures.length > 0) {
-            return `SUCCESS: File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.\n\nFailures:\n${failures.map(f => `  • ${f.error}`).join('\n')}\n\n${diffText}`;
+            return `File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.\n\nFailures:\n${failures.map(f => `  • ${f.error}`).join('\n')}\n\n${diffText}`;
         }
-        return `SUCCESS: File [${targetPath}] updated. [${results.length}/${patchPairs.length}] blocks applied.\n\n${diffText}`;
+        return `File [${targetPath}] updated. [${results.length}/${patchPairs.length}] blocks applied.\n\n${diffText}`;
 
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);

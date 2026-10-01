@@ -231,11 +231,11 @@ export const generate_image = async (args, context = {}) => {
 
         const isMultiModal = context.isMultiModal !== false;
         if (!isMultiModal) {
-            return `SUCCESS: Image successfully generated from prompt [${prompt}] and saved to [${outputPath}].`;
+            return `Image successfully generated from prompt [${prompt}] and saved to [${outputPath}].`;
         }
 
         return {
-            text: `SUCCESS: Image successfully generated from prompt [${prompt}] and saved to [${outputPath}]. Output attached to multimodal part`,
+            text: `Image successfully generated from prompt [${prompt}] and saved to [${outputPath}]. Output attached to multimodal part`,
             binaryPart: {
                 inlineData: {
                     data: finalBuffer.toString('base64'),

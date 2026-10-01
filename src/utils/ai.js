@@ -4461,7 +4461,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             let result = "";
                                             if (normToolName === 'update_file') {
                                                 const diffReport = generateHighFidelityDiff(originalContentForReporting, finalContent, patchResults, 12, settings?.compressToolResults || globalSettings?.systemSettings?.compressToolResults);
-                                                result = `SUCCESS: File [${filePath}] updated via IDE Companion (May have user edits). [${patchResults.length}/${requestedPatchCount}] blocks applied.\n\n${diffReport}`;
+                                                result = `File [${filePath}] updated via IDE Companion (May have user edits). [${patchResults.length}/${requestedPatchCount}] blocks applied.\n\n${diffReport}`;
                                             } else {
                                                 // write_file reporting style
                                                 const verifiedLines = finalContent.split(/\r?\n/);
@@ -4483,7 +4483,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     snippet = `${head}\n\n... [${verifiedLineCount - 100} lines truncated] ...\n\n${tail}`;
                                                 }
 
-                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
+                                                result = `File [${filePath}] saved via IDE Companion (May have user edits).\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
                                                 // console.log(result);
                                             }
 
@@ -4620,7 +4620,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let result = await dispatchTool(normToolName, toolCall.args, execToolContext);
                                 // yield { type: 'spinner', content: true }; // [Obsolete]
 
-                                if ((normToolName === 'write_file' || normToolName === 'update_file') && result.startsWith('SUCCESS')) {
+                                if ((normToolName === 'write_file' || normToolName === 'update_file') && !result.startsWith('ERROR:')) {
                                     const { path: filePath } = parseArgs(toolCall.args);
                                     if (filePath) {
                                         const absPath = path.resolve(process.cwd(), filePath);
@@ -4798,8 +4798,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (isDenied) {
                                     // Already incremented above in the direct deny block, but let's be safe for other tools
                                     // actually, direct deny block handles it.
-                                    // But if a tool itself returns DENIED:, we should handle it here.
-                                    // Let's check if we already handled it.
                                 } else {
                                     await incrementUsage('toolFailure');
                                     if (settings.onToolResult) settings.onToolResult('failure', normToolName);
@@ -4815,7 +4813,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (processedResult.startsWith('[[SAME]]')) {
                                     const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
                                     const lines = cleanText.split(/\r?\n/);
-                                    const successLines = lines.filter(l => l.startsWith('SUCCESS:') || l.trim().startsWith('- Stats:'));
+                                    const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
                                     const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
                                     aiContent = `[ACTION RESULT]: ${headerPart}\n[SYSTEM NOTE]: Content verified and persisted to disk. Full preview omitted to conserve context.`;
                                 } else {
@@ -4830,7 +4828,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 yield { type: 'tool_result', content: uiContent, aiContent: aiContent, binaryPart, toolName: normToolName };
-                                if (normToolName === 'memory' && result.includes('SUCCESS')) yield { type: 'memory_updated' };
+                                if (normToolName === 'memory' && !result.startsWith('ERROR:')) yield { type: 'memory_updated' };
 
                                 toolCallPointer++;
                             }

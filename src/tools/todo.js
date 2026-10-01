@@ -120,9 +120,9 @@ export const todo = async (args, context = {}) => {
             const total = content.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
             if (markedCount > 0) {
                 const completed = content.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('- [x]') || l.startsWith('- [X]')).length;
-                return `SUCCESS: Goal Created (${markedCount} marked done, ${completed} completed, ${total - completed} left)\n${content}`;
+                return `Goal Created (${markedCount} marked done, ${completed} completed, ${total - completed} left)\n${content}`;
             }
-            return `SUCCESS: Goal Created (${total} total)\n${content}`;
+            return `Goal Created (${total} total)\n${content}`;
         }
 
         if (method === 'append') {
@@ -138,7 +138,7 @@ export const todo = async (args, context = {}) => {
             const completed = lines.filter(l => l.startsWith('- [x]') || l.startsWith('- [X]')).length;
             const added = appendContent.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
 
-            return `SUCCESS: Goal Appended (${completed} completed, ${total - completed} left, ${added} added)\n${fullContent}`;
+            return `Goal Appended (${completed} completed, ${total - completed} left, ${added} added)\n${fullContent}`;
         }
 
         if (method === 'get') {
@@ -163,7 +163,7 @@ export const todo = async (args, context = {}) => {
             const total = totalLines.filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
             const completed = totalLines.filter(l => l.startsWith('- [x]') || l.startsWith('- [X]')).length;
 
-            const prefix = markedCount > 0 ? `SUCCESS: ${markedCount} Goal(s) Marked Done` : `Goal`;
+            const prefix = markedCount > 0 ? `${markedCount} Goal(s) Marked Done` : `Goal`;
             return `${prefix}: ${completed} Completed, ${total - completed} left\n${content}`;
         }
 

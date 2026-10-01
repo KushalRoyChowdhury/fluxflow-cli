@@ -15,11 +15,11 @@ export const cancel = async (args, context = {}) => {
     }
 
     if (task.status === 'completed' || task.status === 'failed') {
-        return `INFO: Subagent task with ID [${id}] has already finished with status [${task.status.toUpperCase()}].`;
+        return `Subagent task with ID [${id}] has already finished with status [${task.status.toUpperCase()}].`;
     }
 
     if (task.status === 'cancelled') {
-        return `INFO: Subagent task with ID [${id}] is already cancelled.`;
+        return `Subagent task with ID [${id}] is already cancelled.`;
     }
 
     task.status = 'cancelled';
@@ -27,5 +27,5 @@ export const cancel = async (args, context = {}) => {
         context.onSubagentUpdate();
     }
 
-    return `SUCCESS: Subagent task with ID [${id}] has been cancelled.`;
+    return `Subagent task with ID [${id}] has been cancelled.`;
 };

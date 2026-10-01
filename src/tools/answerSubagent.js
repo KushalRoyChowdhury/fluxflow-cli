@@ -20,12 +20,12 @@ export const answerSubagent = async (args, context = {}) => {
     }
 
     if (!task.questions || task.questions.length === 0) {
-        return `INFO: Subagent task [${id}] has no pending questions.`;
+        return `Subagent task [${id}] has no pending questions.`;
     }
 
     const pending = task.questions.filter(q => !q.answered);
     if (pending.length === 0) {
-        return `INFO: Subagent task [${id}] has no unanswered questions.`;
+        return `Subagent task [${id}] has no unanswered questions.`;
     }
 
     pending.forEach(q => {
@@ -43,5 +43,5 @@ export const answerSubagent = async (args, context = {}) => {
         context.onSubagentUpdate();
     }
 
-    return `SUCCESS: Answer provided to subagent task [${id}]. Subagent execution resumed.`;
+    return `Answer provided to subagent task [${id}]. Subagent execution resumed.`;
 };

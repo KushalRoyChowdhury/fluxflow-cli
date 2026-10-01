@@ -36,5 +36,5 @@ export const steerSubagent = async (args, context = {}) => {
         context.onSubagentUpdate();
     }
 
-    return `SUCCESS: Steering instruction injected into subagent task [${id}]. It will be processed on the subagent's turn.`;
+    return `Steering instruction injected into subagent task [${id}]. It will be processed on the subagent's turn.`;
 };

@@ -617,7 +617,7 @@ export const exec_command = async (args, options = {}) => {
                             const cleanOut = stripAnsi(output);
                             if (/(?:Network:\s+use\s+--host\s+to|Network:\s+Type\s+--host\s+to|Local:\s+http:\/\/localhost:\d+|ready in \d+\s*ms|Compiled successfully|Development server is running|Listening on:)/i.test(cleanOut)) {
                                 isResolved = true;
-                                setTimeout(() => resolve(`SUCCESS: Dev server started successfully in background.\n\n${cleanOut}`), 500);
+                                setTimeout(() => resolve(`Dev server started successfully in background.\n\n${cleanOut}`), 500);
                             }
                         }
                     });
@@ -631,7 +631,7 @@ export const exec_command = async (args, options = {}) => {
                         if (exitCode !== 0) {
                             resolve(`ERROR: Command [${rawCommand}] failed with exit code [${exitCode}].\n\n${finalOutput}`);
                         } else {
-                            resolve(`SUCCESS: Command [${rawCommand}] completed.\n\n${finalOutput}`);
+                            resolve(`Command [${rawCommand}] completed.\n\n${finalOutput}`);
                         }
                     });
                     return true;
@@ -740,7 +740,7 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, shellTy
             const cleanOut = stripAnsi(stdout);
             if (/(?:Network:\s+use\s+--host\s+to|Network:\s+Type\s+--host\s+to|Local:\s+http:\/\/localhost:\d+|ready in \d+\s*ms|Compiled successfully|Development server is running|Listening on:)/i.test(cleanOut)) {
                 isResolved = true;
-                setTimeout(() => resolve(`SUCCESS: Dev server started successfully in background.\n\n${cleanOut}`), 500);
+                setTimeout(() => resolve(`Dev server started successfully in background.\n\n${cleanOut}`), 500);
             }
         }
     });
@@ -769,7 +769,7 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, shellTy
         if (code !== 0) {
             resolve(`ERROR: Command [${rawCommand}] failed with exit code [${code}].\n\n${finalOutput}`);
         } else {
-            resolve(`SUCCESS: Command [${rawCommand}] completed.\n\n${finalOutput}`);
+            resolve(`Command [${rawCommand}] completed.\n\n${finalOutput}`);
         }
     });
 

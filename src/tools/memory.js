@@ -42,7 +42,7 @@ export const memory = async (rawArgs, context = {}) => {
         writeEncryptedJson(TEMP_MEM_FILE, tempStorage);
 
         const currentTotalLength = tempStorage[chatId].reduce((acc, m) => acc + m.length, 0);
-        return `SUCCESS: Temporary context saved for session [${chatId}]. (Size: ${currentTotalLength} chars)`;
+        return `Temporary context saved for session [${chatId}]. (Size: ${currentTotalLength} chars)`;
     }
 
     if (action === 'user') {
@@ -73,14 +73,14 @@ export const memory = async (rawArgs, context = {}) => {
             const scoreArg = parseArg('score');
             const initialScore = scoreArg ? parseFloat(scoreArg) : 0.5;
 
-            const newMemory = { 
-                id: `mem-${Date.now().toString(36)}`, 
+            const newMemory = {
+                id: `mem-${Date.now().toString(36)}`,
                 memory: formattedContent,
                 score: Math.min(2.0, isNaN(initialScore) ? 0.5 : initialScore)
             };
             memories.push(newMemory);
             writeEncryptedJson(MEMORIES_FILE, memories);
-            return `SUCCESS: Memory added with ID [${newMemory.id}] and score [${newMemory.score}]. (Vault Size: ${currentTotalLength + formattedContent.length} chars)`;
+            return `Memory added with ID [${newMemory.id}] and score [${newMemory.score}]. (Vault Size: ${currentTotalLength + formattedContent.length} chars)`;
         }
 
         if (method === 'update') {
@@ -98,7 +98,7 @@ export const memory = async (rawArgs, context = {}) => {
 
             memories[index].memory = formattedText;
             writeEncryptedJson(MEMORIES_FILE, memories);
-            return `SUCCESS: Memory [${memId}] updated.`;
+            return `Memory [${memId}] updated.`;
         }
 
         if (method === 'delete') {
@@ -109,7 +109,7 @@ export const memory = async (rawArgs, context = {}) => {
             if (updatedMemories.length === initialLen) return `ERROR: Memory ID [${memId}] not found.`;
 
             writeEncryptedJson(MEMORIES_FILE, updatedMemories);
-            return `SUCCESS: Memory [${memId}] deleted.`;
+            return `Memory [${memId}] deleted.`;
         }
 
         return `ERROR: Invalid method [${method}] for user memory. Use 'add', 'update', or 'delete'.`;

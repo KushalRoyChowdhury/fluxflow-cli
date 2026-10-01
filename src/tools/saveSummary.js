@@ -34,7 +34,7 @@ export const saveSummary = async (rawArgs, context = {}) => {
         writeEncryptedJson(TEMP_MEM_CHAT_FILE, cacheStorage);
         writeEncryptedJson(TEMP_MEM_FILE, tempStorage);
 
-        return `SUCCESS: Saved summary and purged raw memories for chat [${id}].`;
+        return `Saved summary and purged raw memories for chat [${id}].`;
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to save summary for chat [${id}]: ${errorMsg}`;

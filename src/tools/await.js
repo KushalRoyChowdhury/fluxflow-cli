@@ -40,5 +40,5 @@ export const awaitTool = async (args, context = {}) => {
 
 
     await new Promise(resolve => setTimeout(resolve, seconds * 1000));
-    return `SUCCESS: Waited for ${formatted}${seconds > 180 ? " (Max: 180s)" : ""}${seconds < 10 ? " (Min: 10s)" : ""}.`;
+    return `Waited for ${formatted}${seconds > 180 ? " (Max: 180s)" : ""}${seconds < 10 ? " (Min: 10s)" : ""}.`;
 };

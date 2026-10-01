@@ -15,7 +15,7 @@ export const chat = async (rawArgs, context = {}) => {
 
     try {
         await saveChatTitle(chatId, title);
-        return `SUCCESS: Chat title updated to [${title}] for session [${chatId}].`;
+        return `Chat title updated to [${title}] for session [${chatId}].`;
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to update chat title: ${errorMsg}`;

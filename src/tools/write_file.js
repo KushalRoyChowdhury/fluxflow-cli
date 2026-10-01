@@ -83,7 +83,7 @@ export const write_file = async (args, context = {}) => {
         verifiedContent = null; // Neural Flush: Signal GC that we are done with the massive string
 
         const { systemSettings } = await loadSettings();
-        let resultString = `SUCCESS: File [${targetPath}] saved.\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
+        let resultString = `File [${targetPath}] saved.\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
 
         if (systemSettings?.compressToolResults && verifiedLineCount > 60) {
             const contentLines = finalContent.split(/\r?\n/);

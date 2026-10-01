@@ -56,7 +56,7 @@ export const addMemScore = async (rawArgs, context = {}) => {
         const finalScoreStr = activeTarget ? activeTarget.score.toFixed(2) : 'deleted (score <= 0)';
         const deletedCount = memories.length - updatedMemories.length;
 
-        return `SUCCESS: Adjusted memory scores. Target [${id}] is now ${finalScoreStr}.${deletedCount > 0 ? ` Purged ${deletedCount} decayed memories.` : ''}`;
+        return `Adjusted memory scores. Target [${id}] is now ${finalScoreStr}.${deletedCount > 0 ? ` Purged ${deletedCount} decayed memories.` : ''}`;
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to adjust memory score for [${id}]: ${errorMsg}`;

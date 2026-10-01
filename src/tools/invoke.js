@@ -212,5 +212,5 @@ export const invoke = async (args, context = {}) => {
         if (taskEntry._rejectCompletion) taskEntry._rejectCompletion(err);
     });
 
-    return `SUCCESS: Background subagent started. Task ID: ${taskId}`;
+    return `Background subagent started. Task ID: ${taskId}`;
 };

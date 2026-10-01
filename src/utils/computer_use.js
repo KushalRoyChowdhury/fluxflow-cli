@@ -32,7 +32,7 @@ export async function executeMouseAction(action, target, options = {}) {
         switch (action.toLowerCase()) {
             case 'move': {
                 await mouse.setPosition(new Point(coords.x, coords.y));
-                return `SUCCESS: Moved mouse to grid target ${typeof target === 'string' ? target : `(${coords.x}, ${coords.y})`}`;
+                return `Moved mouse to grid target ${typeof target === 'string' ? target : `(${coords.x}, ${coords.y})`}`;
             }
             case 'click': {
                 await mouse.setPosition(new Point(coords.x, coords.y));
@@ -42,7 +42,7 @@ export async function executeMouseAction(action, target, options = {}) {
                 } else {
                     await mouse.click(buttonType);
                 }
-                return `SUCCESS: ${options.clickType || 'Single'} clicked ${options.button || 'left'} button at ${typeof target === 'string' ? target : `(${coords.x}, ${coords.y})`}`;
+                return `${options.clickType || 'Single'} clicked ${options.button || 'left'} button at ${typeof target === 'string' ? target : `(${coords.x}, ${coords.y})`}`;
             }
             case 'drag': {
                 const fromCoords = await gridToNativeCoordinates(options.from || target);
@@ -54,7 +54,7 @@ export async function executeMouseAction(action, target, options = {}) {
                 await mouse.pressButton(Button.LEFT);
                 await mouse.setPosition(new Point(toCoords.x, toCoords.y));
                 await mouse.releaseButton(Button.LEFT);
-                return `SUCCESS: Dragged mouse from (${fromCoords.x}, ${fromCoords.y}) to (${toCoords.x}, ${toCoords.y})`;
+                return `Dragged mouse from (${fromCoords.x}, ${fromCoords.y}) to (${toCoords.x}, ${toCoords.y})`;
             }
             case 'scroll': {
                 const targetPoint = coords || await gridToNativeCoordinates({ x: 640, y: 360 });
@@ -63,10 +63,10 @@ export async function executeMouseAction(action, target, options = {}) {
                     // Small delay to let the OS recognize the hovered window/sub-element
                     await new Promise(r => setTimeout(r, 60));
                 }
-                
+
                 let rawAmount = parseInt(options.amount, 10);
                 if (isNaN(rawAmount) || rawAmount <= 0) rawAmount = 5;
-                
+
                 // Nut-js on Windows SendInput expects WHEEL_DELTA units (120 per notch) or integer steps.
                 // Sending in a sequential loop guarantees Chromium / Windows window messages process each notch.
                 const count = rawAmount > 50 ? Math.min(20, Math.max(1, Math.round(rawAmount / 100))) : Math.min(20, rawAmount);
@@ -81,7 +81,7 @@ export async function executeMouseAction(action, target, options = {}) {
                     await new Promise(r => setTimeout(r, 20));
                 }
 
-                return `SUCCESS: Scrolled ${options.direction || 'down'} (${count} notches${coords ? ` at target (${coords.x}, ${coords.y})` : ' at screen center'})`;
+                return `Scrolled ${options.direction || 'down'} (${count} notches${coords ? ` at target (${coords.x}, ${coords.y})` : ' at screen center'})`;
             }
             default:
                 return `ERROR: Unsupported mouse action "${action}"`;
@@ -141,7 +141,7 @@ export async function executeKeyboardAction(action, input, options = {}) {
         switch (action.toLowerCase()) {
             case 'type': {
                 if (typeof input !== 'string') return `ERROR: Type action requires a valid string input`;
-                
+
                 // 1. Ensure no modifier keys (Ctrl/Alt/Shift) are stuck down
                 await releaseAllModifiers();
 
@@ -149,7 +149,7 @@ export async function executeKeyboardAction(action, input, options = {}) {
                 await clipboard.setContent(input);
                 const isMac = process.platform === 'darwin';
                 const pasteMod = isMac ? Key.LeftSuper : Key.LeftControl;
-                
+
                 await keyboard.pressKey(pasteMod, Key.V);
                 await keyboard.releaseKey(pasteMod, Key.V);
                 await releaseAllModifiers();
@@ -157,15 +157,15 @@ export async function executeKeyboardAction(action, input, options = {}) {
                 if (options.autoPressEnter) {
                     await new Promise(r => setTimeout(r, 50));
                     await keyboard.type(Key.Enter);
-                    return `SUCCESS: Typed text input ("${input.length > 20 ? input.substring(0, 20) + '...' : input}") and pressed Enter`;
+                    return `Typed text input ("${input.length > 20 ? input.substring(0, 20) + '...' : input}") and pressed Enter`;
                 }
-                return `SUCCESS: Typed text input ("${input.length > 20 ? input.substring(0, 20) + '...' : input}")`;
+                return `Typed text input ("${input.length > 20 ? input.substring(0, 20) + '...' : input}")`;
             }
             case 'key_press': {
                 const mappedKey = resolveKey(input);
                 if (mappedKey === undefined) return `ERROR: Unknown key name "${input}"`;
                 await keyboard.type(mappedKey);
-                return `SUCCESS: Pressed key ${input}`;
+                return `Pressed key ${input}`;
             }
             case 'key_combination': {
                 if (!Array.isArray(input)) return `ERROR: key_combination requires an array of keys (e.g. ["ctrl", "c"])`;
@@ -173,13 +173,13 @@ export async function executeKeyboardAction(action, input, options = {}) {
                 if (mappedKeys.length === 0) return `ERROR: Invalid key combination`;
                 await keyboard.pressKey(...mappedKeys);
                 await keyboard.releaseKey(...mappedKeys);
-                return `SUCCESS: Executed key combination [${input.join(' + ')}]`;
+                return `Executed key combination [${input.join(' + ')}]`;
             }
             case 'clear_input': {
                 await keyboard.pressKey(Key.LeftControl, Key.A);
                 await keyboard.releaseKey(Key.LeftControl, Key.A);
                 await keyboard.type(Key.Backspace);
-                return `SUCCESS: Cleared active text input (Select All + Backspace)`;
+                return `Cleared active text input (Select All + Backspace)`;
             }
             case 'browser_back': {
                 const isMac = process.platform === 'darwin';
@@ -193,7 +193,7 @@ export async function executeKeyboardAction(action, input, options = {}) {
                     await keyboard.releaseKey(Key.LeftAlt, Key.Left);
                 }
                 await releaseAllModifiers();
-                return `SUCCESS: Browser back navigation (${isMac ? 'Cmd+Left' : 'Alt+Left'})`;
+                return `Browser back navigation (${isMac ? 'Cmd+Left' : 'Alt+Left'})`;
             }
             default:
                 return `ERROR: Unsupported keyboard action "${action}"`;

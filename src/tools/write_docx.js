@@ -53,7 +53,7 @@ export const write_docx = async (args) => {
         // Write to disk
         await fs.writeFile(absolutePath, docxBuffer);
 
-        return `SUCCESS: Word document [${targetPath}] generated successfully.\n- Size: ${(docxBuffer.length / 1024).toFixed(1)} KB`;
+        return `Word document [${targetPath}] generated successfully.\n- Size: ${(docxBuffer.length / 1024).toFixed(1)} KB`;
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to generate DOCX [${targetPath}]: ${errorMsg}`;

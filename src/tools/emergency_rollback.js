@@ -83,7 +83,7 @@ export const emergency_rollback = async (args, context = {}) => {
             const { checkpointId, stats } = result;
             const totalFiles = stats.restored + stats.replaced + stats.failed.length;
 
-            let output = `SUCCESS: Repository rolled back to checkpoint [${checkpointId}].\n\n`;
+            let output = `Repository rolled back to checkpoint [${checkpointId}].\n\n`;
             output += `Stats:\n`;
             output += `  Restored : ${stats.restored} file${stats.restored !== 1 ? 's' : ''} (new to workspace)\n`;
             output += `  Replaced : ${stats.replaced} file${stats.replaced !== 1 ? 's' : ''} (overwritten)\n`;

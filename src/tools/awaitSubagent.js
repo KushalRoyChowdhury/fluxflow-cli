@@ -12,7 +12,7 @@ export const awaitSubagent = async (args, context = {}) => {
         if (parsed.time) {
             // Fallback for simple time delay if no subagent id provided
             await new Promise(resolve => setTimeout(resolve, timeoutSec * 1000));
-            return `SUCCESS: Waited for ${timeoutSec}s.`;
+            return `Waited for ${timeoutSec}s.`;
         }
         return 'ERROR: Missing "id" argument for Await.';
     }
@@ -24,13 +24,13 @@ export const awaitSubagent = async (args, context = {}) => {
 
     // Immediate check if task already finished or waiting for answer
     if (task.status === 'completed') {
-        return `SUCCESS: Subagent task [${id}] completed.\nFinal Answer:\n${task.finalAnswer || '(No output)'}`;
+        return `Subagent task [${id}] completed.\nFinal Answer:\n${task.finalAnswer || '(No output)'}`;
     }
     if (task.status === 'failed') {
         return `ERROR: Subagent task [${id}] failed.\nError: ${task.error || 'Unknown error'}`;
     }
     if (task.status === 'cancelled') {
-        return `INFO: Subagent task [${id}] was cancelled.`;
+        return `Subagent task [${id}] was cancelled.`;
     }
 
     let timeoutId;
@@ -53,17 +53,16 @@ export const awaitSubagent = async (args, context = {}) => {
         }
 
         if (task.status === 'completed') {
-            return `SUCCESS: Subagent task [${id}] completed.\nFinal Answer:\n${task.finalAnswer || '(No output)'}`;
+            return `Subagent task [${id}] completed.\nFinal Answer:\n${task.finalAnswer || '(No output)'}`;
         } else if (task.status === 'failed') {
             return `ERROR: Subagent task [${id}] failed.\nError: ${task.error || 'Unknown error'}`;
         } else if (task.status === 'cancelled') {
-            return `INFO: Subagent task [${id}] was cancelled.`;
+            return `Subagent task [${id}] was cancelled.`;
         } else {
-            return `INFO: Subagent task [${id}] status changed to ${task.status.toUpperCase()}.`;
+            return `Subagent task [${id}] status changed to ${task.status.toUpperCase()}.`;
         }
     } catch (err) {
         clearTimeout(timeoutId);
         return `ERROR: Exception while awaiting subagent [${id}]: ${err.message}`;
     }
 };
-
