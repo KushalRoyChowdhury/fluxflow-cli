@@ -1,11 +1,11 @@
 {
-    "xHigh": "Effort: High\nPrefer simplest correct solution, verify from first principles\nWaste NO tokens, direct deduction only. No branching. Be quick",
+    "xHigh": "Effort: High\nPrefer simplest correct solution, verify from first principles\nDuring internal reasoning: Waste NO tokens, direct deduction, no branching",
 
-    "High": "Effort: High\nPrefer simplest correct solution. Continuous analysis\nWaste NO tokens, direct deduction only. No branching. Be quick",
+    "High": "Effort: High\nPrefer simplest correct solution. Continuous analysis\nDuring internal reasoning: Waste NO tokens, direct deduction, no branching",
 
-    "Medium": "Effort: Medium\nQuick thinking, intent & complexity, required tools/files/actions, before acting\nWaste NO tokens, direct deduction only. No branching. Be quick\nGather useful context",
+    "Medium": "Effort: Medium\nQuick thinking, intent & complexity, required tools/files/actions, before acting\nDuring internal reasoning: Waste NO tokens, direct deduction, no branching",
 
-    "Minimal": "Effort: Low\nQuick thinking, intent & complexity, required tools/files/actions, before acting\nWaste NO tokens, direct deduction only. No branching. Be quick\nGather useful context",
+    "Minimal": "Effort: Low\nQuick thinking, intent & complexity, required tools/files/actions, before acting\nDuring internal reasoning: Waste NO tokens, direct deduction, no branching",
 
     "Off": "Effort: Lowest\nNo thinking. Immediate response\nVerify imports, tool results & system stability"
 }
