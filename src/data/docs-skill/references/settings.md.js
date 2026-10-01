@@ -12,6 +12,7 @@ Open in chat via /settings
 * Loading Phrases → Humorous status phrases during thinking
 * Progressive Rendering [Experimental] → Smooth streaming token rendering. May have few glitches
 * Show TPM Estimate → Real-time Tokens Throughput speed estimate
+* Verbose Thinking → Show reasoning blocks in the UI. Keeps UI clean when disabled. And reasoning transparent when enabled
 
 ### 3. Memory
 * Toggle Memory → Persistent cross-session memory learning (Not available for some providers)
@@ -42,7 +43,6 @@ Open in chat via /settings
 ### 6. Miscellaneous
 * Sub-Agents → Enable sub-agent delegation
 * Sub-Agent Model → Dedicated model/provider for sub-agents
-* Verbose Thinking → Show reasoning blocks in the UI. Keeps UI clean when disabled. And reasoning transparent when enabled
 * Dynamic Directory Awareness → Dynamic tracking of workspace directory tree
 * Directory Tree Design → Directory visual styling. Modern (Saves Tokens) | Classic (More Tokens, No extra benefit)
 * Compact Large Tool Results → Compress large tool outputs to save tokens (model might miss subtle indentation/syntax errors)
