@@ -43,8 +43,7 @@ Open in chat via /settings
 ### 6. Miscellaneous
 * Sub-Agents → Enable sub-agent delegation
 * Sub-Agent Model → Dedicated model/provider for sub-agents
-* Dynamic Directory Awareness → Dynamic tracking of workspace directory tree
-* Directory Tree Design → Directory visual styling. Modern (Saves Tokens) | Classic (More Tokens, No extra benefit)
+* Directory Tree Design → Directory visual styling. Modern (Saves Tokens) | Legacy (More Tokens, No extra benefit)
 * Compact Large Tool Results → Compress large tool outputs to save tokens (model might miss subtle indentation/syntax errors)
 * Context Length → Set usable context window size in FluxFlow. 16k, 32k, 64k, 128k, 256k, 512k, 1M. After Limit reached: Start new chat
 * Auto Truncate Results → Auto-truncate tool results after task finished to save token and improve caching
@@ -54,11 +53,11 @@ Open in chat via /settings
 * Disable Todo → Disables Todo/Goal tool for Agent. Doesnt necessarily affect modern models
 
 -- Recomended Settings Preset --
-- Best for Cost Saving: Subagents (off), dynamic directory awareness (off), directory tree design (modern), compact large results (on), auto exclue metadata (on), Image History (Low), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (on), Memory (off), No FluxFlow IDE Companion
+- Best for Cost Saving: Subagents (off), directory tree design (modern), compact large results (on), auto exclue metadata (on), Image History (Low), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (on), Memory (off), No FluxFlow IDE Companion
 
-- Best for General Use: Subagents (on), dynamic directory awareness (off), compact large results (off), auto exclue metadata (off), Image History (Standard), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (on), Memory (off), FluxFlow IDE Companion
+- Best for General Use: Subagents (on), compact large results (off), auto exclue metadata (off), Image History (Standard), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (on), Memory (off), FluxFlow IDE Companion
 
-- Best for Luxurious Experience: Subagents (on), dynamic directory awareness (on), compact large results (off), auto exclue metadata (off), Image History (Extended), Keep reasoning content (on), Emergency Recovery (on), Auto truncate results (off), Memory (on), Security Preset (Autonomous), FluxFlow IDE Companion
+- Best for Luxurious Experience: Subagents (on), compact large results (off), auto exclue metadata (off), Image History (Extended), Keep reasoning content (on), Emergency Recovery (on), Auto truncate results (off), Memory (on), Security Preset (Autonomous), FluxFlow IDE Companion
 
-- Max Cache Hit: Subagents (off), dynamic directory awareness (off), compact large results (on), auto exclue metadata (on), Image History (Low), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (off), Memory (off), No FluxFlow IDE Companion
+- Max Cache Hit: Subagents (off), compact large results (on), auto exclue metadata (on), Image History (Low), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (off), Memory (off), No FluxFlow IDE Companion
 `;
