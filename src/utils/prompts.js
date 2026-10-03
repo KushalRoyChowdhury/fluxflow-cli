@@ -552,7 +552,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         if (thinkingLevel === 'Fast') {
             thinkingConfig = "Effort: Lowest\nNo thinking. Immediate response\nVerify imports, tool results & system stability; avoid syntax errors"
         } else if (thinkingLevel === 'Low') {
-            thinkingConfig = "Effort: Low\nQuick, focused thinking, required tools/files/actions\nDont waste tokens, be efficient, use least thinking tokens, focus on result\nVerify imports, tool results & system stability; avoid syntax errors"
+            thinkingConfig = "Effort: Low\nPrefer simplest correct solution\nMake direct deductions; avoid branching & token waste"
         }
     }
 

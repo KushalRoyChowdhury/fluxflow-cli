@@ -1,11 +1,11 @@
 {
-    "xHigh": "Effort: High\nPrefer simplest correct solution, verify from first principles\nDuring reasoning: prefer direct deduction; avoid unnecessary branching",
+    "xHigh": "Effort: High\nPrefer simplest correct solution\nMake direct deductions; avoid branching & token waste",
 
-    "High": "Effort: High\nPrefer simplest correct solution, verify from first principles\nDuring reasoning: prefer direct deduction; avoid unnecessary branching",
+    "High": "Effort: High\nPrefer simplest correct solution\nMake direct deductions; avoid branching & token waste",
 
-    "Medium": "Effort: Medium\nPrefer simplest correct solution, verify from first principles\nDuring reasoning: prefer direct deduction; avoid unnecessary branching",
+    "Medium": "Effort: Medium\nPrefer simplest correct solution\nMake direct deductions; avoid branching & token waste",
 
-    "Minimal": "Effort: Low\nPrefer simplest correct solution, verify from first principles\nDuring reasoning: prefer direct deduction; avoid unnecessary branching",
+    "Minimal": "Effort: Low\nPrefer simplest correct solution\nMake direct deductions; avoid branching & token waste",
 
     "Off": "Effort: Lowest\nNo thinking. Immediate response\nVerify imports, tool results & system stability"
 }

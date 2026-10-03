@@ -414,17 +414,17 @@ function generateSmartGridSvgOverlay(width, height, cols, rows, activeCells = []
         `;
 
         // Check if there are immediately touching neighbor cells above or below
-        const hasCellAbove = activeCells.some(o => 
-            o !== cell && 
-            (o.startY + o.cellH) >= startY - 6 && 
-            o.startY < startY && 
+        const hasCellAbove = activeCells.some(o =>
+            o !== cell &&
+            (o.startY + o.cellH) >= startY - 6 &&
+            o.startY < startY &&
             Math.max(0, Math.min(startX + cellW, o.startX + o.cellW) - Math.max(startX, o.startX)) > 10
         );
 
-        const hasCellBelow = activeCells.some(o => 
-            o !== cell && 
-            o.startY <= (startY + cellH + 6) && 
-            o.startY > startY && 
+        const hasCellBelow = activeCells.some(o =>
+            o !== cell &&
+            o.startY <= (startY + cellH + 6) &&
+            o.startY > startY &&
             Math.max(0, Math.min(startX + cellW, o.startX + o.cellW) - Math.max(startX, o.startX)) > 10
         );
 
@@ -824,12 +824,24 @@ export async function gridToNativeCoordinates(target, actualScreenWidth, actualS
     } catch (e) {}
 
     if (!screenW || !screenH) {
+        // No passed-in dims AND OS display APIs failed -> probe the live screenshot
+        // itself; its width/height IS the true monitor resolution & aspect ratio,
+        // so this stays correct for 16:9, 4:3, 3:4, 9:16 (rotated/portrait) alike.
         try {
-            screenW = await screen.width();
-            screenH = await screen.height();
+            const probeBuf = await screenshotDesktop({});
+            const probeMeta = await sharp(probeBuf).metadata();
+            if (probeMeta && probeMeta.width && probeMeta.height) {
+                screenW = probeMeta.width;
+                screenH = probeMeta.height;
+            } else {
+                screenW = await screen.width();
+                screenH = await screen.height();
+            }
         } catch (e) {
-            screenW = 1920;
-            screenH = 1080;
+            if (!screenW || !screenH) {
+                screenW = await screen.width();
+                screenH = await screen.height();
+            }
         }
     }
 
