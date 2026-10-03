@@ -1,11 +1,11 @@
 {
-    "xHigh": "Effort: High\nPrefer simplest correct solution\nMake direct deductions; avoid branching & token waste",
+    "xHigh": "Use minimal reasoning. Prefer simplest path; avoid branching",
 
-    "High": "Effort: High\nPrefer simplest correct solution\nMake direct deductions; avoid branching & token waste",
+    "High": "Use minimal reasoning. Prefer simplest path; avoid branching",
 
-    "Medium": "Effort: Medium\nPrefer simplest correct solution\nMake direct deductions; avoid branching & token waste",
+    "Medium": "Use minimal reasoning. Prefer simplest path; avoid branching",
 
-    "Minimal": "Effort: Low\nPrefer simplest correct solution\nMake direct deductions; avoid branching & token waste",
+    "no": "Use minimal reasoning. Prefer simplest path; avoid branching",
 
-    "Off": "Effort: Lowest\nNo thinking. Immediate response\nVerify imports, tool results & system stability"
+    "Off": "No thinking. Immediate response. Verify imports, tool results & system stability"
 }

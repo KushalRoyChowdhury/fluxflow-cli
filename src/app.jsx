@@ -1320,12 +1320,10 @@ export default function App({ args = [] }) {
 
         if (prevProviderRef.current !== aiProvider) {
             prevProviderRef.current = aiProvider;
-            if (aiProvider === 'Mistral') {
-                setThinkingLevel('High');
-            } else if (aiProvider === 'SenseNova' || aiProvider === 'Poolside') {
+            if (aiProvider === 'SenseNova' || aiProvider === 'Poolside') {
                 setThinkingLevel('High');
             } else {
-                setThinkingLevel('Medium');
+                setThinkingLevel('Low');
             }
         }
         // else {
@@ -3330,7 +3328,7 @@ export default function App({ args = [] }) {
                             break;
                         }
                         if (val === 'standard') val = 'medium';
-                        if (val === 'max' || val === 'custom') val = 'xhigh';
+                        if (val === 'custom') val = 'xhigh';
                         formattedLevel = val.charAt(0).toUpperCase() + val.slice(1);
                         if (val === 'xhigh') {
                             formattedLevel = 'xHigh';

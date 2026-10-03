@@ -534,25 +534,27 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         thinkingConfig = thinkingPrompts[levelKey] || thinkingPrompts['Medium'];
     }
     if (isGemini || aiProvider !== 'Google') {
-        const MAP_FOR_NON_GOOGLE_OR_GEMINI = {
-            'Fast': 'Lowest',
-            'Low': 'Low',
-            'Medium': 'Medium',
-            'Standard': 'Medium',
-            'High': 'High',
-            'xHigh': 'High',
-            'Max': 'High'
-        }
+        // const MAP_FOR_NON_GOOGLE_OR_GEMINI = {
+        //     'Fast': 'Lowest',
+        //     'Low': 'Low',
+        //     'Medium': 'Medium',
+        //     'Standard': 'Medium',
+        //     'High': 'High',
+        //     'xHigh': 'High',
+        //     'Max': 'High'
+        // }
 
         // Stays as Fallback
         thinkingConfig = thinkingPrompts['xHigh'];
-        thinkingConfig = thinkingConfig.replace('Effort: High', `Effort: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}`);
+        // thinkingConfig = thinkingConfig.replace('Effort: High', `Effort: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}`);
+        // Different Efforts in test form wasn't benefiting much. API level Effort level controls this anyway.
 
 
         if (thinkingLevel === 'Fast') {
-            thinkingConfig = "Effort: Lowest\nNo thinking. Immediate response\nVerify imports, tool results & system stability; avoid syntax errors"
-        } else if (thinkingLevel === 'Low') {
-            thinkingConfig = "Effort: Low\nPrefer simplest correct solution\nMake direct deductions; avoid branching & token waste"
+            thinkingConfig = "No thinking. Immediate response\nVerify imports, tool results & system stability"
+        } else if (thinkingLevel.toLowerCase() === 'max') {
+            // Hidden escape path of problem is genuinely hard enough that in "Direct resoning" it's unsolvable
+            thinkingConfig = "Effort: Max\nPlan step by step"
         }
     }
 

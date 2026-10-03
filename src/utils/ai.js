@@ -1703,7 +1703,7 @@ export const deleteChatSummary = (chatId) => {
  * Executes a streaming request using the new SDK
  */
 export const getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow) {
-    const { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings, sessionStats, aiProvider = 'Google', apiTier, wildcardTooling, wildercardTooling } = settings;
+    let { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings, sessionStats, aiProvider = 'Google', apiTier, wildcardTooling, wildercardTooling } = settings;
     const isMultiModal = isModelMultimodal(modelName);
     if (!client && aiProvider === 'Google') throw new Error('AI not initialized');
 
@@ -2460,6 +2460,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
             let targetModel = modelName;
             let currentSystemInstruction = '';
+            const thinkingLevelOriginal = thinkingLevel;
+            thinkingLevel = thinkingLevel.toLowerCase() === 'max' ? 'High' : thinkingLevel;
 
             while (retryCount <= MAX_RETRIES && inStreamRetryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
                 let inThinkingState = false;
@@ -2686,9 +2688,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // [SYSTEM INSTRUCTION CACHING]
                     // const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}|${!!systemSettings?.keepReasoningContext}`;
 
-                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}`;
+                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${thinkingLevelOriginal}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}`;
                     let isCacheHit = systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
                     const userHasWAYYTOOMuchMoney_GoodLuck = process.env.I_HAVE_TOO_MUCH_MONEY === "true" || process.env.I_HAVE_TOO_MUCH_MONEY === true || false;
+
                     if (userHasWAYYTOOMuchMoney_GoodLuck) {
                         isCacheHit = false;
                     }
@@ -2696,7 +2699,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         currentSystemInstruction = systemInstructionCache.value;
                     } else {
                         const isGeminiOrReasoning = aiProvider === 'Mistral' ? (hasModelReasoning(targetModel) ? true : false) : (!(targetModel || "gemma").toLowerCase().startsWith('gemma') ? true : false);
-                        currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, isGeminiOrReasoning, chatId, !!systemSettings?.keepReasoningContext, targetModel);
+                        currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevelOriginal : thinkingLevelOriginal, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, isGeminiOrReasoning, chatId, !!systemSettings?.keepReasoningContext, targetModel);
 
                         if (!systemSettings?.dynamicDirAwareness) {
                             currentSystemInstruction += `\n${dirStructure.replace('\n**Directory**', '\n-- Directory --')}`;
