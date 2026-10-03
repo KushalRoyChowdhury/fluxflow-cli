@@ -605,7 +605,7 @@ export default function SettingsMenu({
                 return newSysSettings;
             });
         } else if (item.value === 'imageHistoryCU') {
-            const options = ['Low', 'Standard', 'Extended'];
+            const options = ['Low', 'Standard', 'Extended', 'Max'];
             const currentIndex = options.indexOf(systemSettings.imageHistoryCU || 'Standard');
             const nextIndex = (currentIndex + 1) % options.length;
             setSystemSettings(s => {

@@ -1085,7 +1085,7 @@ export const parseMessageToBlocks = (msg, columns) => {
     const thinkWrapWidth = Math.max(20, (columns || 80) - 8);
 
     if (msg.role === 'think') {
-        completedBlocks.push(getBlock(`${msg.id}-header`, 'think-header', ''));
+        completedBlocks.push(getBlock(`${msg.id}-header`, 'think-header', '', { duration: msg.duration }));
         const rawLines = text.split('\n');
         const lines = [];
         rawLines.forEach(l => {

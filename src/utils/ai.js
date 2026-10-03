@@ -131,7 +131,7 @@ const RE_KIMI_SECTION_BEGIN = /<\|\s*tool_calls_section_begin\s*\|>/gi;
 const RE_KIMI_SECTION_END = /<\|\s*tool_calls_section_end\s*\|>/gi;
 
 // ─── Tool Call Wrapper Stripper – pre-compiled regexes ───
-const RE_TOOL_WRAPPER_CODE_FENCE = /```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi;
+const RE_TOOL_WRAPPER_CODE_FENCE = /```(?:tool|action|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi;
 const RE_XML_TAG_OPEN = /<(\w+)(?:[^>]*)>\r?\n?/gi;
 const RE_XML_TAG_CLOSE = /\r?\n?<\/\w+(?:[^>]*)>/gi;
 
@@ -2340,9 +2340,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
                         };
 
-                        // Retain vision inlineData up to maxTurns based on settings (Low = 1, Standard = 3, Extended = 5)
+                        // Retain vision inlineData up to maxTurns based on settings (Low = 3, Standard = 5, Extended = 10, Max = 999)
                         const historySetting = systemSettings?.imageHistoryCU || 'Standard';
-                        const maxImageTurns = historySetting === 'Low' ? 1 : historySetting === 'Extended' ? 5 : 3;
+                        const maxImageTurns = historySetting === 'Low' ? 3 : historySetting === 'Extended' ? 10 : historySetting === 'Max' ? 999 : 5;
 
                         // Identify messages that contain inlineData
                         const msgsWithImages = modifiedHistory.filter(msg => Array.isArray(msg.parts) && msg.parts.some(p => p.inlineData));
@@ -2481,9 +2481,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // Detect and remove XML/YAML/fence wrappers around our [tool:...] format,
                     // so the model only sees the raw tool call on the next turn.
                     const stripToolCallWrappers = (text) => {
-                        // Just adding safe comment to return instantly without any processing if needed in future
-                        // return text;
-                        if (!text || !text.includes('[tool:')) return text;
+                        if (!text || typeof text !== 'string') return text;
 
                         // 1. Cut the entire leading thought block as-is (protecting any inner XML/HTML tags and backticks)
                         let leadingThink = '';
@@ -2493,17 +2491,31 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             text = leading.remainingText;
                         }
 
-                        // Strip YAML/code fence wrappers around tool calls: ```tool ... [tool:...] ... ```
+                        if (!text.includes('[tool:') && !text.includes('[action:')) {
+                            return (systemSettings?.keepReasoningContext ? leadingThink : '') + text;
+                        }
+
+                        // Strip YAML/code fence wrappers around tool calls: ```tool ... [tool:...] / [action:...] ... ```
                         text = text.replace(RE_TOOL_WRAPPER_CODE_FENCE, (match, inner) => {
-                            if (inner.includes('[tool:')) return inner.trim();
+                            if (inner.includes('[tool:') || inner.includes('[action:')) return inner.trim();
                             return match;
                         });
 
-                        // Process string segment by segment: strip naked XML tags outside [tool:...], keeping backtick code spans and tool content 100% untouched
+                        // Process string segment by segment: strip naked XML tags outside [tool:...]/[action:...], keeping backtick code spans and tool content 100% untouched
                         let result = '';
                         let i = 0;
                         while (i < text.length) {
-                            const toolIdx = text.indexOf('[tool:', i);
+                            const idxTool = text.indexOf('[tool:', i);
+                            const idxAction = text.indexOf('[action:', i);
+                            let toolIdx = -1;
+                            if (idxTool !== -1 && idxAction !== -1) {
+                                toolIdx = Math.min(idxTool, idxAction);
+                            } else if (idxTool !== -1) {
+                                toolIdx = idxTool;
+                            } else {
+                                toolIdx = idxAction;
+                            }
+
                             if (toolIdx === -1) {
                                 result += stripNakedXmlTags(text.substring(i));
                                 break;
@@ -2512,7 +2524,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const beforeTool = text.substring(i, toolIdx);
                             result += stripNakedXmlTags(beforeTool);
 
-                            // Find the true matching ']' for [tool:...(...)]
+                            // Find the true matching ']' for [tool:...(...)] or [action:...(...)]
                             let endToolIdx = -1;
                             let inStr = null;
                             let parenBal = 0;

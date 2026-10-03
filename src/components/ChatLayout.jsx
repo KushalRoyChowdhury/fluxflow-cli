@@ -1453,11 +1453,19 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     if (type === 'think-header') {
         return (
             <Box flexDirection="column" paddingX={1} width="100%" marginTop={0} marginBottom={0}>
-                {isStreamingMsg ? (
-                    <Text bold color={colors.text}>✧ Thinking...</Text>
-                ) : (
-                    <Text bold color={colors.text}>✦ Thoughts...</Text>
-                )}
+                {(() => {
+                    const dur = block.duration || msg?.duration || workedDuration; return (
+                        isStreamingMsg && !dur ? (
+                            <Text bold color={colors.text}>✧ Thinking...</Text>
+                        ) : (
+                            <Text bold color={colors.text}>
+                                ✦ Thought{dur ? (
+                                    <Text color={colors.textMuted}> for <Text bold color={colors.text}>{formatThinkingDuration(dur)}</Text>...</Text>
+                                ) : 's...'}
+                            </Text>
+                        )
+                    );
+                })()}
                 {/* [TEMORARY SOLUTION] */}
                 {showFullThinking && (
                     <Box flexDirection="row" width="100%">

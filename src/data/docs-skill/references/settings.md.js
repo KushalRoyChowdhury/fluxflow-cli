@@ -47,7 +47,7 @@ Open in chat via /settings
 * Compact Large Tool Results → Compress large tool outputs to save tokens (model might miss subtle indentation/syntax errors)
 * Context Length → Set usable context window size in FluxFlow. 16k, 32k, 64k, 128k, 256k, 512k, 1M. After Limit reached: Start new chat
 * Auto Truncate Results → Auto-truncate tool results after task finished to save token and improve caching
-* Image History for CU → Number of images to keep in context for Computer Use. Low (1 image, Low Context Accuracy, Token Efficient) / Standard (3 images, Better Accuracy, Higher Token Usage) / Extended (5 images, Better for complex tasks, Highest Token Usage)
+* Image History for CU → Number of images to keep in context for Computer Use. Low (3 images, Low Context Accuracy, Token Efficient) / Standard (5 images, Better Accuracy, Higher Token Usage) / Extended (10 images, Better for complex tasks, Highest Token Usage) / Max (999 images, Full history kept, Maximum Accuracy, Highest Token Usage)
 * Keep Reasoning Content → Keeps the exact reasoning of model in context for next turns. Uses more tokens. Might improve planning accuracy for very few models
 * Auto Exclude Metadata → Removes Metadata Block when no external Metadata is needed. Will effect agent's Temporal Reasoning Capabilities. Might save Cache Hit & Tokens in specific cases
 * Disable Todo → Disables Todo/Goal tool for Agent. Doesnt necessarily affect modern models
@@ -57,7 +57,7 @@ Open in chat via /settings
 
 - Best for General Use: Subagents (on), compact large results (off), auto exclue metadata (off), Image History (Standard), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (on), Memory (off), FluxFlow IDE Companion
 
-- Best for Luxurious Experience: Subagents (on), compact large results (off), auto exclue metadata (off), Image History (Extended), Keep reasoning content (on), Emergency Recovery (on), Auto truncate results (off), Memory (on), Security Preset (Autonomous), FluxFlow IDE Companion
+- Best for Luxurious Experience: Subagents (on), compact large results (off), auto exclue metadata (off), Image History (Max), Keep reasoning content (on), Emergency Recovery (on), Auto truncate results (off), Memory (on), Security Preset (Autonomous), FluxFlow IDE Companion
 
 - Max Cache Hit: Subagents (off), compact large results (on), auto exclue metadata (on), Image History (Low), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (off), Memory (off), No FluxFlow IDE Companion
 `;
