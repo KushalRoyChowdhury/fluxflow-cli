@@ -1,6 +1,17 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.25.0": {
+        "note": "OCTOBER 3",
+        "added": [
+            "Next-Gen Visual UI Detection: Upgraded Computer Use with an intelligent neural vision engine that automatically recognizes icons, buttons, toggles, and UI controls with pinpoint precision.",
+            "Precision Click Controls: Added flexible OCR correction toggling, allowing instant clicks on custom icons, switches, and graphical elements more accurately."
+        ],
+        "changed": [],
+        "fixes": [
+            "Cleaned up chat transcript formatting in `/export chat` for seamless session sharing and review."
+        ]
+    },
     "4.24.0": {
         "note": "SEPTEMBER 30",
         "added": [

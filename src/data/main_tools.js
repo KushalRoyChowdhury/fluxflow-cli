@@ -81,7 +81,7 @@ Invocations:
     // =====================================================================================================
 
     const computerTools = `**Computer Use (Desktop Automation)**
-- Click(gridId=int, type="single/double", button="left/middle/right", intendedClickText=string). Click target grid number, intendedClickText: literal text/symbol on screen (OCR scannable, upto 3 words). Double click desktop icons
+- Click(gridId=int, type="single/double", button="left/middle/right", intendedClickText=string, ocrCorrection?=bool:true). Click target grid number, intendedClickText: literal text/symbol on screen (OCR scannable, upto 3 words). Double click desktop icons, nonOCR element/icon/toggle? ocrCorrection=false
 - Drag(fromGridId=int, toGridId=int). Drag mouse from start grid number to target grid number
 - Scroll(direction="up/down", gridId=int). Scroll viewport vertically
 - KeyboardTyping(text=string, autoPressEnter?=bool). Type text string into currently active input. JSON escape literal escape sequences

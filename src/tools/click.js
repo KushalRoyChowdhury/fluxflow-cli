@@ -358,24 +358,14 @@ async function getCachedSnapOpts() {
  * Accepts gridId, click type, mouse button, and optional intendedClickText for OCR verification.
  */
 export const click = async (args, context = {}) => {
-    const isDebug = !!(process.env.SHOW_DEBUG_GRID || process.env.DEBUG_OCR || process.env.VERBOSE);
-    const t0 = performance.now();
-    let lastT = t0;
-    const logStep = (label) => {
-        if (!isDebug) return;
-        const now = performance.now();
-        const stepMs = (now - lastT).toFixed(0);
-        const totalMs = (now - t0).toFixed(0);
-        console.log(`[Click Perf] +${stepMs}ms (${totalMs}ms total) -> ${label}`);
-        lastT = now;
-    };
-
-    logStep('Starting click()');
     const parsed = parseArgs(args);
     const gridId = parsed.gridId || parsed.grid || parsed.coordinate || parsed.target || parsed.id;
     const type = (parsed.type || parsed.clickType || 'single').toLowerCase();
     const button = (parsed.button || 'left').toLowerCase();
     const intendedClickText = parsed.intendedClickText || parsed.text || '';
+    const ocrCorrection = parsed.ocrCorrection !== undefined 
+        ? (parsed.ocrCorrection === true || parsed.ocrCorrection === 'true') 
+        : (parsed.useOCR !== undefined ? (parsed.useOCR === true || parsed.useOCR === 'true') : true);
 
     if (!gridId && !intendedClickText) {
         return 'ERROR: Missing required "gridId" parameter for Click tool.';
@@ -383,19 +373,13 @@ export const click = async (args, context = {}) => {
 
     let finalTarget = gridId;
 
-    // OCR Auto-Correction if intendedClickText is provided
-    if (intendedClickText) {
+    // OCR Auto-Correction if intendedClickText is provided and ocrCorrection is enabled
+    if (ocrCorrection && intendedClickText) {
         try {
-            logStep('Parsing grid code');
             const targetPoint = gridId ? parseGridCodeTo720p(gridId) : null;
-
-            logStep('Getting display options');
             const snapOpts = await getCachedSnapOpts();
-
-            logStep('Taking desktop screenshot');
             const rawBuffer = await screenshotDesktop(snapOpts);
 
-            logStep('Getting image metadata');
             const meta = await sharp(rawBuffer).metadata();
             const screenW = meta.width || 1920;
             const screenH = meta.height || 1080;
@@ -408,8 +392,6 @@ export const click = async (args, context = {}) => {
                 : { x: screenW / 2, y: screenH / 2 };
 
             const targetLower = intendedClickText.toLowerCase().trim();
-
-            logStep('Acquiring OCR worker');
             const worker = await getOcrWorker();
             let bestMatch = null;
             let matchSource = '';
@@ -418,7 +400,6 @@ export const click = async (args, context = {}) => {
 
             // ─── PASS 1: Centered Target Crop (3x Zoom Window, 2x Upscale) ────
             if (targetPoint) {
-                logStep('Pass 1: Cropping target crop (3x zoom window, 2x upscale)');
                 const cropW = Math.min(Math.round(screenW / 3), screenW);
                 const cropH = Math.min(Math.round(screenH / 3), screenH);
                 const cropLeft = Math.max(0, Math.min(screenW - cropW, targetCoords.x - Math.floor(cropW / 2)));
@@ -434,15 +415,10 @@ export const click = async (args, context = {}) => {
                 const cleanTag = targetLower.replace(/[^a-z0-9]/g, '_');
                 await saveDebugImage('cropped', `crop_${Date.now()}_${cleanTag}.png`, cropBuffer);
 
-                logStep('Pass 1: Running Tesseract OCR recognize on crop (PSM 11 - Sparse Text)');
                 await worker.setParameters({ tessedit_pageseg_mode: '11' });
                 const { data: cropData } = await worker.recognize(cropBuffer, {}, { tsv: true, blocks: true });
-                logStep('Pass 1: OCR recognition finished, extracting matches');
 
                 if (cropData && cropData.text) {
-                    if (isDebug) {
-                        console.log(`[Pass 1 OCR Read]: "${cropData.text.trim().replace(/\s+/g, ' ')}"`);
-                    }
                     const cropMatches = extractOcrMatches(cropData, targetLower, cropLeft, cropTop, cropScale);
                     if (cropMatches.length > 0) {
                         const candidate = pickBestMatch(cropMatches, targetCoords);
@@ -456,15 +432,12 @@ export const click = async (args, context = {}) => {
 
             // ─── PASS 2: Full-screen OCR (Single-pass broad scan) ────────────────
             if (!bestMatch) {
-                logStep('Pass 2: Entering Full-Screen OCR (broad scan, PSM 3 - Auto)');
                 const fullProcessed = await preprocessForOcr(rawBuffer, 2);
                 const cleanTag = targetLower.replace(/[^a-z0-9]/g, '_');
                 await saveDebugImage('fullscreen', `full_${Date.now()}_${cleanTag}.png`, fullProcessed);
 
-                logStep('Pass 2: Running Tesseract on full screen');
                 await worker.setParameters({ tessedit_pageseg_mode: '3' });
                 const { data: fullData } = await worker.recognize(fullProcessed, {}, { tsv: true, blocks: true });
-                logStep('Pass 2: Full-screen OCR finished');
 
                 if (fullData && fullData.text) {
                     const fullMatches = extractOcrMatches(fullData, targetLower, 0, 0, 2);
@@ -481,21 +454,18 @@ export const click = async (args, context = {}) => {
 
             // ─── PASS 3: Tiled OCR (8 tiles at 3x upscale for microscopic text) ───
             if (!bestMatch) {
-                logStep('Pass 3: Entering Tiled OCR fallback (high-res 3x)');
                 const tiles = getSortedTiles(screenW, screenH, targetCoords.x, targetCoords.y);
                 const cleanTag = targetLower.replace(/[^a-z0-9]/g, '_');
 
                 await worker.setParameters({ tessedit_pageseg_mode: '11' });
                 for (let ti = 0; ti < tiles.length; ti++) {
                     const tile = tiles[ti];
-                    logStep(`Pass 3: Preprocessing tile ${ti + 1}/${tiles.length}`);
                     const tileRaw = await sharp(rawBuffer)
                         .extract({ left: tile.x0, top: tile.y0, width: tile.w, height: tile.h })
                         .toBuffer();
                     const tileBuffer = await preprocessForOcr(tileRaw, 3);
                     await saveDebugImage('tiles', `tile_${ti + 1}_${Date.now()}_${cleanTag}.png`, tileBuffer);
 
-                    logStep(`Pass 3: Running Tesseract on tile ${ti + 1}`);
                     const { data: tileData } = await worker.recognize(tileBuffer, {}, { tsv: true, blocks: true });
                     if (!tileData || !tileData.text) continue;
 
@@ -518,25 +488,19 @@ export const click = async (args, context = {}) => {
                     y: Math.round(bestMatch.y * (720 / screenH))
                 };
 
-                logStep(`Executing mouse click on matched target (${matchSource})`);
                 const mouseRes = await executeMouseAction('click', target720p, { button, clickType: type });
-                logStep('Click completed successfully');
                 return `${mouseRes} (${matchSource} for "${intendedClickText}" at ${Math.round(bestMatch.dist)}px distance)`;
-            } else if (isDebug) {
-                console.log(`[OCR] No match found for "${intendedClickText}". Falling back to gridId.`);
             }
 
         } catch (ocrErr) {
-            if (isDebug) console.error('[OCR Error]', ocrErr);
+            // Silently proceed to fallback gridId
         }
     }
 
-    logStep(`Executing mouse click on fallback gridId: ${finalTarget}`);
     const clickRes = await executeMouseAction('click', finalTarget, {
         button,
         clickType: type
     });
-    logStep('Fallback click completed');
 
     return clickRes;
 };

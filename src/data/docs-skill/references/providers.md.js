@@ -28,6 +28,6 @@ export const PROVIDERS_MD = `# FluxFlow AI Providers & Setup
 ## Setup: 9Router
 1. Install NPM Package (9router)
 2. Set ENV ENABLE_9ROUTER=true
-  * NINEROUTER_URL = https://.../v1/chat/completions Support external openai compatible endpoints too
+  * NINEROUTER_URL = https://.../v1/chat/completions Support external openai compatible endpoints too, for direct URL changes no need for 9router package. But 9router package gives better reliability and Anthropic stye endpoint support
   * NINEROUTER_KEY = If any needed
 `;

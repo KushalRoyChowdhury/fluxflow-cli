@@ -1,6 +1,6 @@
 {
     "name": "fluxflow-cli",
-    "version": "4.24.9",
+    "version": "4.25.0",
     "date": "2026-10-03",
     "description": "One of the lightest, fastest, high-fidelity agentic CLI with sub-agents & computer use.",
     "keywords": [
@@ -43,7 +43,7 @@
     },
     "scripts": {
         "start": "tsx ./src/cli.jsx",
-        "build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --splitting --minify --tree-shaking=true --chunk-names=chunks/[name]-[hash] --outdir=./dist --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:node-pty --external:html-to-docx --external:typescript --external:ws --external:web-tree-sitter --external:diff --external:dotenv --external:fast-glob --external:turndown --external:turndown-plugin-gfm --external:@nut-tree-fork/nut-js --external:sharp --external:screenshot-desktop --external:tesseract.js --external:ollama --external:minimatch && copy package.json dist\\package.json && copy src\\entry.js dist\\entry.js && copy model_config.json dist\\model_config.json"
+        "build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --splitting --minify --tree-shaking=true --chunk-names=chunks/[name]-[hash] --outdir=./dist --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:node-pty --external:html-to-docx --external:typescript --external:ws --external:web-tree-sitter --external:diff --external:dotenv --external:fast-glob --external:turndown --external:turndown-plugin-gfm --external:@nut-tree-fork/nut-js --external:sharp --external:screenshot-desktop --external:tesseract.js --external:ollama --external:minimatch --external:onnxruntime-node && copy package.json dist\\package.json && copy src\\entry.js dist\\entry.js && copy model_config.json dist\\model_config.json"
     },
     "dependencies": {
         "@google/genai": "^1.52.0",
@@ -64,6 +64,7 @@
         "nanoid": "^5.1.9",
         "node-pty": "^1.1.0",
         "ollama": "^0.6.3",
+        "onnxruntime-node": "^1.30.0",
         "pdf-lib": "^1.17.1",
         "puppeteer": "24.43.1",
         "react": "^19.2.5",

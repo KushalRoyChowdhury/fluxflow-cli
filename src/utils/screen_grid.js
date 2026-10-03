@@ -17,13 +17,19 @@ export const GRID_CONFIG = {
     ROWS: 30
 };
 
+// Debug & Model Toggle: Set to false to bypass the ONNX model completely and use only heuristic math
+export const useModel = process.env.USE_UI_MODEL !== 'false' && true;
+
+// Debug Toggle: Set to true to output pure raw ONNX model bounding boxes with zero heuristic math merging
+export const rawModelOnly = process.env.RAW_MODEL_ONLY === 'true' || false;
+
 // Store detected element bounding boxes for dynamic targeting
 let detectedUIElements = [];
 
 /**
  * Detects UI element bounding boxes by analyzing pixel luminance variance / edge density in 40x30 fine grid cells.
  */
-async function detectActiveGridCells(rawBuffer) {
+async function detectActiveGridCells(rawBuffer, isModelMode = false) {
     try {
         const { data, info } = await sharp(rawBuffer)
             .resize(GRID_CONFIG.TARGET_WIDTH, GRID_CONFIG.TARGET_HEIGHT, { fit: 'fill' })
@@ -290,6 +296,86 @@ async function detectActiveGridCells(rawBuffer) {
             }
         }
 
+        // ONLY in Model Mode: Merge 3 or more consecutive horizontally adjacent 2-cell vertical boxes into 1 unified box
+        if (isModelMode) {
+            const mergedModelMath = [];
+            const twoCellBoxes = finalBoxes.filter(b => b.isCustomY || (b.cellH > cellH * 1.5));
+            const otherBoxes = finalBoxes.filter(b => !(b.isCustomY || (b.cellH > cellH * 1.5)));
+
+            const byRow = new Map();
+            for (const b of twoCellBoxes) {
+                const key = b.startY;
+                if (!byRow.has(key)) byRow.set(key, []);
+                byRow.get(key).push(b);
+            }
+
+            for (const [rowY, rowBoxes] of byRow.entries()) {
+                rowBoxes.sort((a, b) => a.startX - b.startX);
+                let currentRun = [];
+
+                for (let i = 0; i < rowBoxes.length; i++) {
+                    const b = rowBoxes[i];
+                    if (currentRun.length === 0) {
+                        currentRun.push(b);
+                    } else {
+                        const prev = currentRun[currentRun.length - 1];
+                        if (Math.abs((prev.startX + prev.cellW) - b.startX) <= 3) {
+                            currentRun.push(b);
+                        } else {
+                            if (currentRun.length >= 3) {
+                                const startX = currentRun[0].startX;
+                                const endX = currentRun[currentRun.length - 1].startX + currentRun[currentRun.length - 1].cellW;
+                                const boxW = endX - startX;
+                                const boxH = currentRun[0].cellH;
+                                mergedModelMath.push({
+                                    cellNum: currentRun[0].cellNum,
+                                    cx: Math.floor(startX + boxW / 2),
+                                    cy: currentRun[0].cy,
+                                    cellW: boxW,
+                                    cellH: boxH,
+                                    startX,
+                                    startY: rowY,
+                                    yOffset: 0,
+                                    isCustomY: true
+                                });
+                            } else {
+                                mergedModelMath.push(...currentRun);
+                            }
+                            currentRun = [b];
+                        }
+                    }
+                }
+
+                if (currentRun.length >= 3) {
+                    const startX = currentRun[0].startX;
+                    const endX = currentRun[currentRun.length - 1].startX + currentRun[currentRun.length - 1].cellW;
+                    const boxW = endX - startX;
+                    const boxH = currentRun[0].cellH;
+                    mergedModelMath.push({
+                        cellNum: currentRun[0].cellNum,
+                        cx: Math.floor(startX + boxW / 2),
+                        cy: currentRun[0].cy,
+                        cellW: boxW,
+                        cellH: boxH,
+                        startX,
+                        startY: rowY,
+                        yOffset: 0,
+                        isCustomY: true
+                    });
+                } else {
+                    mergedModelMath.push(...currentRun);
+                }
+            }
+
+            finalBoxes.length = 0;
+            finalBoxes.push(...mergedModelMath, ...otherBoxes);
+        }
+
+        // Assign clean sequential badge IDs (1, 2, 3... N) to final active UI boxes
+        finalBoxes.forEach((box, index) => {
+            box.badgeId = index + 1;
+        });
+
         detectedUIElements = finalBoxes;
         return finalBoxes;
     } catch (err) {
@@ -319,25 +405,59 @@ function generateSmartGridSvgOverlay(width, height, cols, rows, activeCells = []
 
     // Render clean Set-of-Marks (SoM) cell badges ONLY on active UI element cells
     for (const cell of activeCells) {
-        const { cellNum, startX, startY, cellW, cellH, cx, cy } = cell;
+        const { badgeId, cellNum, startX, startY, cellW, cellH, cx, cy } = cell;
+        const displayLabel = badgeId !== undefined ? badgeId : cellNum;
 
         // Thin subtle cyan bounding rectangle around detected active cell
         gridContent += `
             <rect x="${startX + 1}" y="${startY + 1}" width="${cellW - 2}" height="${cellH - 2}" fill="rgba(0, 255, 255, 0.015)" stroke="rgba(255, 255, 0, 0.3)" stroke-width="1.1" rx="2"/>
         `;
 
+        // Check if there are immediately touching neighbor cells above or below
+        const hasCellAbove = activeCells.some(o => 
+            o !== cell && 
+            (o.startY + o.cellH) >= startY - 6 && 
+            o.startY < startY && 
+            Math.max(0, Math.min(startX + cellW, o.startX + o.cellW) - Math.max(startX, o.startX)) > 10
+        );
+
+        const hasCellBelow = activeCells.some(o => 
+            o !== cell && 
+            o.startY <= (startY + cellH + 6) && 
+            o.startY > startY && 
+            Math.max(0, Math.min(startX + cellW, o.startX + o.cellW) - Math.max(startX, o.startX)) > 10
+        );
+
         let textY;
         if (cell.isCustomY) {
             textY = cy;
+            if (!hasCellAbove && textY < startY + 11) {
+                textY = Math.max(10, Math.min(textY, startY + 4));
+            }
         } else {
-            const rawTextY = cy + (cell.yOffset !== undefined ? cell.yOffset : 3);
-            // Clamp textY so the SVG text stays inside box boundaries while allowing lower placement
-            textY = Math.max(startY + 11, Math.min(startY + cellH + 3, rawTextY));
+            let offset = cell.yOffset !== undefined ? cell.yOffset : 3;
+            // If text is centered/tall and headroom is available, give a slightly more generous upward push
+            if (!hasCellAbove && offset < 0) {
+                offset = Math.min(offset, -12);
+            }
+            const rawTextY = cy + offset;
+
+            // If shifting UP and headroom is free above: allow extra buffer headroom up to startY + 4
+            // If shifting DOWN and room is free below: allow extra buffer room up to startY + cellH + 6
+            const minY = (!hasCellAbove && (offset < 0 || rawTextY < startY + 11))
+                ? Math.max(10, startY + 4)
+                : startY + 11;
+
+            const maxY = (!hasCellBelow && (offset > 0 || rawTextY > startY + cellH - 2))
+                ? Math.min(height - 2, startY + cellH + 6)
+                : startY + cellH + 3;
+
+            textY = Math.max(minY, Math.min(maxY, rawTextY));
         }
 
         // Centered number text per cell with dynamic text-avoidance Y-shift
         gridContent += `
-            <text x="${cx}" y="${textY}" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#FFFF00" stroke="#000000" stroke-width="2" paint-order="stroke fill" stroke-linejoin="round" opacity="0.8" text-anchor="middle">${cellNum}</text>
+            <text x="${cx}" y="${textY}" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#FFFF00" stroke="#000000" stroke-width="2" paint-order="stroke fill" stroke-linejoin="round" opacity="0.8" text-anchor="middle">${displayLabel}</text>
         `;
     }
 
@@ -404,12 +524,163 @@ async function captureStableScreenshot() {
 }
 
 /**
+ * Merges ONNX model boxes with heuristic detection clusters, taking model boxes as primary base.
+ */
+function mergeDetections(modelBoxes = [], heuristicBoxes = []) {
+    if (!modelBoxes || modelBoxes.length === 0) return heuristicBoxes || [];
+    if (!heuristicBoxes || heuristicBoxes.length === 0) return modelBoxes;
+
+    const merged = [...modelBoxes];
+    const getModelConf = typeof modelBoxes.getModelConfidence === 'function'
+        ? modelBoxes.getModelConfidence.bind(modelBoxes)
+        : null;
+
+    // Add heuristic cluster ONLY IF the model detected non-zero UI confidence in that region
+    // AND it doesn't overlap with any existing model box
+    for (const hBox of heuristicBoxes) {
+        // Only consider math box if model saw potential UI features (confidence >= 0.01)
+        if (getModelConf) {
+            const rawScore = getModelConf(hBox.startX, hBox.startY, hBox.cellW, hBox.cellH);
+            // If the model gave < 0.01 confidence to this region, ignore math box
+            if (rawScore < 0.01) {
+                continue;
+            }
+        }
+
+        let curX1 = hBox.startX;
+        let curX2 = hBox.startX + hBox.cellW;
+        const curY1 = hBox.startY;
+        const curY2 = hBox.startY + hBox.cellH;
+
+        // Trim math box horizontal bounds to exclude any model boxes overlapping from left or right
+        for (const mBox of modelBoxes) {
+            const mX1 = mBox.startX;
+            const mY1 = mBox.startY;
+            const mX2 = mBox.startX + mBox.cellW;
+            const mY2 = mBox.startY + mBox.cellH;
+
+            // Check if mBox overlaps vertically
+            const vOverlap = Math.max(0, Math.min(curY2, mY2) - Math.max(curY1, mY1));
+            if (vOverlap > hBox.cellH * 0.4) {
+                // Check if mBox overlaps horizontally
+                if (mX1 < curX2 && mX2 > curX1) {
+                    const mCenterX = (mX1 + mX2) / 2;
+                    const hCenterX = (curX1 + curX2) / 2;
+                    if (mCenterX <= hCenterX) {
+                        // Model box is on the left half: advance left edge past model box
+                        curX1 = Math.max(curX1, mX2);
+                    } else {
+                        // Model box is on the right half: pull right edge back to model box
+                        curX2 = Math.min(curX2, mX1);
+                    }
+                }
+            }
+        }
+
+        const trimmedW = curX2 - curX1;
+        if (trimmedW < 18) {
+            continue;
+        }
+
+        const hX1 = curX1;
+        const hY1 = curY1;
+        const hX2 = curX2;
+        const hY2 = curY2;
+        const hCx = Math.floor(curX1 + trimmedW / 2);
+        const hCy = hBox.cy;
+
+        let overlaps = false;
+        for (const mBox of modelBoxes) {
+            const mX1 = mBox.startX;
+            const mY1 = mBox.startY;
+            const mX2 = mBox.startX + mBox.cellW;
+            const mY2 = mBox.startY + mBox.cellH;
+
+            // 1. Center-point containment check: if math box center is inside model box, it's a duplicate
+            if (hCx >= mX1 && hCx <= mX2 && hCy >= mY1 && hCy <= mY2) {
+                overlaps = true;
+                break;
+            }
+
+            const xA = Math.max(hX1, mX1);
+            const yA = Math.max(hY1, mY1);
+            const xB = Math.min(hX2, mX2);
+            const yB = Math.min(hY2, mY2);
+
+            const interArea = Math.max(0, xB - xA) * Math.max(0, yB - yA);
+            const hArea = (hX2 - hX1) * (hY2 - hY1);
+
+            // 2. Area overlap check: if >= 25% of math box area is covered by model box, discard duplicate
+            if (interArea / (hArea || 1) >= 0.25) {
+                overlaps = true;
+                break;
+            }
+        }
+
+        if (!overlaps) {
+            merged.push({
+                ...hBox,
+                startX: hX1,
+                cellW: trimmedW,
+                cx: hCx
+            });
+        }
+    }
+
+    // Sort top-to-bottom, left-to-right for consistent sequential badge numbering
+    merged.sort((a, b) => {
+        if (Math.abs(a.startY - b.startY) > 18) {
+            return a.startY - b.startY;
+        }
+        return a.startX - b.startX;
+    });
+
+    merged.forEach((box, index) => {
+        box.badgeId = index + 1;
+    });
+
+    return merged;
+}
+
+/**
  * Captures desktop screenshot, detects active UI elements, composites Set-of-Marks overlay, saves debug preview, and returns base64 PNG payload.
  */
 export async function captureGriddedScreenshot() {
     try {
         const rawBuffer = await captureStableScreenshot();
-        const activeCells = await detectActiveGridCells(rawBuffer);
+
+        let activeCells = null;
+
+        if (useModel) {
+            // 1. Run ONNX Model (and optionally heuristic math in parallel)
+            const onnxPromise = (async () => {
+                try {
+                    const { detectUIBoxesONNX } = await import('./ui_detector_onnx.js');
+                    return await detectUIBoxesONNX(rawBuffer, GRID_CONFIG.TARGET_WIDTH, GRID_CONFIG.TARGET_HEIGHT);
+                } catch (e) {
+                    return null;
+                }
+            })();
+
+            if (rawModelOnly) {
+                // Debug Mode: Pure raw model output with zero heuristic math merging
+                const modelBoxes = await onnxPromise;
+                activeCells = modelBoxes || [];
+            } else {
+                const heuristicPromise = detectActiveGridCells(rawBuffer, true);
+                const [modelBoxes, heuristicBoxes] = await Promise.all([onnxPromise, heuristicPromise]);
+
+                // 2. Merge detections (Model as primary base + non-overlapping heuristic boxes)
+                activeCells = (modelBoxes && modelBoxes.length > 0)
+                    ? mergeDetections(modelBoxes, heuristicBoxes)
+                    : (await detectActiveGridCells(rawBuffer, false));
+            }
+        } else {
+            // Debug Mode: Model disabled, use only heuristic math detection
+            activeCells = await detectActiveGridCells(rawBuffer, false);
+        }
+
+        detectedUIElements = activeCells;
 
         const svgOverlay = generateSmartGridSvgOverlay(
             GRID_CONFIG.TARGET_WIDTH,
@@ -487,15 +758,18 @@ export function parseGridCodeTo720p(gridInput) {
 
     if (cellNum === null || isNaN(cellNum)) return null;
 
-    // Check if cellNum matches a detected merged UI element box
+    // Check if cellNum matches a detected active UI element badge ID (1..N) or fallback cellNum
     if (detectedUIElements && detectedUIElements.length > 0) {
-        const mergedMatch = detectedUIElements.find(box => box.cellNum === cellNum);
-        if (mergedMatch) {
+        const badgeMatch = detectedUIElements.find(box => box.badgeId === cellNum) ||
+                           detectedUIElements.find(box => box.cellNum === cellNum);
+        if (badgeMatch) {
+            const rawCol = Math.floor((badgeMatch.cellNum - 1) % GRID_CONFIG.COLS);
+            const rawRow = Math.floor((badgeMatch.cellNum - 1) / GRID_CONFIG.COLS);
             return {
-                x: mergedMatch.cx,
-                y: mergedMatch.cy,
-                colIdx: Math.floor((cellNum - 1) % GRID_CONFIG.COLS),
-                rowIdx: Math.floor((cellNum - 1) / GRID_CONFIG.COLS),
+                x: badgeMatch.cx,
+                y: badgeMatch.cy,
+                colIdx: rawCol >= 0 ? rawCol : 0,
+                rowIdx: rawRow >= 0 ? rawRow : 0,
                 cellNum
             };
         }

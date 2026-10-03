@@ -8,7 +8,7 @@ import { LOGS_DIR } from './paths.js';
 export const parseAgentText = (text) => {
     if (!text) return [];
     const blocks = [];
-    const toolRegex = /\[tool:(.*?)\((.*?)\)\]/g;
+    const toolRegex = /\[(?:tool|action):(.*?)\(([\s\S]*?)\)\]/g;
     let lastIndex = 0;
     let match;
 
