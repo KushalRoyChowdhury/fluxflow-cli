@@ -396,12 +396,12 @@ export const click = async (args, context = {}) => {
             let bestMatch = null;
             let matchSource = '';
 
-            const MAX_TRUST_RADIUS_PX = targetPoint ? 220 : 500;
+            const MAX_TRUST_RADIUS_PX = targetPoint ? 320 : 500;
 
-            // ─── PASS 1: Centered Target Crop (3x Zoom Window, 2x Upscale) ────
+            // ─── PASS 1: Centered Target Crop (2x Zoom Window, 2x Upscale) ────
             if (targetPoint) {
-                const cropW = Math.min(Math.round(screenW / 3), screenW);
-                const cropH = Math.min(Math.round(screenH / 3), screenH);
+                const cropW = Math.min(Math.round(screenW / 2), screenW);
+                const cropH = Math.min(Math.round(screenH / 2), screenH);
                 const cropLeft = Math.max(0, Math.min(screenW - cropW, targetCoords.x - Math.floor(cropW / 2)));
                 const cropTop = Math.max(0, Math.min(screenH - cropH, targetCoords.y - Math.floor(cropH / 2)));
 
