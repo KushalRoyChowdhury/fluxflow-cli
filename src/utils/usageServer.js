@@ -638,7 +638,8 @@ function generateDashboardHtml() {
 
         .table-timed td,
         .table-daily td,
-        .table-models td {
+        .table-models td,
+        .table-providers td {
             white-space: nowrap;
         }
 
@@ -970,7 +971,8 @@ function generateDashboardHtml() {
                     <div class="tabs-group" id="table-mode-tabs">
                         <button class="tab-btn active" data-table-mode="daily">Daily Records</button>
                         <button class="tab-btn" data-table-mode="models">Model Stats</button>
-            <button class="tab-btn" data-table-mode="timed">Timed (Per-Call)</button>
+            <button class="tab-btn" data-table-mode="providers">Provider Stats</button>
+                        <button class="tab-btn" data-table-mode="timed">Timed (Per-Call)</button>
                     </div>
                     <input type="text" id="table-search" placeholder="Search..." style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.8rem; outline: none;">
                 </div>
@@ -1008,6 +1010,8 @@ function generateDashboardHtml() {
         let modelSortOrder = 'desc';
         let timedSortField = 'time';
         let timedSortOrder = 'desc';
+        let providerSortField = 'tokens';
+        let providerSortOrder = 'desc';
         let timedCurrentPage = 1;
         const timedPageSize = 69;
         let timelineChart = null;
@@ -1745,6 +1749,13 @@ function generateDashboardHtml() {
                     modelSortField = field;
                     modelSortOrder = (field === 'model' || field === 'provider') ? 'asc' : 'desc';
                 }
+            } else if (tableMode === 'providers') {
+                if (providerSortField === field) {
+                    providerSortOrder = providerSortOrder === 'asc' ? 'desc' : 'asc';
+                } else {
+                    providerSortField = field;
+                    providerSortOrder = (field === 'provider') ? 'asc' : 'desc';
+                }
             } else {
                 if (timedSortField === field) {
                     timedSortOrder = timedSortOrder === 'asc' ? 'desc' : 'asc';
@@ -1966,6 +1977,83 @@ function generateDashboardHtml() {
                             </td>
                         </tr>
                     \`;
+                }).join('');
+            } else if (tableMode === 'providers') {
+                if (paginationContainer) paginationContainer.style.display = 'none';
+                titleEl.textContent = 'Provider Statistics';
+                subtitleEl.textContent = 'Requests and tokens per provider for the selected range';
+                searchInput.placeholder = 'Filter by provider...';
+
+                thead.innerHTML = '<tr>' +
+                    '<th class=sortable onclick=handleSort(&#39;provider&#39;)>Provider ' + getSortIndicator('provider', providerSortField, providerSortOrder) + '</th>' +
+                    '<th class=sortable onclick=handleSort(&#39;requests&#39;)>Requests ' + getSortIndicator('requests', providerSortField, providerSortOrder) + '</th>' +
+                    '<th class=sortable onclick=handleSort(&#39;promptTokens&#39;)>INPUT ' + getSortIndicator('promptTokens', providerSortField, providerSortOrder) + '</th>' +
+                    '<th class=sortable onclick=handleSort(&#39;cachePct&#39;)>Cache % ' + getSortIndicator('cachePct', providerSortField, providerSortOrder) + '</th>' +
+                    '<th class=sortable onclick=handleSort(&#39;candidateTokens&#39;)>OUTPUT ' + getSortIndicator('candidateTokens', providerSortField, providerSortOrder) + '</th>' +
+                    '<th class=sortable onclick=handleSort(&#39;tokens&#39;)>Total Tokens ' + getSortIndicator('tokens', providerSortField, providerSortOrder) + '</th>' +
+                    '</tr>';
+
+                const provMap = {};
+                let grandTokens = 0;
+                timeline.forEach(day => {
+                    const reqs = day.providerRequests || {};
+                    const models = day.models || {};
+                    const provSet = new Set([...Object.keys(reqs), ...Object.keys(models)]);
+                    provSet.forEach(prov => {
+                        if (!provMap[prov]) {
+                            provMap[prov] = { provider: prov, requests: 0, tokens: 0, cachedTokens: 0, candidateTokens: 0, promptTokens: 0 };
+                        }
+                        provMap[prov].requests += reqs[prov] || 0;
+                        const provModels = models[prov] || {};
+                        for (const m in provModels) {
+                            const entry = provModels[m] || {};
+                            const tTok = entry.tokens || 0;
+                            const tCand = entry.candidateTokens || 0;
+                            provMap[prov].tokens += tTok;
+                            provMap[prov].candidateTokens += tCand;
+                            provMap[prov].cachedTokens += (entry.cachedTokens || 0);
+                            provMap[prov].promptTokens += Math.max(0, tTok - tCand);
+                            grandTokens += tTok;
+                        }
+                    });
+                });
+
+                let provList = Object.values(provMap).map(item => {
+                    const cachePct = item.promptTokens > 0 ? ((item.cachedTokens / item.promptTokens) * 100).toFixed(1) : '0.0';
+                    return { ...item, cachePct: parseFloat(cachePct) };
+                });
+
+                provList.sort((a, b) => {
+                    let valA = a[providerSortField];
+                    let valB = b[providerSortField];
+                    if (providerSortField === 'provider') {
+                        valA = (valA || '').toLowerCase();
+                        valB = (valB || '').toLowerCase();
+                        return providerSortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                    }
+                    valA = valA || 0;
+                    valB = valB || 0;
+                    return providerSortOrder === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+                });
+
+                if (filterText) {
+                    provList = provList.filter(p => p.provider.toLowerCase().includes(filterText));
+                }
+
+                if (provList.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan=6 style=text-align:center;color:var(--text-dim);padding:2rem;>No provider data for this range.</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = provList.map(function(p) {
+                    var sharePct = grandTokens > 0 ? ((p.tokens / grandTokens) * 100).toFixed(1) : '0.0';
+                    var cachedTxt = p.cachedTokens > 0 ? ' <span style=color:#059669;font-size:0.85em;>(' + formatNumber(p.cachedTokens) + ' cached)</span>' : '';
+                    return '<tr><td><span class=badge-info style=font-size:0.75rem;display:inline-flex;align-items:center;gap:6px;>' + getProviderBrandIcon(p.provider, 16) + ' ' + p.provider + '</span></td>' +
+                        '<td class=mono style=font-weight:700;color:var(--accent-amber);>' + p.requests.toLocaleString() + '</td>' +
+                        '<td class=mono style=color:var(--accent-emerald);>' + formatNumber(p.promptTokens) + cachedTxt + '</td>' +
+                        '<td><span class=badge-positive style=font-size:0.75rem;>' + p.cachePct + '%</span></td>' +
+                        '<td class=mono style=color:var(--accent-violet);>' + formatNumber(p.candidateTokens) + '</td>' +
+                        '<td class=mono style=font-weight:700;color:var(--text-main);>' + formatNumber(p.tokens) + ' <span style=color:var(--text-muted);font-size:0.75em;font-weight:500;>(' + sharePct + '%)</span></td></tr>';
                 }).join('');
             } else if (tableMode === 'timed') {
                 titleEl.textContent = 'Per-Request Timed Log';
