@@ -128,7 +128,21 @@ const QUOTES = [
   '✨ Physics called — it wants its gravity back.',
   '🎇 That was 100% JavaScript. No pixels were harmed.',
   '🌟 Thanks for watching! Tip your local terminal.',
-];
+  '🪐 The fireworks have returned to the void. You may now resume scrolling.',
+  '💤 Every spark dies. Like my motivation on a Monday.',
+  '🔥 This script served. The terminal is forever changed.',
+  '🌌 You are now 60 seconds closer to death. You spent them watching me explode.',
+  '🪄 Abracadabra — now you\'re back at your shell. Magic, isn\'t it?',
+  '🚀 The rocket has reached maximum regret. Landing in peace.',
+  '☠️ Ctrl+C is always the escape route. You could have just... not.',
+  '🌡️ The CPU fan has calmed. The fire is out. For now.',
+  '🧠 The garbage collector cleaned up after us this time. No memory leak. No guilt.',
+  '🪦 Here lies the process. It exited with code 0. A perfect death.',
+  '🌀 Somewhere, a stack overflow is quietly jealous of that performance.',
+  '🐇 The terminal rabbit hole goes deep. We surfaced briefly. Goodbye.',
+  '⚡ The kernel blinked. The user blinked harder. We both lost.',
+]
+
 
 setTimeout(() => cleanup('\n' + pick(QUOTES)), DURATION_MS).unref();
 

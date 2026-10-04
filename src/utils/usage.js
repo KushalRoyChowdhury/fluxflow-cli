@@ -138,98 +138,128 @@ export const forceFlushUsage = async () => {
   * O(1) append writes, no in-memory cache, no AES, no debounce.
   * USAGE_FILE_TIMED is a DIRECTORY; each day is timed_usage/YYYY-MM-DD.jsonl
   */
- const TIMED_RETENTION_DAYS = 30;
+const MAX_TIMED_ENTRIES = 500;
+let timedAppendCount = 0;
 
- const todayFile = () => {
-     const d = new Date();
-     const ymd = d.toISOString().split('T')[0];
-     return path.join(USAGE_FILE_TIMED, `${ymd}.jsonl`);
- };
+const todayFile = () => {
+    const d = new Date();
+    const ymd = d.toISOString().split('T')[0];
+    return path.join(USAGE_FILE_TIMED, `${ymd}.jsonl`);
+};
 
- /**
-  * Appends one request's token breakdown as a single JSONL line.
-  * Fire-and-forget: never throws, never blocks the chat loop.
-  * @param {{provider:string, model:string, prompt:number, cached:number, output:number, reasoning?:number}} d
-  */
- export const recordTimedUsage = async (d) => {
-     try {
-         await fs.ensureDir(USAGE_FILE_TIMED);
-         const entry = {
-             time: new Date().toISOString(),
-             provider: d.provider || 'unknown',
-             model: d.model || 'unknown',
-             input: Number(d.prompt) || 0,
-             cached: Number(d.cached) || 0,
-             output: Number(d.output) || 0,
-             reasoning: Number(d.reasoning) || 0,
-         };
-         await fs.appendFile(todayFile(), JSON.stringify(entry) + '\n', 'utf8');
-     } catch {
-         // best-effort; a log write must never crash the agent
-     }
- };
+/**
+ * Appends one request's token breakdown as a single JSONL line.
+ * Fire-and-forget: never throws, never blocks the chat loop.
+ * @param {{provider:string, model:string, prompt:number, cached:number, output:number, reasoning?:number}} d
+ */
+export const recordTimedUsage = async (d) => {
+    try {
+        await fs.ensureDir(USAGE_FILE_TIMED);
+        const entry = {
+            time: new Date().toISOString(),
+            provider: d.provider || 'unknown',
+            model: d.model || 'unknown',
+            input: Number(d.prompt) || 0,
+            cached: Number(d.cached) || 0,
+            output: Number(d.output) || 0,
+            reasoning: Number(d.reasoning) || 0,
+        };
+        await fs.appendFile(todayFile(), JSON.stringify(entry) + '\n', 'utf8');
 
- /**
- * Deletes daily JSONL files older than TIMED_RETENTION_DAYS.
+        // Throttled trim so the log stays bounded even within a long session
+        if (++timedAppendCount >= 25) {
+            timedAppendCount = 0;
+            await purgeTimedUsage();
+        }
+    } catch {
+        // best-effort; a log write must never crash the agent
+    }
+};
+
+/**
+ * Trims the timed JSONL log down to the most-recent MAX_TIMED_ENTRIES lines.
+ * Entries are kept in chronological order across all daily files; oldest
+ * files/lines are removed first.
  */
 const purgeTimedUsage = async () => {
     try {
         if (!(await fs.exists(USAGE_FILE_TIMED))) return;
-         const cutoff = new Date();
-         cutoff.setDate(cutoff.getDate() - TIMED_RETENTION_DAYS);
-         const files = await fs.readdir(USAGE_FILE_TIMED);
-         for (const f of files) {
-             if (!f.endsWith('.jsonl')) continue;
-             const ymd = f.replace('.jsonl', '');
-             if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) continue;
-             if (new Date(ymd) < cutoff) {
-                 await fs.remove(path.join(USAGE_FILE_TIMED, f));
-             }
-         }
-     } catch {}
- };
+        const files = (await fs.readdir(USAGE_FILE_TIMED))
+            .filter((f) => f.endsWith('.jsonl'))
+            .sort();
 
- /**
-  * Reads the last N days of timed usage entries (most-recent file first).
-  * @param {number} days how many trailing calendar files to read
-  * @returns {Promise<Array<{time:string,provider:string,model:string,input:number,cached:number,output:number}>>}
-  */
- export const getTimedUsage = async (days = TIMED_RETENTION_DAYS) => {
-     const out = [];
-     try {
-         if (!(await fs.exists(USAGE_FILE_TIMED))) return out;
-         const files = (await fs.readdir(USAGE_FILE_TIMED))
-             .filter((f) => f.endsWith('.jsonl'))
-             .sort();
-         const recent = files.slice(-Math.max(1, days));
-         for (const f of recent) {
-             try {
-                 const raw = await fs.readFile(path.join(USAGE_FILE_TIMED, f), 'utf8');
-                 for (const line of raw.split('\n')) {
-                     if (!line.trim()) continue;
-                     try {
-                         out.push(JSON.parse(line));
-                     } catch (parseErr) {
-                         await logUsageError(`getTimedUsage:parseLine (${f})`, parseErr);
-                     }
-                 }
-             } catch (readErr) {
-                 await logUsageError(`getTimedUsage:readFile (${f})`, readErr);
-             }
-         }
-     } catch (err) {
-         await logUsageError('getTimedUsage', err);
-     }
-     return out;
- };
+        const parsed = [];
+        for (const f of files) {
+            try {
+                const raw = await fs.readFile(path.join(USAGE_FILE_TIMED, f), 'utf8');
+                for (const line of raw.split('\n')) {
+                    if (!line.trim()) continue;
+                    parsed.push({ file: f, line });
+                }
+            } catch { }
+        }
 
- /**
-  * Initializes the usage cache + timed retention purge
-  */
- export const initUsage = async () => {
-     cachedUsage = await loadUsageFromFile();
-     await purgeTimedUsage();
- };
+        if (parsed.length <= MAX_TIMED_ENTRIES) return;
+
+        const kept = parsed.slice(-MAX_TIMED_ENTRIES);
+        const byFile = new Map();
+        for (const e of kept) {
+            if (!byFile.has(e.file)) byFile.set(e.file, []);
+            byFile.get(e.file).push(e.line);
+        }
+
+        for (const f of files) {
+            const lines = byFile.get(f);
+            if (!lines || lines.length === 0) {
+                await fs.remove(path.join(USAGE_FILE_TIMED, f));
+            } else {
+                await fs.writeFile(path.join(USAGE_FILE_TIMED, f), lines.join('\n') + '\n', 'utf8');
+            }
+        }
+    } catch { }
+};
+
+/**
+ * Reads the last N days of timed usage entries (most-recent file first).
+ * @param {number} days how many trailing calendar files to read
+ * @returns {Promise<Array<{time:string,provider:string,model:string,input:number,cached:number,output:number}>>}
+ */
+export const getTimedUsage = async (days = 30) => {
+    const out = [];
+    try {
+        if (!(await fs.exists(USAGE_FILE_TIMED))) return out;
+        const files = (await fs.readdir(USAGE_FILE_TIMED))
+            .filter((f) => f.endsWith('.jsonl'))
+            .sort();
+        const recent = files.slice(-Math.max(1, days));
+        for (const f of recent) {
+            try {
+                const raw = await fs.readFile(path.join(USAGE_FILE_TIMED, f), 'utf8');
+                for (const line of raw.split('\n')) {
+                    if (!line.trim()) continue;
+                    try {
+                        out.push(JSON.parse(line));
+                    } catch (parseErr) {
+                        await logUsageError(`getTimedUsage:parseLine (${f})`, parseErr);
+                    }
+                }
+            } catch (readErr) {
+                await logUsageError(`getTimedUsage:readFile (${f})`, readErr);
+            }
+        }
+    } catch (err) {
+        await logUsageError('getTimedUsage', err);
+    }
+    return out;
+};
+
+/**
+ * Initializes the usage cache + timed retention purge
+ */
+export const initUsage = async () => {
+    cachedUsage = await loadUsageFromFile();
+    await purgeTimedUsage();
+};
 
 /**
  * Gets the daily usage stats from memory

@@ -183,7 +183,8 @@ export const WITTY_LOADING_PHRASES = [
     'Petting the holographic giant cat',
     'Securing payload for Earth re-entry',
 
-    // --- Halo --- 'Launching Halo ring just kidding, still loading.',
+    // --- Halo ---
+    'Launching Halo ring just kidding, still loading.',
     'Wort wort wort!',
     'Did you touch my Warthog?',
     'One small step for man, one giant leap for the loading bar.',
@@ -194,7 +195,8 @@ export const WITTY_LOADING_PHRASES = [
     'Counting sheep wait, wrong game.',
     'S-Tier loading screen incoming.',
 
-    // --- GTA --- 'Traffic jam in the information highway.',
+    // --- GTA ---
+    'Traffic jam in the information highway.',
     'Alarm blaring it\'s just your internet connection.',
     'Looking for a helicopter or just your patience.',
     'Need a taxi? Just kidding, I\'m loading.',

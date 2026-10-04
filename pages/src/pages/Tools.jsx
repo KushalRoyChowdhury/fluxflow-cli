@@ -50,7 +50,7 @@ export default function Tools() {
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Communication (Ask)</td>
+                        <td>Communication (AskUser)</td>
                         <td>✅ Available</td>
                         <td>✅ Available</td>
                         <td>✅ Available</td>
@@ -74,7 +74,7 @@ export default function Tools() {
                         <td>✅ FluxCU / ❌ ICU</td>
                     </tr>
                     <tr>
-                        <td>Todo (Planning)</td>
+                        <td>Goal (Planning)</td>
                         <td>✅ Available</td>
                         <td>❌ Restricted</td>
                         <td>✅ FluxCU / ❌ ICU</td>
@@ -141,6 +141,12 @@ export default function Tools() {
                     </ul>
                 </li>
                 <li>
+                    <strong><code>FindFile</code></strong> — Locates a file path across the workspace using exact, glob, substring, and fuzzy (bigram) name matching. Extension optional.
+                    <ul>
+                        <li><code>basename</code> <em>(string, required)</em>: File name, partial name, or glob pattern (e.g. <code>find_file.js</code>, <code>*.jsx</code>).</li>
+                    </ul>
+                </li>
+                <li>
                     <strong><code>CodeSearch</code></strong> <em>(or <code>SearchKeyword</code>)</em> — Performs fast project-wide code search with regex and fuzzy matching.
                     <ul>
                         <li><code>keyword</code> <em>(string, required)</em>: Search query, identifier, or regex pattern.</li>
@@ -156,7 +162,7 @@ export default function Tools() {
                     </ul>
                 </li>
                 <li>
-                    <strong><code>Todo</code></strong> — Manages a task list plan for complex multi-step sessions.
+                    <strong><code>Goal</code></strong> <em>(also <code>Todo</code>)</em> — Manages a task list plan for complex multi-step sessions.
                     <ul>
                         <li><code>method</code> <em>(string, required)</em>: Action to perform — <code>"create"</code>, <code>"append"</code>, or <code>"get"</code>.</li>
                         <li><code>tasks</code> <em>(string array, optional)</em>: List of task descriptions to add when creating or appending.</li>
@@ -183,7 +189,7 @@ export default function Tools() {
                     </ul>
                 </li>
                 <li>
-                    <strong><code>Ask</code></strong> — Prompts the user with structured multiple-choice options when faced with ambiguity, path divergence, or security decisions.
+                    <strong><code>AskUser</code></strong> <em>(also <code>Ask</code>)</em> — Prompts the user with structured multiple-choice options when faced with ambiguity, path divergence, or security decisions.
                     <ul>
                         <li><code>question</code> <em>(string, required)</em>: The clarifying inquiry or question presented to the user.</li>
                         <li><code>optionA..D</code> <em>(string, optional, max 4)</em>: Selectable options formatted as <code>"title::description"</code>.</li>

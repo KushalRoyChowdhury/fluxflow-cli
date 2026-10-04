@@ -8,14 +8,15 @@ export const TOOLS_MD = `# FluxFlow Tool Reference
 * PatchFile(path, searchContent1..15, newContent1..15, allowMultiple?) → Atomic multi-replacement; supports ^LINE:start..end$
 * WriteFile(path, content) → Create/overwrite file
 * ReadFolder(path, recurse?) → List directory tree (depth: 1-3)
+* FindFile(basename) → Locate file path by name/glob/fuzzy match (ext optional)
 * CodeSearch / SearchKeyword(keyword, path?, fuzzy?, regex?) → Fast text search; path="#docs" for doc index
 * Run(command) → Execute command in shell
-* Todo(method, tasks?, markDone?) → Planner ("create" | "append" | "get")
+* Goal(method, tasks?, markDone?) → Planner ("create" | "append" | "get"); alias: Todo
 
 ## 2. Web & Communication
 * WebSearch(query, aiMode?, limit?) → Live web search + AI summary
 * WebScrape(url) → Extract markdown from URL
-* Ask(question, optionA..D?) → Interactive prompt to user ("title::desc")
+* AskUser(question, optionA..D?) → Interactive prompt to user ("title::desc"); alias: Ask
 
 ## 3. Sub-Agents
 * InvokeSync(title, task) → Blocking sub-agent

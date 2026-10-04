@@ -24,6 +24,7 @@ Trigger in chat via /command
 ## Configuration & Model Controls
 * /settings → Full-screen interactive settings menu
 * /mode → Toggle Operating Mode
+* /display index → Select active screen for Computer Use mode
 * /model model-id --flags → Flags optional to customize list (--save, --remove, --default, /model old-model new-model --rename)
 * /provider → Switch AI provider
 * /thinking effort → Set reasoning effort. Can be mapped based on provider & model support (/thinking effort --map provider-effort-value/'rm' to unmap). Changes the Translation Table only for the currently selected provider and model
@@ -43,4 +44,6 @@ Trigger in chat via /command
 * /changelog → Release notes
 * /update check → Check npm updates
 * /update latest → Install latest release
+* /fluxflow init → Create local FluxFlow.md project-instructions template
+* /move → Transfer Playground session data to CWD/playground-export
 `;

@@ -196,12 +196,15 @@ export const adjustWindowsCommand = (command, usePowerShell = false) => {
         }
 
         if (char === '\\') {
-            // Check if the next character is a space (escaped space)
-            if (command[i + 1] === ' ') {
+            // Backslash escape for an escaped SPACE only when NOT inside quotes
+            // (CMD/PowerShell treat \ literal inside quoted strings; collapsing it here
+            //  was mangling quoted Windows paths/args like "My\ file" or "C:\a\b")
+            if (!inQuote && command[i + 1] === ' ') {
                 current += ' ';
-                i++; // Skip the space
+                i++; // Skip the escaped space
                 continue;
             }
+            // Preserve the backslash verbatim in every other case (paths, regex, \\\\)
             current += char;
             isEscaped = true;
             continue;
@@ -248,6 +251,21 @@ export const adjustWindowsCommand = (command, usePowerShell = false) => {
                     current = '';
                 }
                 tokens.push('|');
+            } else if ((char === '>' || char === '<') && (i === 0 || /\s|['"]/.test(command[i - 1] || ''))) {
+                // Tokenize redirection operators as STANDALONE tokens (>> before >).
+                // Downstream controlOperators lists expect '>', '>>', '<' as separate
+                // tokens; previously they were glued into neighbours, breaking
+                // redirect detection (e.g. "mkdir x > log", "echo hi > file").
+                if (current.length > 0) {
+                    tokens.push(current);
+                    current = '';
+                }
+                if (char === '>' && command[i + 1] === '>') {
+                    tokens.push('>>');
+                    i++; // consume the second >
+                } else {
+                    tokens.push(char);
+                }
             } else if (/\s/.test(char)) {
                 if (current.length > 0) {
                     tokens.push(current);

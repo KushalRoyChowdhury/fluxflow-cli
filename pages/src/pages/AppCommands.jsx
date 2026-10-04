@@ -45,6 +45,9 @@ export default function AppCommands() {
                     <strong><code>/thinking [fast|low|medium|high|max]</code></strong> — Adjust reasoning depth and thinking level.
                 </li>
                 <li>
+                    <strong><code>/wildcard-tooling</code></strong> & <strong><code>/wildercard-tooling</code></strong> — Tool compatibility mode for non-tooling models; <code>wildercard</code> is the extended variant.
+                </li>
+                <li>
                     <strong><code>/display [index]</code></strong> — Used for Computer Use mode to set which display screen the agent can see and operate on.
                 </li>
                 <li>
@@ -56,6 +59,7 @@ export default function AppCommands() {
             <ul>
                 <li><strong><code>/settings</code></strong> — Opens the main configuration menu for system preferences, external data, and sandbox presets.</li>
                 <li><strong><code>/budget</code></strong> — Set or view request and token quota limits.</li>
+                <li><strong><code>/provider</code></strong> — Switch the active AI provider (and its base URL / key routing).</li>
                 <li><strong><code>/key</code></strong> — Open the API Key management view to update or remove credentials.</li>
                 <li><strong><code>/profile</code></strong> — Update developer persona, nickname, and custom instructions.</li>
                 <li><strong><code>/memory</code></strong> — View and manage persistent long-term memories extracted by the Janitor.</li>
@@ -64,6 +68,8 @@ export default function AppCommands() {
             <h2 id="utility-commands">Utility Commands</h2>
             <ul>
                 <li><strong><code>/help</code></strong> — List all available commands in chat.</li>
+                <li><strong><code>/theme</code></strong> — Select the UI color theme.</li>
+                <li><strong><code>/usage</code></strong> — Opens the graphical token-usage analytics dashboard in the browser.</li>
                 <li><strong><code>/stats</code></strong> — Shows session token usage and context limits.</li>
                 <li><strong><code>/about</code></strong> — Displays project info, version, and credits.</li>
                 <li><strong><code>/changelog</code></strong> — Opens the latest release notes in your default browser.</li>
