@@ -208,9 +208,12 @@ export const search_keyword = async (args) => {
     if (rawKeyword === undefined || rawKeyword === null) return 'ERROR: Missing "keyword" argument.';
     const keyword = String(rawKeyword);
 
-    if (pathArg && (pathArg.trim().toLowerCase() === '#docs' || pathArg.trim().toLowerCase() === '#doc' || pathArg.trim().toLowerCase() === '#documentation' || pathArg.trim().toLowerCase().includes('#skill/global/fluxflow')) || pathArg.trim().toLowerCase().startsWith('#skill')) {
-        // return searchDocsDirectory(keyword);
-        return "ERROR: Cannot search in reserved VFS '#skill' namespace. Use 'ReadFile' to read specific skills."
+    if (pathArg) {
+        const pNorm = pathArg.trim().toLowerCase();
+        if (pNorm === '#docs' || pNorm === '#doc' || pNorm === '#documentation' || pNorm.includes('#skill/global/fluxflow') || pNorm.startsWith('#skill')) {
+            // return searchDocsDirectory(keyword);
+            return "ERROR: Cannot search in reserved VFS '#skill' namespace. Use 'ReadFile' to read specific skills."
+        }
     }
 
     // Normalise boolean-like flags

@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS = {
             Poolside: 'Free',
             ExpLabs: 'Free',
             TokenHarbor: 'Free',
+            Infron: 'Free',
             APInex: 'Free'
         }
     },

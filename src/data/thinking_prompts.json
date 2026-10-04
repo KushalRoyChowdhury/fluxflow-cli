@@ -1,11 +1,11 @@
 {
-    "xHigh": "Use minimal reasoning. Prefer simplest path; avoid branching",
+    "xHigh": "Use minimal reasoning. Prefer simplest path; avoid branching; waste NO tokens overthinking",
 
-    "High": "Use minimal reasoning. Prefer simplest path; avoid branching",
+    "High": "Use minimal reasoning. Prefer simplest path; avoid branching; waste NO tokens overthinking",
 
-    "Medium": "Use minimal reasoning. Prefer simplest path; avoid branching",
+    "Medium": "Use minimal reasoning. Prefer simplest path; avoid branching; waste NO tokens overthinking",
 
-    "no": "Use minimal reasoning. Prefer simplest path; avoid branching",
+    "Minimal": "Use minimal reasoning. Prefer simplest path; avoid branching; waste NO tokens overthinking",
 
-    "Off": "No thinking. Immediate response. Verify imports, tool results & system stability"
+    "Off": "NO thinking. Immediate response. Verify imports, tool results & system stability"
 }

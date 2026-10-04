@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.26.0": {
+        "note": "OCTOBER 4",
+        "added": [
+            "Added new Provider: InfronAI"
+        ],
+        "changed": [],
+        "fixes": [
+            "Bug Fixes."
+        ]
+    },
     "4.25.0": {
         "note": "OCTOBER 3",
         "added": [

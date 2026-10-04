@@ -31,20 +31,31 @@ import { getDirTreeBox } from './getDirTree/box.js';
 import { isPsAvailable } from '../data/main_tools.js';
 import { bypassBacktick } from './text.js';
 
-// ─── Provider Stream Functions (dedicated modules) ───
-import { getDeepSeekStream } from './providers/deepseek.js';
-import { getMistralStream } from './providers/mistral.js';
-import { getNVIDIAStream, wrapNvidiaStreamWithQueueDepth } from './providers/nvidia.js';
-import { getOpenRouterStream } from './providers/openrouter.js';
-import { getOllamaStream } from './providers/ollama.js';
-import { getInferXStream } from './providers/inferx.js';
-import { getSenseNovaStream } from './providers/sensenova.js';
-import { getAIHubMixStream } from './providers/aihubmix.js';
-import { getPoolsideStream } from './providers/poolside.js';
-import { getNineRouterStream } from './providers/9router.js';
-import { getExpLabsStream } from './providers/explabs.js';
-import { getTokenHarborStream } from './providers/tokenharbor.js';
-import { getAPInexStream } from './providers/apinex.js';
+// ─── Provider Stream Functions (lazy loaded – mirrors tools.js TOOL_MAP pattern) ───
+// Only the ACTIVE provider's module is parsed on first use; each resolved fn is
+// cached in _providerCache so subsequent turns are O(1). Boot-time savings: ~13 modules.
+const PROVIDER_LOADERS = {
+    Ollama:      () => import('./providers/ollama.js').then(m => m.getOllamaStream),
+    OpenRouter:  () => import('./providers/openrouter.js').then(m => m.getOpenRouterStream),
+    DeepSeek:    () => import('./providers/deepseek.js').then(m => m.getDeepSeekStream),
+    Mistral:     () => import('./providers/mistral.js').then(m => m.getMistralStream),
+    NVIDIA:      () => import('./providers/nvidia.js').then(m => m.getNVIDIAStream),
+    NVIDIA_wrap: () => import('./providers/nvidia.js').then(m => m.wrapNvidiaStreamWithQueueDepth),
+    InferX:      () => import('./providers/inferx.js').then(m => m.getInferXStream),
+    SenseNova:   () => import('./providers/sensenova.js').then(m => m.getSenseNovaStream),
+    AIHubMix:    () => import('./providers/aihubmix.js').then(m => m.getAIHubMixStream),
+    Poolside:    () => import('./providers/poolside.js').then(m => m.getPoolsideStream),
+    NineRouter:  () => import('./providers/9router.js').then(m => m.getNineRouterStream),
+    ExpLabs:     () => import('./providers/explabs.js').then(m => m.getExpLabsStream),
+    TokenHarbor: () => import('./providers/tokenharbor.js').then(m => m.getTokenHarborStream),
+    Infron:      () => import('./providers/infron.js').then(m => m.getInfronStream),
+    APInex:      () => import('./providers/apinex.js').then(m => m.getAPInexStream),
+};
+const _providerCache = {};
+const loadProvider = async (key) => {
+    if (!_providerCache[key]) _providerCache[key] = await PROVIDER_LOADERS[key]();
+    return _providerCache[key];
+};
 
 
 // ─── Stutter Detection – pre-compiled regexes (module scope, compiled once) ───
@@ -522,7 +533,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                 const streamPromise = (async () => {
                     if (aiProvider === 'OpenRouter') {
                         const janitorOpenRouterModel = getFallbackValue('janitor_open_router');
-                        const stream = getOpenRouterStream(
+                        const stream = (await loadProvider('OpenRouter'))(
                             apiKey,
                             janitorOpenRouterModel,
                             janitorContents,
@@ -537,7 +548,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
                     } else if (aiProvider === 'DeepSeek' && !useNvidiaFallback) {
-                        const stream = getDeepSeekStream(
+                        const stream = (await loadProvider('DeepSeek'))(
                             apiKey,
                             getFallbackValue('deepseek_fast_fallback'),
                             janitorContents,
@@ -552,7 +563,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
                     } else if (aiProvider === 'Mistral' && !useNvidiaFallback) {
-                        const stream = getMistralStream(
+                        const stream = (await loadProvider('Mistral'))(
                             apiKey,
                             getFallbackValue('mistral_janitor_fallback'),
                             janitorContents,
@@ -567,7 +578,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
                     } else if (aiProvider === 'NVIDIA' || useNvidiaFallback) {
-                        const stream = getNVIDIAStream(
+                        const stream = (await loadProvider('NVIDIA'))(
                             useNvidiaFallback ? nvidiaApiKey : apiKey,
                             getFallbackValue('nvidia_janitor_fallback'),
                             // "mistralai/mistral-nemotron", // [DEBUGGING POINT]
@@ -583,7 +594,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
                     } else if (aiProvider === 'InferX') {
-                        const stream = getInferXStream(
+                        const stream = (await loadProvider('InferX'))(
                             apiKey,
                             targetModel || getFallbackValue('inferx_fallback') || 'deepseek-v4-flash',
                             janitorContents,
@@ -598,7 +609,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
                     } else if (aiProvider === 'SenseNova') {
-                        const stream = getSenseNovaStream(
+                        const stream = (await loadProvider('SenseNova'))(
                             apiKey,
                             targetModel || getFallbackValue('sensenova_fallback') || 'sensenova-6.8-flash-lite',
                             janitorContents,
@@ -613,7 +624,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
                     } else if (aiProvider === 'AIHubMix') {
-                        const stream = getAIHubMixStream(
+                        const stream = (await loadProvider('AIHubMix'))(
                             apiKey,
                             targetModel || getFallbackValue('aihubmix_fallback') || 'gpt-4o-mini',
                             janitorContents,
@@ -628,7 +639,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
                     } else if (aiProvider === 'Poolside') {
-                        const stream = getPoolsideStream(
+                        const stream = (await loadProvider('Poolside'))(
                             apiKey,
                             targetModel || getFallbackValue('poolside_fallback') || 'poolside/laguna-s-2.1',
                             janitorContents,
@@ -643,7 +654,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
                     } else if (aiProvider === '9router' || aiProvider === '9Router') {
-                        const stream = getNineRouterStream(
+                        const stream = (await loadProvider('NineRouter'))(
                             apiKey,
                             targetModel || getFallbackValue('9router_fallback') || 'z-ai/glm-5.3-flash',
                             janitorContents,
@@ -658,7 +669,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
                     } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
-                        const stream = getExpLabsStream(
+                        const stream = (await loadProvider('ExpLabs'))(
                             apiKey,
                             targetModel || getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813',
                             janitorContents,
@@ -1327,31 +1338,33 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
         try {
             let stream;
             if (aiProvider === 'Ollama') {
-                stream = getOllamaStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, settings.systemSettings?.ollamaEndpoint || 'Cloud');
+                stream = (await loadProvider('Ollama'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, settings.systemSettings?.ollamaEndpoint || 'Cloud');
             } else if (aiProvider === 'OpenRouter') {
-                stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('OpenRouter'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'DeepSeek') {
-                stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('DeepSeek'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'Mistral') {
-                stream = getMistralStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('Mistral'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'NVIDIA') {
-                stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('NVIDIA'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'InferX') {
-                stream = getInferXStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('InferX'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'SenseNova') {
-                stream = getSenseNovaStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('SenseNova'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'AIHubMix') {
-                stream = getAIHubMixStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('AIHubMix'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'Poolside') {
-                stream = getPoolsideStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('Poolside'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === '9router' || aiProvider === '9Router') {
-                stream = getNineRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('NineRouter'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
-                stream = getExpLabsStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('ExpLabs'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === 'Infron' || aiProvider === 'infron') {
+                stream = (await loadProvider('Infron'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') {
-                stream = getTokenHarborStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('TokenHarbor'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'APInex' || aiProvider === 'apinex' || aiProvider === 'apx') {
-                stream = getAPInexStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+                stream = (await loadProvider('APInex'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else {
                 const googleClient = getGoogleClient(apiKey);
                 const { serviceTier: simpleServiceTier, cleanModel: simpleCleanModel } = getServiceTierFromModel(model);
@@ -1628,6 +1641,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
         if (aiProvider === '9router' || aiProvider === '9Router') targetModel = getFallbackValue('9router_fallback');
         if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') targetModel = getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813';
         if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') targetModel = getFallbackValue('tokenharbor_fallback') || 'deepseek-v4.1-flash:free';
+        if (aiProvider === 'Infron' || aiProvider === 'infron') targetModel = getFallbackValue('infron_fallback');
 
         let attempts = 0;
         let success = false;
@@ -1711,7 +1725,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
     // }
 
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx' || settings?.aiProvider === 'Infron' || settings?.aiProvider === 'infron') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -1882,7 +1896,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             ...getGitignoreExcludes(process.cwd())
         ]));
 
-        const getDirTree = (dir, maxDepth = 4) => {
+        const getDirTree = (dir, maxDepth = 6) => {
             const useModern = systemSettings?.indentationTree !== false;
             return useModern
                 ? getDirTreeIndentation(dir, maxDepth, 1, safeReaddirWithTypes, activeExcludedDirs)
@@ -1926,7 +1940,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const dynamicDirAwareness = !!systemSettings?.dynamicDirAwareness;
         const sysInstructionCacheKey = `${chatId}|${aiProvider}|${thinkingLevel}|${modelName}|${profile}|${dynamicDirAwareness}`;
         const isSysInstructionCached = !dynamicDirAwareness && systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
-        let dirStructure = isSysInstructionCached ? '' : ('\n**Directory**\nCWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}` + '\n' + getDirTree(process.cwd(), 4));
+        let dirStructure = isSysInstructionCached ? '' : ('\n**Directory**\nCWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}` + '\n' + getDirTree(process.cwd(), 6));
 
         const ideCtx = await getIDEContext();
         let ideBlock = "";
@@ -2788,7 +2802,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     let activeContents = contents;
 
                     if (aiProvider === 'Ollama') {
-                        stream = getOllamaStream(
+                        stream = (await loadProvider('Ollama'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2801,7 +2815,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             systemSettings?.ollamaEndpoint || 'Cloud'
                         );
                     } else if (aiProvider === 'OpenRouter') {
-                        stream = getOpenRouterStream(
+                        stream = (await loadProvider('OpenRouter'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2814,7 +2828,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             chatId
                         );
                     } else if (aiProvider === 'DeepSeek') {
-                        stream = getDeepSeekStream(
+                        stream = (await loadProvider('DeepSeek'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2826,7 +2840,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.0
                         );
                     } else if (aiProvider === 'Mistral') {
-                        stream = getMistralStream(
+                        stream = (await loadProvider('Mistral'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2839,7 +2853,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             chatId
                         );
                     } else if (aiProvider === 'NVIDIA') {
-                        const rawStream = getNVIDIAStream(
+                        const rawStream = (await loadProvider('NVIDIA'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2850,9 +2864,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             abortController.signal,
                             1.0
                         );
-                        stream = wrapNvidiaStreamWithQueueDepth(rawStream, targetModel);
+                        stream = (await loadProvider('NVIDIA_wrap'))(rawStream, targetModel);
                     } else if (aiProvider === 'InferX') {
-                        stream = getInferXStream(
+                        stream = (await loadProvider('InferX'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2864,7 +2878,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.0
                         );
                     } else if (aiProvider === 'SenseNova') {
-                        stream = getSenseNovaStream(
+                        stream = (await loadProvider('SenseNova'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2876,7 +2890,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.0
                         );
                     } else if (aiProvider === 'AIHubMix') {
-                        stream = getAIHubMixStream(
+                        stream = (await loadProvider('AIHubMix'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2888,7 +2902,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.0
                         );
                     } else if (aiProvider === 'Poolside') {
-                        stream = getPoolsideStream(
+                        stream = (await loadProvider('Poolside'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2900,7 +2914,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.0
                         );
                     } else if (aiProvider === '9router' || aiProvider === '9Router') {
-                        stream = getNineRouterStream(
+                        stream = (await loadProvider('NineRouter'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2912,7 +2926,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.0
                         );
                     } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
-                        stream = getExpLabsStream(
+                        stream = (await loadProvider('ExpLabs'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2923,8 +2937,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             abortController.signal,
                             1.0
                         );
+                    } else if (aiProvider === 'Infron' || aiProvider === 'infron') {
+                        stream = (await loadProvider('Infron'))(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0);
                     } else if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') {
-                        stream = getTokenHarborStream(
+                        stream = (await loadProvider('TokenHarbor'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2936,7 +2961,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.0
                         );
                     } else if (aiProvider === 'APInex' || aiProvider === 'apinex' || aiProvider === 'apx') {
-                        stream = getAPInexStream(
+                        stream = (await loadProvider('APInex'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -5321,6 +5346,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'aihubmix' || lower === 'aihub') return 'AIHubMix';
         if (lower === 'explabs' || lower === 'experientiallabs' || lower === 'experimentallabs') return 'ExpLabs';
         if (lower === 'tokenharbor' || lower === 'token harbor' || lower === 'token_harbor' || lower === 'thk') return 'TokenHarbor';
+        if (lower === 'infron') return 'Infron';
         if (lower === 'apinex' || lower === 'apx') return 'APInex';
         return null;
     };

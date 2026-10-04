@@ -33,6 +33,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **Poolside**
   - **Token Harbor**
   - **APInex**
+  - **Infron**
   - **Experimental Labs** (*Experimental*)
   - **9Router** (*Experimental*)
   - **AIHubMix** (*Experimental*)
@@ -116,20 +117,30 @@ fluxflow [options]
 ```
 
 ### Supported Flags:
- - `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.7-flash`). Keeps settings file untouched.
+- `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.7-flash`). Keeps settings file untouched.
  - `--cwd <path>`: Set the working directory for the session (relative or absolute path).
  - `--path <path>`: Alias for `--cwd`. Set the working directory for the session.
- - `--memory <on | off>`: Toggle persistent long-term agent memory for the session.
+ - `--memory <on | off>`: Toggle persistent long-term agent memory for the session. [Legacy. Deprecated]
  - `--resume <session-id>`: Resume a previous chat session programmatically.
  - `--update <check | latest>`: Manually run an update check (`check`) or execute latest update setup (`latest`).
  - `--package <npm | pnpm | yarn | bun>`: Override default package manager to run core application updates.
  - `--auto-del <1d | 7d | 30d>`: Set automated chat log deletion schedule.
- - `--yolo <on | off>`: Toggle autonomous command execution permission.
+ - `--yolo <on | off>`: Toggle autonomous execution permission.
  - `--external-access <on | off>`: Toggle permission to let agent read files outside CWD.
- - `--thinking <Fast | Medium | High | xHigh>`: Override default thinking level.
- - `--key <key@google | key@deepseek | key@openrouter | key@nvidia | key@ollama/LOCAL | key@mistral >`: Set API key and provider.
- - `--provider <google | deepseek | openrouter | nvidia | ollama | mistral>`: Override default provider.
- - `--usage`: Launches the usage dashboard in your browser.
+ - `--thinking <Low | Medium/Standard | High>`: Override thinking level for reasoning depth.
+ - `--key <key@google | key@deepseek | key@openrouter>`: Set API key and provider.
+ - `--provider <google | deepseek | openrouter>`: Override default provider.
+ - `--usage`: Launches the usage dashboard in your browser
+ - `--mode <flux | flow | icu | omni>`: Set startup mode (Agent / Chat / Computer Use / Sentient being).
+ - `--allocation <mb>`: Override Node.js max-old-space-size in MB (default: auto).
+ - `--auto-exec <on | off>`: Toggle permission for autonomous command execution (same as `--yolo`).
+ - `-p, --prompt <text> [-n | --new]`: One-shot non-TUI answer (`-n` to start fresh conversation).
+ - `-r, --run <command>`: Execute shell command and pass output as context to `-p`/`--prompt`.
+ - `-v, --version`: Show installed version.
+ - `--help`: Show this help menu.
+ - `--help commands`: Show available `/commands`.
+ - `--playground`: Launch in Playground mode (fixed session, CWD: `DATA_DIR/playground`).
+ - `--export error`: Export system error logs to `fluxflow-error-<timestamp>.txt`.
 
 ---
 

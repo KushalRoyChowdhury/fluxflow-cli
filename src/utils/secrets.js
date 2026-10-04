@@ -36,6 +36,7 @@ export const getProviderAPIKey = async (provider) => {
         if (provider === '9router' || provider === '9Router') return secrets['9ROUTER_API_KEY'] || 'LOCAL';
         if (provider === 'ExpLabs' || provider === 'ExperientialLabs' || provider === 'ExperimentalLabs' || provider === 'explabs') return secrets.EXPLABS_API_KEY || secrets.EXPERIENTIALLABS_API_KEY || null;
         if (provider === 'TokenHarbor' || provider === 'Token Harbor' || provider === 'tokenharbor' || provider === 'token_harbor' || provider === 'thk') return secrets.TOKENHARBOR_API_KEY || secrets.TOKEN_HARBOR_API_KEY || null;
+        if (provider === 'Infron' || provider === 'infron') return secrets.INFRON_API_KEY || null;
         if (provider === 'APInex' || provider === 'apinex' || provider === 'apx') return secrets.APINEX_API_KEY || null;
     } catch (e) {}
     return null;
@@ -67,6 +68,8 @@ export const saveProviderAPIKey = async (provider, key) => {
         await saveSecret('EXPLABS_API_KEY', key);
     } else if (provider === 'TokenHarbor' || provider === 'Token Harbor' || provider === 'tokenharbor' || provider === 'token_harbor' || provider === 'thk') {
         await saveSecret('TOKENHARBOR_API_KEY', key);
+    } else if (provider === 'Infron' || provider === 'infron') {
+        await saveSecret('INFRON_API_KEY', key);
     } else if (provider === 'APInex' || provider === 'apinex' || provider === 'apx') {
         await saveSecret('APINEX_API_KEY', key);
     }
