@@ -318,11 +318,17 @@ export const getMonthlyUsage = async () => {
     const summed = { ...defaultStats };
     summed.imageCalls = [];
     summed.models = {};
+    summed.providerRequests = {};
 
     const addStats = (target, source) => {
         for (const key in target) {
             if (key === 'imageCalls') {
                 target.imageCalls = [...(target.imageCalls || []), ...(source.imageCalls || [])];
+            } else if (key === 'providerRequests') {
+                const srcPR = source.providerRequests || {};
+                for (const p in srcPR) {
+                    target.providerRequests[p] = (target.providerRequests[p] || 0) + (srcPR[p] || 0);
+                }
             } else if (key === 'models') {
                 const srcModels = source.models || {};
                 for (const provider in srcModels) {
@@ -465,11 +471,17 @@ export const getCustomPeriodUsage = async (resetDay = 1) => {
     const summed = { ...defaultStats };
     summed.imageCalls = [];
     summed.models = {};
+    summed.providerRequests = {};
 
     const addStats = (target, source) => {
         for (const key in target) {
             if (key === 'imageCalls') {
                 target.imageCalls = [...(target.imageCalls || []), ...(source.imageCalls || [])];
+            } else if (key === 'providerRequests') {
+                const srcPR = source.providerRequests || {};
+                for (const p in srcPR) {
+                    target.providerRequests[p] = (target.providerRequests[p] || 0) + (srcPR[p] || 0);
+                }
             } else if (key === 'models') {
                 const srcModels = source.models || {};
                 for (const provider in srcModels) {

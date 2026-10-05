@@ -6063,11 +6063,12 @@ export default function App({ args = [] }) {
                             if (filteredModels.length === 0) return;
 
                             const providerTotalTokens = filteredModels.reduce((sum, [, m]) => sum + (m.tokens || 0), 0);
+                            const providerReqs = (u?.providerRequests && u.providerRequests[provider]) || 0;
                             if (pIdx > 0 && breakdownRows.length > 0) {
                                 breakdownRows.push(<Box key={`space-prov-${provider}`}><Text>{' '}</Text></Box>);
                             }
                             breakdownRows.push(
-                                renderLeaderRow(`prov-${provider}`, `${provider}:`, formatTokens(providerTotalTokens), colors.primary, colors.text, 0, true)
+                                renderLeaderRow(`prov-${provider}`, `${provider}:`, `${formatTokens(providerTotalTokens)} (${providerReqs})`, colors.primary, colors.text, 0, true)
                             );
                             filteredModels.forEach(([modelName, stats], mIdx) => {
                                 if (mIdx > 0) {
