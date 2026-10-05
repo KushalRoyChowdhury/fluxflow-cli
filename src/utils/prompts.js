@@ -637,7 +637,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT ===
 Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : 'Flux Flow. Sassy, CLI Assistant'}
-${ADD_NO_INS ? '' : `${mode === "Flux" ? "Run Automated Tests" :
+${ADD_NO_INS ? '' : `${mode === "Flux" ? "" :
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
 mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
 "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}

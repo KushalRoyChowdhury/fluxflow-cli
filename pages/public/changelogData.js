@@ -2,7 +2,7 @@ export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
 
-    "4.26.3": {
+    "4.27.0": {
         "note": "OCTOBER 6",
         "added": [
             "Added daily/monthly request count (api calls) per provider used."
