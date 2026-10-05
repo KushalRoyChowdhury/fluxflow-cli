@@ -275,7 +275,7 @@ export default function Tools() {
             </ul>
 
             <h2 id="computer-use-tools">Computer Use Tools (GUI Automation)</h2>
-            <p>Available in <strong>ICU</strong> (dedicated Computer Use) and <strong>FluxCU</strong> (Workspace + Computer Use) modes for interacting with the desktop GUI via visual grid coordinates.</p>
+            <p>Computer Use tools are available in <strong>ICU</strong> (dedicated desktop automation) and <strong>FluxCU</strong> (workspace plus desktop automation) modes. Common tools such as memory, chat, web, and agent-coordination tools may also be available depending on the active mode.</p>
             <ul>
                 <li>
                     <strong><code>Click</code></strong> — Clicks on a specific coordinate grid cell on screen.

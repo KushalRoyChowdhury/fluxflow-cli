@@ -30,8 +30,8 @@ export default function StartupArgs() {
             <h2 id="core-settings">Core Settings</h2>
             <ul>
                 <li>
-                    <strong><code>--mode &lt;flux|flow&gt;</code></strong><br />
-                    Set the startup operating mode. <code>flux</code> activates the high-speed developer agent, while <code>flow</code> starts a standard chat session.
+                    <strong><code>--mode &lt;flux|flow|icu|fluxcu&gt;</code></strong><br />
+                    Set the startup operating mode. <code>icu</code> starts Computer Use and <code>fluxcu</code> starts autonomous workspace plus desktop execution.
                 </li>
                 <li>
                     <strong><code>--cwd &lt;path&gt;</code></strong><br />
@@ -66,16 +66,16 @@ export default function StartupArgs() {
                     Temporary override for the active AI model (e.g., <code>gemini-3.7-flash</code>). This keeps your global settings file untouched.
                 </li>
                 <li>
-                    <strong><code>--provider &lt;google|deepseek|openrouter&gt;</code></strong><br />
-                    Override the default AI provider for the session.
+                    <strong><code>--provider &lt;provider&gt;</code></strong><br />
+                    Override the default AI provider for the session. Provider availability depends on the installed configuration and API keys; use the in-app provider selector for the current list.
                 </li>
                 <li>
                     <strong><code>--key &lt;key@provider&gt;</code></strong><br />
                     Provide an API key and its associated provider inline (e.g., <code>--key AIzaSy...@google</code>).
                 </li>
                 <li>
-                    <strong><code>--thinking &lt;Fast|Low|Medium|High|xHigh&gt;</code></strong><br />
-                    Override the thinking level for reasoning depth. <em>Note: <code>Standard</code> is an alias for <code>Medium</code> to maintain DeepSeek compatibility.</em>
+                    <strong><code>--thinking &lt;Fast|Low|Medium|High|xHigh|Custom|Max&gt;</code></strong><br />
+                    Override the thinking level. <code>Standard</code> is an alias for <code>Medium</code>.
                 </li>
             </ul>
 

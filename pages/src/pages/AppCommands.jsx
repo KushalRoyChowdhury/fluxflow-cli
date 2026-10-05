@@ -24,7 +24,7 @@ export default function AppCommands() {
                 <li><strong><code>/chats</code></strong> — Lists all saved chat sessions.</li>
                 <li><strong><code>/export</code></strong> — Exports the current chat transcript to a <code>.txt</code> file in your workspace.</li>
                 <li><strong><code>/compress</code></strong> — Summarizes and compresses the active chat history to free up context tokens.</li>
-                <li><strong><code>/truncate</code></strong> — Truncates tool results in active chat history to save up to 60% tokens on standard workflows.</li>
+                <li><strong><code>/truncate</code></strong> — Replaces completed tool results in the active history with compact markers to reduce context usage.</li>
                 <li><strong><code>/revert</code></strong> — Opens the high-fidelity checkpoint viewer to rollback codebase changes to a previous state.</li>
                 <li><strong><code>/quit</code></strong> — Safely exits and shuts down FluxFlow.</li>
             </ul>
@@ -32,21 +32,17 @@ export default function AppCommands() {
             <h2 id="agent-controls">Agent Controls</h2>
             <ul>
                 <li>
-                    <strong><code>/mode [flux|flow]</code></strong> — Quickly switch operating mode:
+                    <strong><code>/mode [flux|flow|icu|fluxcu]</code></strong> — Switch operating mode:
                     <ul>
-                        <li><code>flux</code>: Enables Dev toolset & full workspace access.</li>
-                        <li><code>flow</code>: Enables Chat mode (Web & Creative access).</li>
+                        <li><code>flux</code>: Enables Dev toolset and full workspace access.</li>
+                        <li><code>flow</code>: Creative studio, document, PDF, web, and conversation tools.</li>
+                        <li><code>icu</code>: Dedicated Computer Use mode for interactive desktop automation.</li>
+                        <li><code>fluxcu</code>: Autonomous workspace and desktop execution.</li>
                     </ul>
                 </li>
-                <li>
-                    <strong><code>/model [name]</code></strong> — Choose which AI model to use for the main interaction.
-                </li>
-                <li>
-                    <strong><code>/thinking [fast|low|medium|high|max]</code></strong> — Adjust reasoning depth and thinking level.
-                </li>
-                <li>
-                    <strong><code>/wildcard-tooling</code></strong> & <strong><code>/wildercard-tooling</code></strong> — Tool compatibility mode for non-tooling models; <code>wildercard</code> is the extended variant.
-                </li>
+                <li><strong><code>/model [name]</code></strong> — Select a model. Supports <code>--multimodal</code>, <code>--save</code>, <code>--remove</code>, <code>--rename</code>, and <code>--default</code>.</li>
+                <li><strong><code>/thinking [fast|low|medium|standard|high|xhigh|custom|max]</code></strong> — Adjust reasoning depth. Supports <code>--map</code>, <code>--bypass</code>, and <code>--force</code>.</li>
+                <li><strong><code>/wildcard-tooling</code></strong> — Toggle compatibility mode for models without native tooling support.</li>
                 <li>
                     <strong><code>/display [index]</code></strong> — Used for Computer Use mode to set which display screen the agent can see and operate on.
                 </li>
@@ -59,10 +55,10 @@ export default function AppCommands() {
             <ul>
                 <li><strong><code>/settings</code></strong> — Opens the main configuration menu for system preferences, external data, and sandbox presets.</li>
                 <li><strong><code>/budget</code></strong> — Set or view request and token quota limits.</li>
-                <li><strong><code>/provider</code></strong> — Switch the active AI provider (and its base URL / key routing).</li>
+                <li><strong><code>/provider</code> or <code>/providers</code></strong> — Switch the active AI provider.</li>
                 <li><strong><code>/key</code></strong> — Open the API Key management view to update or remove credentials.</li>
                 <li><strong><code>/profile</code></strong> — Update developer persona, nickname, and custom instructions.</li>
-                <li><strong><code>/memory</code></strong> — View and manage persistent long-term memories extracted by the Janitor.</li>
+                <li><strong><code>/memory [view|migrate]</code></strong> — View persistent memories or migrate them to the global <code>AGENTS.md</code>.</li>
             </ul>
 
             <h2 id="utility-commands">Utility Commands</h2>
@@ -75,10 +71,10 @@ export default function AppCommands() {
                 <li><strong><code>/changelog</code></strong> — Opens the latest release notes in your default browser.</li>
                 <li><strong><code>/docs</code></strong> — Opens documentation site in your default browser.</li>
                 <li><strong><code>/reset</code></strong> — Warning: Wipes all project-specific data (history, memories, checkpoints).</li>
-                <li>
-                    <strong><code>/fluxflow</code></strong> — Project management tools:
+                <li><strong><code>/fluxflow</code></strong> — Project management tools:
                     <ul>
-                        <li><code>init</code>: Creates a local <code>FluxFlow.md</code> template for project-specific instructions.</li>
+                        <li><code>global</code>: Opens the global FluxFlow directory.</li>
+                        <li><code>saves</code>: Opens the FluxFlow AppData/saves directory.</li>
                     </ul>
                 </li>
                 <li>
@@ -88,9 +84,11 @@ export default function AppCommands() {
                         <li><code>latest</code>: Initiates the auto-updater to install the latest release.</li>
                     </ul>
                 </li>
-                <li><strong><code>/move</code></strong> — Transfer Playground Session data to CWD/playground-export.</li>
+                <li><strong><code>/move</code></strong> — In playground mode, copies the playground to <code>CWD/playground-export</code>.</li>
+                <li><strong><code>/files</code></strong> — Lists loaded instruction and skill files.</li>
+                <li><strong><code>/target</code></strong> — Shows the current provider and model as a unique target.</li>
+                <li><strong><code>/gemini</code></strong> — Prints a Gemini CLI quote.</li>
             </ul>
         </DocPage>
     )
 }
-
