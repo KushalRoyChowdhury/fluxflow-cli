@@ -3262,8 +3262,8 @@ export default function App({ args = [] }) {
                     let formattedLevel;
                     if (parts[1]) {
                         const rawArgs = parts.slice(1);
-                        const isBypass = rawArgs.includes('--bypass');
-                        const isForce = rawArgs.includes('--force');
+                        const isBypass = rawArgs.includes('--bypass') || rawArgs.includes('-b'); // New Alias
+                        const isForce = rawArgs.includes('--force') || rawArgs.includes('-f'); // New Alias
 
                         // Check for --map flag (e.g. /thinking Standard --map high or /thinking Standard --map 8192)
                         const mapIdx = rawArgs.findIndex(a => a === '--map' || a === '-m');
