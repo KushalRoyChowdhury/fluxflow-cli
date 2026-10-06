@@ -3,6 +3,23 @@ import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 // import fs from 'fs';
 
 export const getInfronStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
+    // Optional "<model>:<tier>" suffix. Only split when the suffix is a valid tier.
+    // e.g. "deepseek-v4.1-flash:flex" -> cleanModel="deepseek-v4.1-flash", tier="flex"
+    //      "deepseek-v4.1-flash:free" -> kept intact as "deepseek-v4.1-flash:free"
+    const VALID_SERVICE_TIERS = ['flex', 'standard', 'priority'];
+    let requestedTier = null;
+    let cleanModel = model;
+    if (typeof model === 'string') {
+        const lastColon = model.lastIndexOf(':');
+        if (lastColon !== -1) {
+            const suffix = model.slice(lastColon + 1).trim().toLowerCase();
+            if (VALID_SERVICE_TIERS.includes(suffix)) {
+                requestedTier = suffix;
+                cleanModel = model.slice(0, lastColon);
+            }
+        }
+    }
+
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -42,7 +59,7 @@ export const getInfronStream = async function* (apiKey, model, contents, systemI
         });
     }
 
-    const customEffort = getMappedThinkingLevel('Infron', model, thinkingLevel);
+    const customEffort = getMappedThinkingLevel('Infron', cleanModel, thinkingLevel);
     const reasoningEffortMap = {
         'Fast': 'none',
         'Low': 'low',
@@ -54,7 +71,7 @@ export const getInfronStream = async function* (apiKey, model, contents, systemI
     const effort = customEffort !== null ? customEffort : reasoningEffortMap[thinkingLevel];
 
     const requestPayload = {
-        model: model,
+        model: cleanModel,
         messages: messages,
         stream: true,
         stream_options: { include_usage: true },
@@ -62,6 +79,10 @@ export const getInfronStream = async function* (apiKey, model, contents, systemI
         tools: [], // Forcing models not to fallback to API function calls
         tool_choice: "none"
     };
+
+    if (requestedTier) {
+        requestPayload.provider = { service_tier: requestedTier };
+    }
 
     if (effort) {
         requestPayload.reasoning = { effort };
