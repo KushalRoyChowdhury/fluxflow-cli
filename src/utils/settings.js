@@ -30,10 +30,12 @@ const DEFAULT_SETTINGS = {
             ExpLabs: 'Free',
             TokenHarbor: 'Free',
             Infron: 'Free',
-            APInex: 'Free'
+            APInex: 'Free',
+            c_openai: 'Free'
         }
     },
     systemSettings: {
+        customOpenAIBaseUrl: '',
         memory: false,
         theme: 'Dark',
         compression: 0.0,

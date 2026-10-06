@@ -6,6 +6,9 @@ Open in chat via /settings
 ## Settings Categories & Options
 
 ### 1. Providers & Tips → references/PROVIDERS.md
+- Custom OpenAI Endpoint?
+    * Base URL: .../v1
+    * API Key: optional
 
 ### 2. Appearance
 * Theme → UI theme (Dark | Light | Cyberpunk | Forest | Sunset | Matrix | Dracula | Nord | Monokai | Mystery/Chaos)

@@ -525,7 +525,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         const model = getFlag(['--model']) || baseSettings.activeModel || getDefaultModel(provider, baseSettings.apiTier) || getDefaultModel(provider, 'paid');
         const apiKey = getFlag(['--key']) || await getProviderAPIKey(provider);
 
-        if (!apiKey) {
+        if (!apiKey && !(provider === 'c_openai' && baseSettings.systemSettings?.customOpenAIBaseUrl)) {
             console.error(`[ERROR] No API key resolved for provider "${provider}".`);
             process.exit(1);
         }

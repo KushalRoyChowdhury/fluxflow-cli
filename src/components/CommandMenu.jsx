@@ -21,7 +21,9 @@ const CustomItem = ({ label, isSelected, theme = 'Dark' }) => {
     );
 };
 
-export default function CommandMenu({ title, subtitle, items = [], onSelect, theme = 'Dark', searchable = false }) {
+const VISIBLE_COUNT = 8;
+
+export default function CommandMenu({ title, subtitle, items = [], onSelect, theme = 'Dark', searchable = false, maxVisible = VISIBLE_COUNT }) {
     const colors = getThemeColors(theme);
     const [query, setQuery] = useState('');
     const [cursor, setCursor] = useState(0);
@@ -37,18 +39,44 @@ export default function CommandMenu({ title, subtitle, items = [], onSelect, the
         setCursor(0);
     }, [query]);
 
+    const [scrollOffset, setScrollOffset] = useState(0);
+
+    // Keep cursor clamped and adjust scrollOffset when filtered items or cursor changes
+    useEffect(() => {
+        setScrollOffset(prev => {
+            if (filteredItems.length <= maxVisible) return 0;
+            if (cursor < prev) {
+                return cursor;
+            }
+            if (cursor >= prev + maxVisible) {
+                return cursor - maxVisible + 1;
+            }
+            return prev;
+        });
+    }, [cursor, filteredItems.length, maxVisible]);
+
     useInput((input, key) => {
         if (!searchable) return;
 
         if (key.upArrow) {
             setMode('list');
-            setCursor(prev => (filteredItems.length > 0 ? (prev > 0 ? prev - 1 : filteredItems.length - 1) : 0));
+            setCursor(prev => {
+                if (filteredItems.length === 0) return 0;
+                if (prev > 0) return prev - 1;
+                // Wrapping around to bottom
+                return filteredItems.length - 1;
+            });
             return;
         }
 
         if (key.downArrow) {
             setMode('list');
-            setCursor(prev => (filteredItems.length > 0 ? (prev < filteredItems.length - 1 ? prev + 1 : 0) : 0));
+            setCursor(prev => {
+                if (filteredItems.length === 0) return 0;
+                if (prev < filteredItems.length - 1) return prev + 1;
+                // Wrapping around to top
+                return 0;
+            });
             return;
         }
 
@@ -84,6 +112,16 @@ export default function CommandMenu({ title, subtitle, items = [], onSelect, the
         }
     }, { isActive: searchable });
 
+    // Windowed scrolling slice calculation
+    const totalItems = filteredItems.length;
+    let startIndex = scrollOffset;
+    if (totalItems <= maxVisible) {
+        startIndex = 0;
+    } else {
+        startIndex = Math.max(0, Math.min(scrollOffset, totalItems - maxVisible));
+    }
+    const visibleItems = filteredItems.slice(startIndex, startIndex + maxVisible);
+
     if (!searchable) {
         return (
             <Box
@@ -95,9 +133,16 @@ export default function CommandMenu({ title, subtitle, items = [], onSelect, the
                 flexShrink={0}
                 width="100%"
             >
-                {title && <Box paddingX={1} paddingY={0} marginBottom={subtitle ? 0 : 1}>
-                    <Text color={colors.text} bold>{typeof title === 'string' ? title.toUpperCase() : title}</Text>
-                </Box>}
+                {title && (
+                    <Box paddingX={1} paddingY={0} marginBottom={subtitle ? 0 : 1} flexDirection="row" justifyContent="space-between">
+                        <Text color={colors.text} bold>{typeof title === 'string' ? title.toUpperCase() : title}</Text>
+                        {items.length > maxVisible && (
+                            <Text color={colors.textMuted} italic>
+                                {items.length} options
+                            </Text>
+                        )}
+                    </Box>
+                )}
 
                 {subtitle && (
                     <Box paddingX={1} marginBottom={1}>
@@ -109,6 +154,7 @@ export default function CommandMenu({ title, subtitle, items = [], onSelect, the
                     <SelectInput
                         items={items}
                         onSelect={onSelect}
+                        limit={maxVisible}
                         itemComponent={(props) => <CustomItem {...props} theme={theme} />}
                         indicatorComponent={() => null}
                     />
@@ -131,11 +177,16 @@ export default function CommandMenu({ title, subtitle, items = [], onSelect, the
             flexShrink={0}
             width="100%"
         >
-            {title && (
-                <Box paddingX={1} paddingY={0} marginBottom={subtitle ? 0 : 0}>
+            <Box paddingX={1} paddingY={0} marginBottom={subtitle ? 0 : 0} flexDirection="row" justifyContent="space-between">
+                {title ? (
                     <Text color={colors.text} bold>{typeof title === 'string' ? title.toUpperCase() : title}</Text>
-                </Box>
-            )}
+                ) : <Box />}
+                {totalItems > 0 && (
+                    <Text color={colors.textMuted}>
+                        {cursor + 1}/{totalItems}
+                    </Text>
+                )}
+            </Box>
 
             {subtitle && (
                 <Box paddingX={1} marginBottom={0}>
@@ -163,12 +214,13 @@ export default function CommandMenu({ title, subtitle, items = [], onSelect, the
                         <Text color={colors.warning || "yellow"} italic>   No matching items found</Text>
                     </Box>
                 ) : (
-                    filteredItems.map((item, index) => {
-                        const isSelected = index === cursor;
+                    visibleItems.map((item, relIdx) => {
+                        const actualIdx = startIndex + relIdx;
+                        const isSelected = actualIdx === cursor;
                         const isCancel = item.label === 'Cancel' || item.label === 'Back' || item.label.toLowerCase().includes('exit') || item.label.toLowerCase().includes('back');
                         return (
                             <Box
-                                key={item.value ?? item.label ?? index}
+                                key={item.value ?? item.label ?? actualIdx}
                                 marginTop={isCancel ? 1 : 0}
                                 backgroundColor={isSelected ? colors.highlightBg : undefined}
                                 paddingX={1}

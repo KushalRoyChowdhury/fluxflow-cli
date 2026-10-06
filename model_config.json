@@ -26,7 +26,8 @@
         "9router_fallback": "",
         "explabs_fallback": "",
         "tokenharbor_fallback": "",
-        "infron_fallback": ""
+        "infron_fallback": "",
+        "c_openai_fallback": ""
     },
     "providers": {}
 }

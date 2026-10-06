@@ -1,7 +1,17 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-
+    "4.28.0": {
+        "note": "OCTOBER 6",
+        "added": [
+            "Added native support for Custom OpenAI Compatible (chat completions) endpoints, (without ENV hacks like before).",
+            "New & Advance Diff algorithm to reduce context bloat & improve accuracy."
+        ],
+        "changed": [],
+        "fixes": [
+            "Bug fix."
+        ]
+    },
     "4.27.0": {
         "note": "OCTOBER 6",
         "added": [

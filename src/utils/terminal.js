@@ -1,6 +1,8 @@
 import gradient from 'gradient-string';
 import { STARTUP_QUOTES } from '../data/gemini_cli.js';
 import { getThemeColors } from './theme.js';
+import { SETTINGS_FILE } from './paths.js';
+import { readAesEncryptedJson } from './crypto.js';
 
 /**
  * Terminal capability detection and normalization.
@@ -51,6 +53,19 @@ export const getFluxLogo = (version = '...', provider = 'Loading...', theme = 'D
     // ];
     const colors = getThemeColors(theme);
 
+    let displayProvider = provider;
+    if (provider === 'c_openai' || provider === 'Custom (OpenAI)') {
+        try {
+            const savedSettings = readAesEncryptedJson(SETTINGS_FILE, {});
+            const baseUrl = savedSettings?.systemSettings?.customOpenAIBaseUrl;
+            if (baseUrl) {
+                displayProvider = baseUrl;
+            }
+        } catch (e) {
+            // fallback to original provider string
+        }
+    }
+
     const textColor = colors.logoTextAnsi;
     const bodyColor = colors.logoBodyAnsi;
     const greyColor = colors.logoMutedAnsi;
@@ -72,7 +87,7 @@ export const getFluxLogo = (version = '...', provider = 'Loading...', theme = 'D
     const grey = (t) => `${greyColor}${t}${reset}`;
 
     return `${coloredArt[0]}
-${coloredArt[1]}  ${textColor}Selected Provider: ${provider}${reset}
+${coloredArt[1]}  ${textColor}Selected Provider: ${displayProvider}${reset}
 ${coloredArt[2]}
 ${coloredArt[3]}  ${textColor}FluxFlow ${grey('v' + version)}${reset}
 ${coloredArt[4]}

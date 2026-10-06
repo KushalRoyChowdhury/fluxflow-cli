@@ -67,7 +67,16 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
         requestPayload.reasoning_effort = effort;
     }
 
-    const baseUrl = process.env['9ROUTER_URL'] || process.env.NINEROUTER_URL || 'http://127.0.0.1:20128/v1/chat/completions';
+    const rawUrl = (process.env['9ROUTER_URL'] || process.env.NINEROUTER_URL || 'http://127.0.0.1:20128/v1').trim();
+    const cleanUrl = rawUrl.replace(/\/+$/, '');
+
+    if (!cleanUrl.endsWith('/v1') && !cleanUrl.endsWith('/v1/chat/completions')) {
+        throw new Error(`Invalid 9Router URL: "${rawUrl}". Endpoint URL MUST end with /v1 (e.g. http://127.0.0.1:20128/v1 or https://.../v1).`);
+    }
+
+    const baseUrl = cleanUrl.endsWith('/chat/completions')
+        ? cleanUrl
+        : `${cleanUrl}/chat/completions`;
 
     const headers = {
         'Content-Type': 'application/json',

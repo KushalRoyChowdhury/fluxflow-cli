@@ -1,6 +1,7 @@
 import os from 'os';
 import { DATA_DIR } from './paths';
 import fs from 'fs';
+import { structuredPatch } from 'diff';
 
 export const flattenString = (str) => {
     if (typeof str !== 'string') return str;
@@ -589,10 +590,10 @@ export const applyPatches = (content, patches, options = {}) => {
 };
 
 export const generateHighFidelityDiff = (originalContent, finalContent, patchResults, threshold = 8, compressToolResults = false) => {
-    if (!patchResults || patchResults.length === 0) return "";
+    if (originalContent === finalContent) return "";
 
-    const allLinesOriginal = originalContent.split(/\r?\n/);
-    const allLinesFinal = finalContent.split(/\r?\n/);
+    const allLinesOriginal = (originalContent || '').split(/\r?\n/);
+    const allLinesFinal = (finalContent || '').split(/\r?\n/);
 
     const maxLineNum = Math.max(allLinesOriginal.length, allLinesFinal.length, 1);
     const gutterWidth = Math.max(4, String(maxLineNum).length);
@@ -601,111 +602,39 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     let diffText = `[DIFF_START]\n`;
     const separatorLine = '═'.repeat(88);
 
-    let currentFinalLineIdx = 0;
-    let lastSuccessfulHunk = null;
+    // Compute exact structured patch between original and final content
+    const patch = structuredPatch('', '', originalContent || '', finalContent || '', '', '', { context: 3 });
 
-    const sortedResults = patchResults
-        .filter(res => res.success)
-        .sort((a, b) => a.originalStartLine - b.originalStartLine);
-
-    sortedResults.forEach((res, idx) => {
-        const startLineFinal = res.finalStartLine !== undefined ? res.finalStartLine : res.originalStartLine;
-
-        // 1. Context Before / Hunk Merging
-        if (lastSuccessfulHunk === null) {
-            const contextStart = Math.max(0, startLineFinal - 4);
-            currentFinalLineIdx = contextStart;
-            while (currentFinalLineIdx < startLineFinal - 1) {
-                diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
-                currentFinalLineIdx++;
-            }
-        } else {
-            const prev = lastSuccessfulHunk;
-            const prevOriginalEnd = prev.originalStartLine + prev.oldContent.split('\n').length - 1;
-            const gap = res.originalStartLine - prevOriginalEnd - 1;
-
-            if (gap >= threshold) {
-                let afterLimit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
-                while (currentFinalLineIdx < afterLimit) {
-                    diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
-                    currentFinalLineIdx++;
-                }
-                diffText += `[UI_CONTEXT] ${separatorLine}\n`;
-
-                const beforeStart = Math.max(currentFinalLineIdx, startLineFinal - 4);
-                currentFinalLineIdx = beforeStart;
-                while (currentFinalLineIdx < startLineFinal - 1) {
-                    diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
-                    currentFinalLineIdx++;
-                }
-            } else {
-                while (currentFinalLineIdx < startLineFinal - 1) {
-                    diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
-                    currentFinalLineIdx++;
-                }
-            }
-        }
-
-        // 2. Report the Removal (-)
-        const originalLineIdx = res.originalStartLine - 1;
-        const fullOrigLine = allLinesOriginal[originalLineIdx] || '';
-        const oldLines = res.oldContent.split('\n');
-
-        // Calculate leading indentation of the original line in file
-        const origIndentMatch = fullOrigLine.match(/^\s*/);
-        const origIndent = origIndentMatch ? origIndentMatch[0] : '';
-
-        oldLines.forEach((line, i) => {
-            let lineText = line;
-            if (oldLines.length === 1 && fullOrigLine.trim().length > 0 && fullOrigLine.includes(line.trim())) {
-                // If model targeted a subword/fragment of a single line, report the full original line
-                lineText = fullOrigLine;
-            } else if (i === 0) {
-                const lineIndentMatch = line.match(/^\s*/);
-                const lineIndent = lineIndentMatch ? lineIndentMatch[0] : '';
-                if (lineIndent.length < origIndent.length && fullOrigLine.includes(line.trim())) {
-                    lineText = origIndent + line.trimStart();
-                }
-            }
-            diffText += `-${fmtNum(res.originalStartLine + i)} |${lineText}\n`;
-        });
-
-        // 3. Report the Addition (+) with Exact Anchoring
-        let hunkEndInFinal = currentFinalLineIdx;
-        if (res.finalStartLine !== undefined) {
-            hunkEndInFinal = res.finalStartLine - 1 + (res.newContent ? res.newContent.split('\n').length : 0);
-        } else {
-            const originalResyncLineIdx = res.originalStartLine + oldLines.length - 1;
-            const resyncAnchorText = allLinesOriginal[originalResyncLineIdx] || null;
-            if (resyncAnchorText !== null) {
-                const lookAheadLimit = (idx < sortedResults.length - 1) ? (sortedResults[idx + 1].originalStartLine || allLinesFinal.length) + 10 : allLinesFinal.length;
-                for (let s = currentFinalLineIdx; s < lookAheadLimit; s++) {
-                    if (allLinesFinal[s] === resyncAnchorText) {
-                        hunkEndInFinal = s;
-                        break;
-                    }
-                    if (s === allLinesFinal.length - 1) hunkEndInFinal = allLinesFinal.length;
-                }
-            } else {
-                hunkEndInFinal = allLinesFinal.length;
-            }
-        }
-
-        while (currentFinalLineIdx < hunkEndInFinal) {
-            diffText += `+${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
-            currentFinalLineIdx++;
-        }
-
-        lastSuccessfulHunk = res;
-    });
-
-    if (lastSuccessfulHunk !== null) {
-        let limit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
-        while (currentFinalLineIdx < limit) {
-            diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
-            currentFinalLineIdx++;
-        }
+    if (!patch || !patch.hunks || patch.hunks.length === 0) {
+        return "";
     }
+
+    patch.hunks.forEach((hunk, hIdx) => {
+        // Context separation between distinct disjoint hunks
+        if (hIdx > 0) {
+            diffText += `[UI_CONTEXT] ${separatorLine}\n`;
+        }
+
+        let oldLineIdx = hunk.oldStart;
+        let newLineIdx = hunk.newStart;
+
+        for (const line of hunk.lines) {
+            const marker = line[0];
+            const text = line.slice(1);
+
+            if (marker === ' ') {
+                diffText += `[UI_CONTEXT] ${fmtNum(newLineIdx)} |${text}\n`;
+                oldLineIdx++;
+                newLineIdx++;
+            } else if (marker === '-') {
+                diffText += `-${fmtNum(oldLineIdx)} |${text}\n`;
+                oldLineIdx++;
+            } else if (marker === '+') {
+                diffText += `+${fmtNum(newLineIdx)} |${text}\n`;
+                newLineIdx++;
+            }
+        }
+    });
 
     if (compressToolResults) {
         const header = `[DIFF_START]\n`;

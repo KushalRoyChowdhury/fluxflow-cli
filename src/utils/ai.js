@@ -50,6 +50,7 @@ const PROVIDER_LOADERS = {
     TokenHarbor: () => import('./providers/tokenharbor.js').then(m => m.getTokenHarborStream),
     Infron:      () => import('./providers/infron.js').then(m => m.getInfronStream),
     APInex:      () => import('./providers/apinex.js').then(m => m.getAPInexStream),
+    c_openai:    () => import('./providers/custom_openai.js').then(m => m.getCustomOpenAIStream),
 };
 const _providerCache = {};
 const loadProvider = async (key) => {
@@ -422,7 +423,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs' || aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') ? false : systemSettings?.memory !== false;
 
     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
@@ -1365,6 +1366,8 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
                 stream = (await loadProvider('TokenHarbor'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'APInex' || aiProvider === 'apinex' || aiProvider === 'apx') {
                 stream = (await loadProvider('APInex'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
+                stream = (await loadProvider('c_openai'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, settings.systemSettings?.customOpenAIBaseUrl || '');
             } else {
                 const googleClient = getGoogleClient(apiKey);
                 const { serviceTier: simpleServiceTier, cleanModel: simpleCleanModel } = getServiceTierFromModel(model);
@@ -1725,7 +1728,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
     // }
 
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx' || settings?.aiProvider === 'Infron' || settings?.aiProvider === 'infron') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx' || settings?.aiProvider === 'Infron' || settings?.aiProvider === 'infron' || settings?.aiProvider === 'c_openai' || settings?.aiProvider === 'Custom (OpenAI)') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -2972,6 +2975,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             abortController.signal,
                             1.0
                         );
+                    } else if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
+                        stream = (await loadProvider('c_openai'))(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0,
+                            systemSettings?.customOpenAIBaseUrl || ''
+                        );
                     } else {
                         const googleClient = getGoogleClient(settings?.apiKey);
                         const { serviceTier: streamServiceTier, cleanModel: streamCleanModel } = getServiceTierFromModel(targetModel);
@@ -3156,7 +3172,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (isInsideThinking) {
                                         msgs.push({ type: 'text', content: seg });
                                     } else {
-                                        const lfOnly = seg.replace(/[^\n]/g, '');
+                                        const lfOnly = seg.replace(/[^\r\n]/g, '');
                                         if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
                                     }
                                 }
@@ -3177,7 +3193,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (isInsideThinking) {
                                     msgs.push({ type: 'text', content: rest });
                                 } else {
-                                    const lfOnly = rest.replace(/[^\n]/g, '');
+                                    const lfOnly = rest.replace(/[^\r\n]/g, '');
                                     if (lfOnly) msgs.push({ type: 'text', content: lfOnly });
                                 }
                             }
@@ -3316,14 +3332,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 passedParen = true;
                                             } else if (char === ')') {
                                                 balance--;
-                                            } else if (char === '[') {
-                                                bracketBalance++;
                                             } else if (char === ']') {
-                                                if (passedParen && balance === 0 && bracketBalance === 1) {
+                                                if (passedParen && balance === 0) {
                                                     endIdx = i;
                                                     break;
                                                 }
-                                                bracketBalance--;
                                             }
                                         }
                                     }
@@ -3351,19 +3364,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     activeBufferType = null;
                                     remaining = combined.substring(endIdx + endLen);
                                 } else {
-                                    // [LIMIT PROTECTION] - Prevent crashes on massive tool calls (e.g. large file writes)
-                                    // Flush buffer if it exceeds limits
-                                    const MAX_BUFFER = activeBufferType?.startsWith('kimi') ? 8192 : 512;
-                                    if (combined.length > MAX_BUFFER) {
-                                        emitTextChunk(combined);
-                                        toolCallBuffer = '';
-                                        isBufferingToolCall = false; // Give up on this
-                                        activeBufferType = null;
-                                        isToolCallInBacktick = false;
-                                        isToolCallInThink = false;
-                                    } else {
-                                        toolCallBuffer = combined;
-                                    }
+                                    // Keep buffering the tool call without flushing it to UI text
+                                    toolCallBuffer = combined;
                                     remaining = '';
                                     break;
                                 }
@@ -4417,7 +4419,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 // Start a polling loop to check for IDE decision while waiting for terminal input
                                                 const pollInterval = setInterval(() => {
                                                     if (ideDecision) {
-                                                        if (globalSettings.onIDEApproval) globalSettings.onIDEApproval(ideDecision);
+                                                        const notifyIDEApproval = settings.onIDEApproval || (globalSettings && globalSettings.onIDEApproval);
+                                                        if (notifyIDEApproval) notifyIDEApproval(ideDecision);
                                                         clearInterval(pollInterval);
                                                         resolve(ideDecision);
                                                     }
@@ -4501,7 +4504,33 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             let result = "";
                                             if (normToolName === 'update_file') {
                                                 const diffReport = generateHighFidelityDiff(originalContentForReporting, finalContent, patchResults, 12, settings?.compressToolResults || globalSettings?.systemSettings?.compressToolResults);
-                                                result = `File [${filePath}] updated via IDE Companion (May have user edits). [${patchResults.length}/${requestedPatchCount}] blocks applied.\n\n${diffReport}`;
+
+                                                // Verify which patches were actually retained in finalContent vs rejected/reverted by user in IDE
+                                                let appliedBlocks = 0;
+                                                const blockNotes = [];
+                                                const { patchPairs: originalPatches } = parsePatchPairs(toolCall.args);
+
+                                                if (originalPatches && originalPatches.length > 0) {
+                                                    originalPatches.forEach((patch, idx) => {
+                                                        const searchClean = (patch.search || '').trim();
+                                                        const replaceClean = (patch.replace || '').trim();
+
+                                                        // If newContent is present in final file and searchContent is not (or search is different from final)
+                                                        const isNewPresent = replaceClean ? finalContent.includes(replaceClean) : true;
+                                                        const isOldGone = searchClean && searchClean !== replaceClean ? !finalContent.includes(searchClean) : true;
+
+                                                        if (isNewPresent && (isOldGone || !searchClean)) {
+                                                            appliedBlocks++;
+                                                        } else {
+                                                            blockNotes.push(`  • Block ${idx + 1}: No change detected OR user rejected change.`);
+                                                        }
+                                                    });
+                                                } else {
+                                                    appliedBlocks = patchResults.length;
+                                                }
+
+                                                const failureSection = blockNotes.length > 0 ? `\n\nNotes:\n${blockNotes.join('\n')}` : '';
+                                                result = `File [${filePath}] updated via IDE Companion (May have user edits). [${appliedBlocks}/${requestedPatchCount}] blocks applied.${failureSection}\n\n${diffReport}`;
                                             } else {
                                                 // write_file reporting style
                                                 const verifiedLines = finalContent.split(/\r?\n/);
@@ -4547,7 +4576,24 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             lastToolFinishedAt = toolEnd;
                                             yield { type: 'tool_time', content: toolEnd - executionStart };
 
-                                            const aiContent = `[ACTION RESULT]: ${result}`;
+                                            const rawResult = (result || '').toString()
+                                                .replaceAll('═'.repeat(88), '='.repeat(35))
+                                                .replaceAll('[UI_CONTEXT]', '');
+                                            let processedResult = rawResult;
+                                            if (processedResult.includes('[[VERIFIED]]')) {
+                                                processedResult = processedResult.replace(/\[\[VERIFIED\]\][\s\S]*?\[\[\/VERIFIED\]\]/g, '[SYSTEM NOTE]: Patch Block matched & applied successfully. Large Block omitted to conserve context.\n');
+                                            }
+
+                                            let aiContent;
+                                            if (processedResult.startsWith('[[SAME]]')) {
+                                                const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
+                                                const lines = cleanText.split(/\r?\n/);
+                                                const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
+                                                const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
+                                                aiContent = `[ACTION RESULT]: ${headerPart}\n[SYSTEM NOTE]: Content verified and persisted to disk. Full preview omitted to conserve context.`;
+                                            } else {
+                                                aiContent = `[ACTION RESULT]: ${processedResult}`;
+                                            }
                                             toolResults.push({ role: 'user', text: aiContent });
                                             anyToolExecutedInThisTurn = true;
                                             await incrementUsage('toolSuccess');
@@ -4843,7 +4889,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (settings.onToolResult) settings.onToolResult('failure', normToolName);
                                 }
 
-                                const rawResult = (result || '').toString().replaceAll('[UI_CONTEXT]', '');
+                                const rawResult = (result || '').toString()
+                                    .replaceAll('═'.repeat(88), '='.repeat(35))
+                                    .replaceAll('[UI_CONTEXT]', '');
                                 let processedResult = rawResult;
                                 if (processedResult.includes('[[VERIFIED]]')) {
                                     processedResult = processedResult.replace(/\[\[VERIFIED\]\][\s\S]*?\[\[\/VERIFIED\]\]/g, '[SYSTEM NOTE]: Patch Block matched & applied successfully. Large Block omitted to conserve context.\n');
@@ -5348,6 +5396,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'tokenharbor' || lower === 'token harbor' || lower === 'token_harbor' || lower === 'thk') return 'TokenHarbor';
         if (lower === 'infron') return 'Infron';
         if (lower === 'apinex' || lower === 'apx') return 'APInex';
+        if (lower === 'c_openai' || lower === 'custom_openai' || lower === 'custom (openai)' || lower === 'custom') return 'c_openai';
         return null;
     };
 
@@ -5696,8 +5745,8 @@ Current Time: ${time}
                             if (line.includes('[DIFF_START]')) { insideDiff = true; continue; }
                             if (line.includes('[DIFF_END]')) { insideDiff = false; continue; }
                             if (insideDiff) {
-                                if (/^\+\d+/.test(line)) added++;
-                                else if (/^\-\d+/.test(line)) removed++;
+                                if (/^\+\s*\d+/.test(line)) added++;
+                                else if (/^\-\s*\d+/.test(line)) removed++;
                             }
                         }
                         if (added > 0 || removed > 0) {
@@ -5715,8 +5764,11 @@ Current Time: ${time}
                             for (const line of result.split('\n')) {
                                 if (line.includes('Old File contents:')) { insideOldFile = true; continue; }
                                 if (insideOldFile) {
-                                    if (line.trim() === '') { insideOldFile = false; }
-                                    else if (/^\d+ \|/.test(line)) oldLinesCount++;
+                                    if (line.startsWith('- Content Preview:') || (line.trim() === '' && !/^\s*\d+\s*\|/.test(line))) {
+                                        insideOldFile = false;
+                                    } else if (/^\s*\d+\s*\|/.test(line)) {
+                                        oldLinesCount++;
+                                    }
                                 }
                             }
                         }

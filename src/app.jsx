@@ -2330,7 +2330,11 @@ export default function App({ args = [] }) {
             if (!key) {
                 key = await getProviderAPIKey(startupProvider);
             }
-            if (key) {
+            if (startupProvider === 'c_openai') {
+                const effectiveKey = key || '';
+                setApiKey(effectiveKey);
+                initAI(effectiveKey, { aiProvider: startupProvider, onIDEApproval: resetPendingApproval });
+            } else if (key) {
                 setApiKey(key);
                 initAI(key, { aiProvider: startupProvider, onIDEApproval: resetPendingApproval }); // Initialize SDK
             }
@@ -2584,7 +2588,45 @@ export default function App({ args = [] }) {
         };
 
         const isOllamaLocalEscape = (aiProvider === 'Ollama' || aiProvider === '9router') && (key.trim() === 'LOCAL' || key.trim() === '');
+        const isCustomOpenAI = aiProvider === 'c_openai';
         const effectiveKey = isOllamaLocalEscape ? 'LOCAL' : key;
+
+        if (isCustomOpenAI) {
+            const cleanUrl = key.trim().replace(/\/+$/, '');
+            const newSys = { ...systemSettings, customOpenAIBaseUrl: cleanUrl, memory: false };
+            setSystemSettings(newSys);
+
+            const savedKey = await getProviderAPIKey('c_openai');
+            const effKey = savedKey || '';
+            setApiKey(effKey);
+            initAI(effKey, { aiProvider: 'c_openai', onIDEApproval: resetPendingApproval });
+
+            const defaultModel = getDefaultModel('c_openai', apiTier) || '';
+            setActiveModel(defaultModel);
+
+            await saveSettings({
+                mode,
+                thinkingLevel,
+                aiProvider: 'c_openai',
+                activeModel: defaultModel,
+                showFullThinking,
+                systemSettings: newSys,
+                profileData,
+                imageSettings,
+                apiTier
+            });
+
+            setMessages(prev => [
+                ...prev,
+                {
+                    role: 'system',
+                    text: `✦ Custom (OpenAI) Base URL saved!\n⠀⠀\x1b[2m└─\x1b[22m Endpoint: ${cleanUrl}${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom (OpenAI).\n⠀`,
+                    isMeta: true
+                }
+            ]);
+            setTempKey('');
+            return;
+        }
 
         if (isOllamaLocalEscape || (key.startsWith(prefix) && key.length >= minLength)) {
             await saveProviderAPIKey(aiProvider, effectiveKey);
@@ -2851,8 +2893,8 @@ export default function App({ args = [] }) {
             return;
         }
 
-        // Check if we are in setup mode (missing API key)
-        if (!apiKey) {
+        // Check if we are in setup mode (missing API key or missing custom URL for c_openai)
+        if (!apiKey && !(aiProvider === 'c_openai' && systemSettings.customOpenAIBaseUrl)) {
             handleSetup(absoluteClean);
             setTempKey('');
             return;
@@ -3392,7 +3434,7 @@ export default function App({ args = [] }) {
                         const rawArgs = parts.slice(1);
 
                         // Check for multimodal flag
-                        const isMultimodalFlag = rawArgs.some(a => a === '--multimodal' || a === '-m');
+                        const isMultimodalFlag = rawArgs.some(a => a === '--multimodal' || a === '-m' || a === '--vision' || a === '-v');
 
                         // Check for save / remove / rename / default flags
                         const isSave = rawArgs.some(a => a === '--save' || a === '-sv' || a === '--add');
@@ -3401,7 +3443,7 @@ export default function App({ args = [] }) {
                         const isDefault = rawArgs.some(a => a === '--default' || a === '-df');
 
                         if (isSave || isRemove || isRename || isDefault) {
-                            const nonFlagArgs = rawArgs.filter(a => !['--save', '-sv', '--add', '--remove', '-rm', '--rename', '-rn', '-mv', '--default', '-df', '--multimodal', '-m'].includes(a));
+                            const nonFlagArgs = rawArgs.filter(a => !['--save', '-sv', '--add', '--remove', '-rm', '--rename', '-rn', '-mv', '--default', '-df', '--multimodal', '-m', '--vision', '-v'].includes(a));
 
                             if (isDefault) {
                                 const modelToDefault = nonFlagArgs.join(' ').trim();
@@ -3492,7 +3534,7 @@ export default function App({ args = [] }) {
                             break;
                         }
 
-                        const filteredParts = rawArgs.filter(arg => arg !== '--multimodal' && arg !== '-m');
+                        const filteredParts = rawArgs.filter(arg => arg !== '--multimodal' && arg !== '-m' && arg !== '--vision' && arg !== '-v');
                         const mod = filteredParts.join(' ').trim();
 
                         setCustomMultimodal(isMultimodalFlag);
@@ -3504,16 +3546,16 @@ export default function App({ args = [] }) {
                             const freeDefault = getDefaultModel('Google', 'Free');
                             const paidDefault = getDefaultModel('Google', 'Paid');
                             if (mod === freeDefault && apiTier !== 'Free' && aiProvider === 'Google' && false) {
-                                setMessages(prev => {
-                                    setCompletedIndex(prev.length + 1);
-                                    return [...prev, {
-                                        id: Date.now(),
-                                        role: 'system',
-                                        text: `**[ACCESS DENIED]** ${freeDefault} is restricted to the Free API tier. Automatically switching you to **${paidDefault}** for optimal performance.`,
-                                        isMeta: true
-                                    }];
-                                });
-                                setActiveModel(paidDefault);
+                                // setMessages(prev => {
+                                //     setCompletedIndex(prev.length + 1);
+                                //     return [...prev, {
+                                //         id: Date.now(),
+                                //         role: 'system',
+                                //         text: `**[ACCESS DENIED]** ${freeDefault} is restricted to the Free API tier. Automatically switching you to **${paidDefault}** for optimal performance.`,
+                                //         isMeta: true
+                                //     }];
+                                // });
+                                // setActiveModel(paidDefault);
                             } else {
                                 setActiveModel(mod);
                                 const isMmActive = isMultimodalFlag || isModelMultimodal(mod);
@@ -4339,6 +4381,7 @@ export default function App({ args = [] }) {
                                     setSessionToolFailure(prev => prev + 1);
                                 }
                             },
+                            onIDEApproval: resetPendingApproval,
                             onToolApproval: async (tool, args) => {
                                 const isAuto = autoAcceptWrites || systemSettings.autoExec;
 
@@ -4713,9 +4756,9 @@ export default function App({ args = [] }) {
                                         continue;
                                     }
                                     if (insideDiff) {
-                                        if (/^\+\d+/.test(line)) {
+                                        if (/^\+\s*\d+/.test(line)) {
                                             added++;
-                                        } else if (/^\-\d+/.test(line)) {
+                                        } else if (/^\-\s*\d+/.test(line)) {
                                             removed++;
                                         }
                                     }
@@ -4736,16 +4779,18 @@ export default function App({ args = [] }) {
                                             continue;
                                         }
                                         if (insideOldFile) {
-                                            if (line.trim() === '') {
+                                            if (line.startsWith('- Content Preview:') || (line.trim() === '' && !/^\s*\d+\s*\|/.test(line))) {
                                                 insideOldFile = false;
-                                            } else if (/^\d+ \|/.test(line)) {
+                                            } else if (/^\s*\d+\s*\|/.test(line)) {
                                                 oldLinesCount++;
                                             }
                                         }
                                     }
                                 }
-                                addToUsage('linesAdded', verifiedLinesCount);
-                                addToUsage('linesRemoved', oldLinesCount);
+                                if (verifiedLinesCount > 0 || oldLinesCount > 0) {
+                                    addToUsage('linesAdded', verifiedLinesCount);
+                                    addToUsage('linesRemoved', oldLinesCount);
+                                }
                             }
 
                             continue;
@@ -5279,11 +5324,12 @@ export default function App({ args = [] }) {
                             { label: 'Token Harbor', value: 'TokenHarbor' },
                             { label: 'Infron', value: 'Infron' },
                             { label: 'APInex', value: 'APInex' },
-                            ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router', value: '9router' }] : []),
                             { label: 'Ollama', value: 'Ollama' },
-                            { label: 'AIHubMix       [EXPERIMENTAL]', value: 'AIHubMix' },
-                            { label: 'Mistral        [EXPERIMENTAL]', value: 'Mistral' },
-                            { label: 'OpenRouter     [EXPERIMENTAL]', value: 'OpenRouter' },
+                            ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router        [Local Proxy]', value: '9router' }] : []),
+                            { label: 'AIHubMix       [Experimental]', value: 'AIHubMix' },
+                            { label: 'Mistral        [Experimental]', value: 'Mistral' },
+                            { label: 'OpenRouter     [Experimental]', value: 'OpenRouter' },
+                            { label: 'Custom         [OpenAI Chat Completion]', value: 'c_openai' },
                             { label: 'Back', value: providerReturnView }
                         ]}
                         theme={systemSettings.theme}
@@ -5304,6 +5350,40 @@ export default function App({ args = [] }) {
                                 }
                             }
 
+                            if (selectedProvider === 'c_openai') {
+                                if (!systemSettings.customOpenAIBaseUrl) {
+                                    setInputConfig({
+                                        label: "Enter Custom OpenAI Base URL (.../v1):",
+                                        key: 'customOpenAIBaseUrl',
+                                        value: '',
+                                        returnView: providerReturnView
+                                    });
+                                    setActiveView('input');
+                                    return;
+                                }
+
+                                const effectiveKey = key || '';
+                                setAiProvider(selectedProvider);
+                                setApiKey(effectiveKey);
+                                initAI(effectiveKey, { aiProvider: selectedProvider, onIDEApproval: resetPendingApproval });
+                                const targetTier = (quotas.providerTiers || {})[selectedProvider] || 'Free';
+                                const defaultModel = getDefaultModel(selectedProvider, targetTier) || '';
+                                setActiveModel(defaultModel);
+                                setApiTier(targetTier);
+                                setSystemSettings(s => ({ ...s, memory: false }));
+                                saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
+                                setMessages(prev => [
+                                    ...prev,
+                                    {
+                                        role: 'system',
+                                        text: `✦ Switched to Custom (OpenAI)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}\n⠀⠀\x1b[2m└─\x1b[22m Endpoint: ${systemSettings.customOpenAIBaseUrl}${systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom (OpenAI).` : ''}\n⠀`,
+                                        isMeta: true
+                                    }
+                                ]);
+                                setActiveView(providerReturnView);
+                                return;
+                            }
+
                             if (key) {
                                 setAiProvider(selectedProvider);
                                 setApiKey(key);
@@ -5312,24 +5392,25 @@ export default function App({ args = [] }) {
                                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                                 setActiveModel(defaultModel);
                                 setApiTier(targetTier);
-                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'Infron' || selectedProvider === 'APInex') {
+                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'Infron' || selectedProvider === 'APInex' || selectedProvider === 'c_openai') {
                                     setSystemSettings(s => ({ ...s, memory: false }));
                                     saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
                                 } else {
                                     saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas });
                                 }
+                                const displayProvName = selectedProvider === 'c_openai' ? 'Custom (OpenAI)' : selectedProvider;
                                 setMessages(prev => [
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'Infron' || selectedProvider === 'APInex') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}${warningMsg}\n⠀`,
+                                        text: `✦ Switched to ${displayProvName} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'Infron' || selectedProvider === 'APInex' || selectedProvider === 'c_openai') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${displayProvName}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}${warningMsg}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
                                 setActiveView(providerReturnView);
                             } else {
                                 setInputConfig({
-                                    label: `Enter ${selectedProvider} API Key:`,
+                                    label: `Enter ${selectedProvider === 'c_openai' ? 'Custom (OpenAI)' : selectedProvider} API Key:`,
                                     key: 'providerKey',
                                     provider: selectedProvider,
                                     value: '',
@@ -5899,6 +5980,35 @@ export default function App({ args = [] }) {
                                         setSystemSettings(newSysSettings);
                                         newSettings.systemSettings = newSysSettings;
                                         setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: '[EXTERNAL STORAGE] Flux Flow will use ' + val.trim() + ' for data after restart.' }]);
+                                    } else if (key === 'customOpenAIBaseUrl') {
+                                        const cleanUrl = val.trim().replace(/\/+$/, '');
+                                        const newSysSettings = { ...systemSettings, customOpenAIBaseUrl: cleanUrl, memory: false };
+                                        setSystemSettings(newSysSettings);
+                                        newSettings.systemSettings = newSysSettings;
+
+                                        const targetTier = (quotas.providerTiers || {})['c_openai'] || 'Free';
+                                        const defaultModel = getDefaultModel('c_openai', targetTier) || '';
+                                        setAiProvider('c_openai');
+                                        setActiveModel(defaultModel);
+                                        setApiTier(targetTier);
+                                        newSettings.aiProvider = 'c_openai';
+                                        newSettings.activeModel = defaultModel;
+                                        newSettings.apiTier = targetTier;
+
+                                        const key = await getProviderAPIKey('c_openai');
+                                        const effectiveKey = key || '';
+                                        setApiKey(effectiveKey);
+                                        initAI(effectiveKey, { aiProvider: 'c_openai', onIDEApproval: resetPendingApproval });
+
+                                        setMessages(prev => [
+                                            ...prev,
+                                            {
+                                                id: Date.now(),
+                                                role: 'system',
+                                                text: `✦ Custom OpenAI Base URL saved!\n⠀⠀\x1b[2m└─\x1b[22m Switched to Custom (OpenAI)\n⠀⠀\x1b[2m└─\x1b[22m Endpoint: ${cleanUrl}${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}\n⠀`,
+                                                isMeta: true
+                                            }
+                                        ]);
                                     } else if (key === 'imageSettings') {
                                         const apiKeyInput = val.trim();
                                         if (apiKeyInput.startsWith('sk_')) {
@@ -7258,10 +7368,10 @@ export default function App({ args = [] }) {
                             <Box borderStyle="double" borderColor="grey" padding={1} flexShrink={0}>
                                 <Text color="white">Starting Flux Flow...</Text>
                             </Box>
-                        ) : !apiKey ? (
+                        ) : (!apiKey && !(aiProvider === 'c_openai' && systemSettings.customOpenAIBaseUrl)) ? (
                             <Box borderStyle="round" borderColor="white" padding={0} flexDirection="column" flexShrink={0} width="100%">
                                 <Box paddingX={1} marginBottom={1}>
-                                    <Text color="gray" bold>API KEY REQUIRED</Text>
+                                    <Text color="gray" bold>{aiProvider === 'c_openai' ? 'CUSTOM BASE URL REQUIRED' : 'API KEY REQUIRED'}</Text>
                                 </Box>
 
                                 <Box paddingX={1} flexDirection="column">
@@ -7277,17 +7387,18 @@ export default function App({ args = [] }) {
                                                         { label: 'DeepSeek', value: 'DeepSeek' },
                                                         { label: 'InferX', value: 'InferX' },
                                                         { label: 'SenseNova', value: 'SenseNova' },
-                                                        { label: 'CrofAI', value: 'CrofAI' },
+                                                        // { label: 'CrofAI', value: 'CrofAI' }, // Cleanup
                                                         { label: 'Poolside', value: 'Poolside' },
                                                         { label: 'Experiential Labs', value: 'ExpLabs' },
                                                         { label: 'Token Harbor', value: 'TokenHarbor' },
                                                         { label: 'Infron', value: 'Infron' },
                                                         { label: 'APInex', value: 'APInex' },
-                                                        ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router', value: '9router' }] : []),
                                                         { label: 'Ollama', value: 'Ollama' },
-                                                        { label: 'AIHubMix     [EXPERIMENTAL]', value: 'AIHubMix' },
-                                                        { label: 'Mistral      [EXPERIMENTAL]', value: 'Mistral' },
-                                                        { label: 'OpenRouter   [EXPERIMENTAL]', value: 'OpenRouter' },
+                                                        ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router      [Local Proxy]', value: '9router' }] : []),
+                                                        { label: 'AIHubMix     [Experimental]', value: 'AIHubMix' },
+                                                        { label: 'Mistral      [Experimental]', value: 'Mistral' },
+                                                        { label: 'OpenRouter   [Experimental]', value: 'OpenRouter' },
+                                                        { label: 'Custom       [OpenAI Chat Completion]', value: 'c_openai' },
                                                     ]}
                                                     onSelect={(item) => {
                                                         setAiProvider(item.value);
@@ -7301,7 +7412,7 @@ export default function App({ args = [] }) {
                                             <Text color="white">
                                                 {aiProvider === 'Ollama'
                                                     ? 'Enter Ollama API Key (or type LOCAL to use local host):'
-                                                    : `Enter your ${aiProvider} API Key:`}
+                                                    : (aiProvider === 'c_openai' ? 'Enter Custom OpenAI Base URL (.../v1):' : `Enter your ${aiProvider} API Key:`)}
                                             </Text>
                                             <Box marginTop={1}>
                                                 <Text color="gray" bold> {'>'} </Text>
@@ -7309,7 +7420,7 @@ export default function App({ args = [] }) {
                                                     value={tempKey}
                                                     onChange={setTempKey}
                                                     onSubmit={handleSetup}
-                                                    mask="*"
+                                                    mask={aiProvider === 'c_openai' ? undefined : '*'}
                                                 />
                                             </Box>
                                         </>
@@ -7386,7 +7497,7 @@ export default function App({ args = [] }) {
                                     <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
                                         <Box flexDirection="row">
                                             <Text color={colors.primary || colors.text} bold>
-                                                {isFileSug ? "FILES" : isModelSug ? "SAVED MODELS" : isThinkingSug ? "THINKING LEVELS" : "COMMANDS"}
+                                                {isFileSug ? "WORKSPACE FILES" : isModelSug ? "SAVED MODELS" : isThinkingSug ? "THINKING LEVELS" : "COMMANDS"}
                                             </Text>
                                             <Text color={colors.textMuted}> ({totalCount})</Text>
                                         </Box>
@@ -7419,11 +7530,11 @@ export default function App({ args = [] }) {
                                             const pathPart = s.cmd.startsWith("\\@[") ? s.cmd.slice(3, -1) : s.cmd.slice(2, -1);
                                             const parts = pathPart.split(/[\/\\]/);
                                             return parts[parts.length - 1];
-                                        })() : (s.cmd && s.cmd.includes("/") ? s.cmd.split("/").pop() : s.cmd));
+                                        })() : (!isModelSug && s.cmd && s.cmd.includes("/") ? s.cmd.split("/").pop() : s.cmd));
 
                                         if (isModelSug) {
                                             const isMulti = s.multimodal === true || isModelMultimodal(s.cmd || s);
-                                            const badgeText = isMulti ? "Multimodal" : "Text Only";
+                                            const badgeText = isMulti ? "Vision" : "Text Only";
                                             return (
                                                 <Box
                                                     key={s.cmd || i}

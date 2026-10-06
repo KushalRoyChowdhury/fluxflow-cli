@@ -154,11 +154,18 @@ export const getNVIDIAStream = async function* (apiKey, model, contents, systemI
     const maxAttempts = 6;
     let hasYielded = false;
 
-    let _baseUrl = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1/chat/completions';
-    let _apiKey = process.env.NVIDIA_API_KEY && process.env.NVIDIA_BASE_URL ? process.env.NVIDIA_API_KEY : apiKey;
-    if (!_baseUrl.endsWith('/chat/completions')) {
-        _baseUrl = _baseUrl.replace(/\/+$/, '') + '/chat/completions';
+    const rawNvidiaUrl = (process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1').trim();
+    const cleanNvidiaUrl = rawNvidiaUrl.replace(/\/+$/, '');
+
+    if (!cleanNvidiaUrl.endsWith('/v1') && !cleanNvidiaUrl.endsWith('/v1/chat/completions')) {
+        throw new Error(`Invalid NVIDIA Base URL: "${rawNvidiaUrl}". Endpoint URL MUST end with /v1 (e.g. https://integrate.api.nvidia.com/v1 or http://.../v1).`);
     }
+
+    const _baseUrl = cleanNvidiaUrl.endsWith('/chat/completions')
+        ? cleanNvidiaUrl
+        : `${cleanNvidiaUrl}/chat/completions`;
+
+    let _apiKey = process.env.NVIDIA_API_KEY && process.env.NVIDIA_BASE_URL ? process.env.NVIDIA_API_KEY : apiKey;
 
     while (attempts < maxAttempts) {
         // fs.appendFileSync("NVIDIA_REQUEST.txt", `${JSON.stringify(body)}\n\n`);

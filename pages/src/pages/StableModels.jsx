@@ -153,7 +153,7 @@ export default function StableModels() {
                         <li><strong>Google Gemini</strong> (Native multimodal &amp; Flash/Pro)</li>
                         <li><strong>DeepSeek</strong> (platform.deepseek.com)</li>
                         <li><strong>Mistral AI</strong> (admin.mistral.ai)</li>
-                        <li><strong>NVIDIA NIM</strong> (Local &amp; cloud OpenAI-compatible endpoints)</li>
+                        <li><strong>NVIDIA NIM</strong> (Local &amp; cloud OpenAI-compatible endpoints — base URL must end with <code>/v1</code>)</li>
                         <li><strong>Ollama</strong> (Local models with multimodal support)</li>
                         <li><strong>SenseNova</strong> (platform.sensenova.ai)</li>
                         <li><strong>InferX</strong> (model.inferx.net)</li>

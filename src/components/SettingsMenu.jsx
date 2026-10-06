@@ -100,7 +100,7 @@ export default function SettingsMenu({
 
     useEffect(() => {
         const checkKeys = async () => {
-            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'];
+            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'c_openai'];
             const keyMap = {};
             for (const p of providers) {
                 try {
@@ -114,7 +114,7 @@ export default function SettingsMenu({
     }, []);
 
     const allSubAgentItems = React.useMemo(() => {
-        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'];
+        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'c_openai'];
         const hasEnv = !!(process.env.SUBAGENT_MODEL && process.env.SUBAGENT_MODEL.trim());
         const envLabel = hasEnv ? `ENV (${process.env.SUBAGENT_MODEL.trim()})` : 'ENV';
 
@@ -262,7 +262,7 @@ export default function SettingsMenu({
         switch (catId) {
             case 'providers': {
                 const items = [
-                    { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
+                    { label: 'Current Provider', value: 'aiProvider', status: aiProvider === 'c_openai' ? 'Custom (OpenAI)' : aiProvider },
                     // ...(
                     //     aiProvider.toLowerCase() === 'google' ||
                     //         aiProvider.toLowerCase() === 'openrouter'
@@ -279,6 +279,18 @@ export default function SettingsMenu({
                         label: 'Endpoint',
                         value: 'ollamaEndpoint',
                         status: systemSettings.ollamaEndpoint || 'Cloud'
+                    });
+                }
+                if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
+                    items.push({
+                        label: 'Base URL',
+                        value: 'customOpenAIBaseUrl',
+                        status: systemSettings.customOpenAIBaseUrl || 'Not Configured'
+                    });
+                    items.push({
+                        label: 'API Key (if needed)',
+                        value: 'customOpenAIKey',
+                        status: activeProviderKeys['c_openai'] ? 'Set' : 'None'
                     });
                 }
                 return items;
@@ -534,9 +546,12 @@ export default function SettingsMenu({
             setEditValue(systemSettings.autoApproveCommands || '');
         } else if (item.value === 'autoApproveGit') {
             setSystemSettings(s => ({ ...s, autoApproveGit: !s.autoApproveGit, sandboxPreset: 'Custom' }));
-        } else if (item.value === 'autoDisallow') {
-            setEditingItem('autoDisallowCommands');
-            setEditValue(systemSettings.autoDisallowCommands || '');
+        } else if (item.value === 'customOpenAIBaseUrl') {
+            setEditingItem('customOpenAIBaseUrl');
+            setEditValue(systemSettings.customOpenAIBaseUrl || '');
+        } else if (item.value === 'customOpenAIKey') {
+            setEditingItem('customOpenAIKey');
+            setEditValue('');
         } else if (item.value === 'ollamaEndpoint') {
             setSystemSettings(s => {
                 const nextEndpoint = (s.ollamaEndpoint === 'Local') ? 'Cloud' : 'Local';
@@ -990,7 +1005,9 @@ export default function SettingsMenu({
                                 const isEditingThis = isSelected && editingItem &&
                                     ((editingItem === 'alwaysAskCommands' && item.value === 'alwaysAsk') ||
                                         (editingItem === 'autoApproveCommands' && item.value === 'autoApprove') ||
-                                        (editingItem === 'autoDisallowCommands' && item.value === 'autoDisallow'));
+                                        (editingItem === 'autoDisallowCommands' && item.value === 'autoDisallow') ||
+                                        (editingItem === 'customOpenAIBaseUrl' && item.value === 'customOpenAIBaseUrl') ||
+                                        (editingItem === 'customOpenAIKey' && item.value === 'customOpenAIKey'));
                                 const isCommandListItem = item.value === 'alwaysAsk' || item.value === 'autoApprove' || item.value === 'autoDisallow';
                                 const isParserDownload = item.value === 'parserDownload';
 
@@ -1024,15 +1041,26 @@ export default function SettingsMenu({
                                                     <TextInput
                                                         value={editValue}
                                                         onChange={setEditValue}
-                                                        onSubmit={(val) => {
-                                                            const newSysSettings = { ...systemSettings, [editingItem]: val.trim(), sandboxPreset: 'Custom' };
-                                                            setSystemSettings(newSysSettings);
-                                                            saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                                                        onSubmit={async (val) => {
+                                                            if (editingItem === 'customOpenAIBaseUrl') {
+                                                                const cleanUrl = val.trim().replace(/\/+$/, '');
+                                                                const newSysSettings = { ...systemSettings, customOpenAIBaseUrl: cleanUrl };
+                                                                setSystemSettings(newSysSettings);
+                                                                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                                                            } else if (editingItem === 'customOpenAIKey') {
+                                                                const { saveProviderAPIKey } = await import('../utils/secrets.js');
+                                                                await saveProviderAPIKey('c_openai', val.trim());
+                                                                setActiveProviderKeys(prev => ({ ...prev, c_openai: !!val.trim() }));
+                                                            } else {
+                                                                const newSysSettings = { ...systemSettings, [editingItem]: val.trim(), sandboxPreset: 'Custom' };
+                                                                setSystemSettings(newSysSettings);
+                                                                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                                                            }
                                                             setEditingItem(null);
                                                         }}
                                                     />
                                                 </Box>
-                                                <Text color="gray" italic>  Comma separated • Press Enter to save, Esc to cancel</Text>
+                                                <Text color="gray" italic>  {editingItem === 'customOpenAIBaseUrl' ? 'Enter Base URL (.../v1) • Press Enter to save, Esc to cancel' : (editingItem === 'customOpenAIKey' ? 'Enter API Key • Press Enter to save, Esc to cancel • Restart Required' : 'Comma separated • Press Enter to save, Esc to cancel')}</Text>
                                             </Box>
                                         )}
                                     </Box>
