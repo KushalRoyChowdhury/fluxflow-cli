@@ -4,7 +4,7 @@ export const changelogData = {
     "4.30.0": {
         "note": "OCTOBER 7",
         "added": [
-            "Added support for service tiers in Infron."
+            "Added TTFT counter per request (GUI Analytics exclusive)."
         ],
         "changed": [],
         "fixes": []
