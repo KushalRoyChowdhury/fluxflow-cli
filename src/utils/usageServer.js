@@ -1800,7 +1800,7 @@ function generateDashboardHtml() {
             if (tableMode === 'daily') {
                 if (paginationContainer) paginationContainer.style.display = 'none';
                 titleEl.textContent = 'Daily Detailed Token Records';
-                subtitleEl.textContent = 'Itemized log of daily token stats';
+                subtitleEl.textContent = 'Itemized log of daily stats';
                 searchInput.placeholder = 'Filter by date...';
 
                 thead.innerHTML = \`
@@ -1871,7 +1871,7 @@ function generateDashboardHtml() {
             } else if (tableMode === 'models') {
                 if (paginationContainer) paginationContainer.style.display = 'none';
                 titleEl.textContent = 'Model/Provider Token Statistics';
-                subtitleEl.textContent = 'Token stats for each model';
+                subtitleEl.textContent = 'Stats per model';
                 searchInput.placeholder = 'Filter by model or provider...';
 
                 thead.innerHTML = \`
@@ -1992,7 +1992,7 @@ function generateDashboardHtml() {
             } else if (tableMode === 'providers') {
                 if (paginationContainer) paginationContainer.style.display = 'none';
                 titleEl.textContent = 'Provider Statistics';
-                subtitleEl.textContent = 'Requests and tokens per provider for the selected range';
+                subtitleEl.textContent = 'Stats per provider';
                 searchInput.placeholder = 'Filter by provider...';
 
                 thead.innerHTML = '<tr>' +
