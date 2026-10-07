@@ -563,7 +563,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 Use NO markdown, only plain text
 Additional Context:
 - OS: ${osDetected}
-- Model: ${path.basename(oneShotSettings.model).trim().replace(':free', '').replace('-free', '').replace('/free', '').replace('_free', '').replace('free_', '').replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase().trim())}
+- Model: ${path.basename(oneShotSettings.model.replace('/free', '').trim()).replace(':free', '').replace('-free', '').replace('/free', '').replace('_free', '').replace('free_', '').replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, char => char.toUpperCase().trim())}
 - Approx time: ${dateTimeStr}
 - Non interactive CLI, support piped inputs
 - 'fluxflow' TUI has full agentic tools & capabilities${nickname.trim().length > 0 ? `\nUser Nickname: ${nickname.trim()}` : ''}${instructions.trim().length > 0 ? `\nUser Preferences: ${instructions.trim()}` : ''}`.trim();
@@ -601,8 +601,7 @@ Additional Context:
                 const magenta = '\x1b[35m';
                 const reset = '\x1b[0m';
 
-                const modelName = path.basename(oneShotSettings.model)
-                    .trim()
+                const modelName = path.basename(oneShotSettings.model.replace('/free', '').trim()) // Some providers are evil enough to ruin direct 'basename'. We can't trust "creative" humans who don't touch grass.
                     .replace(':free', '')
                     .replace('-free', '')
                     .replace('/free', '')

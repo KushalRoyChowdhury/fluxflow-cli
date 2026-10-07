@@ -141,7 +141,7 @@ export const web_scrape = async (args) => {
 
             await browser.close();
             // fs.writeFileSync(`scraped.md`, `Markdown parsed from [${url}]:\n\n${markdown}${rawMarkdown.length > 50000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}`);
-            return `Markdown parsed from [${url}]:\n\n${markdown}${rawMarkdown.length > 50000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}`;
+            return `Markdown parsed from [${url}]:\n\n${markdown}${rawMarkdown.length > 50000 ? '\n\n...Truncated at 50K chars' : ''}`;
 
         } catch (err) {
             lastError = err;
