@@ -1,6 +1,17 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.31.0": {
+        "note": "OCTOBER 8",
+        "added": [
+            "Added custom date range selector in Analytics GUI."
+        ],
+        "changed": [
+            "Improved Analytics GUI for better experience.",
+            "Removed \"Export as JSON\" in Analytics GUI."
+        ],
+        "fixes": []
+    },
     "4.30.0": {
         "note": "OCTOBER 7",
         "added": [

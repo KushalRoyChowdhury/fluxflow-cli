@@ -9,6 +9,27 @@ export { sendUsageHeartbeat, sendUsageFinalize };
 
 const USAGE_ERROR_LOG_FILE = path.join(LOGS_DIR, 'usage', 'usage_error.txt');
 
+let cachedBaseUrl = null;
+export const invalidateCachedBaseUrl = () => {
+    cachedBaseUrl = null;
+};
+const resolveProvider = async (provider) => {
+    if (provider !== 'c_openai') return provider;
+    if (cachedBaseUrl) return cachedBaseUrl;
+    try {
+        const settings = await loadSettings();
+        let url = settings?.systemSettings?.customOpenAIBaseUrl || '';
+        url = url.trim().replace(/\/+$/, '');
+        if (url) {
+            const v1Idx = url.indexOf('/v1');
+            if (v1Idx !== -1) url = url.substring(0, v1Idx + 3);
+            cachedBaseUrl = url;
+            return url;
+        }
+    } catch {}
+    return 'c_openai';
+};
+
 const logUsageError = async (context, err) => {
     const errorMsg = err?.stack || err?.message || String(err);
     console.error(`[Usage Error] [${context}]:`, err);
@@ -155,9 +176,10 @@ const todayFile = () => {
 export const recordTimedUsage = async (d) => {
     try {
         await fs.ensureDir(USAGE_FILE_TIMED);
+        const resolvedProv = await resolveProvider(d.provider);
         const entry = {
             time: new Date().toISOString(),
-            provider: d.provider || 'unknown',
+            provider: resolvedProv || 'unknown',
             model: d.model || 'unknown',
             input: Number(d.prompt) || 0,
             cached: Number(d.cached) || 0,
@@ -167,8 +189,8 @@ export const recordTimedUsage = async (d) => {
         };
         await fs.appendFile(todayFile(), JSON.stringify(entry) + '\n', 'utf8');
 
-        // Throttled trim so the log stays bounded even within a long session
-        if (++timedAppendCount >= 25) {
+        // Throttled trim so the log stays strictly bounded
+        if (++timedAppendCount >= 10) {
             timedAppendCount = 0;
             await purgeTimedUsage();
         }
@@ -182,7 +204,7 @@ export const recordTimedUsage = async (d) => {
  * Entries are kept in chronological order across all daily files; oldest
  * files/lines are removed first.
  */
-const purgeTimedUsage = async () => {
+export const purgeTimedUsage = async () => {
     try {
         if (!(await fs.exists(USAGE_FILE_TIMED))) return;
         const files = (await fs.readdir(USAGE_FILE_TIMED))
@@ -221,7 +243,8 @@ const purgeTimedUsage = async () => {
 };
 
 /**
- * Reads the last N days of timed usage entries (most-recent file first).
+ * Reads the last N days of timed usage entries (most-recent file first),
+ * bounded to at most MAX_TIMED_ENTRIES.
  * @param {number} days how many trailing calendar files to read
  * @returns {Promise<Array<{time:string,provider:string,model:string,input:number,cached:number,output:number}>>}
  */
@@ -251,7 +274,7 @@ export const getTimedUsage = async (days = 30) => {
     } catch (err) {
         await logUsageError('getTimedUsage', err);
     }
-    return out;
+    return out.slice(-MAX_TIMED_ENTRIES);
 };
 
 /**
@@ -372,6 +395,7 @@ export const getMonthlyUsage = async () => {
  * Increments a specific usage key in memory and forwards to daemon
  */
 export const incrementUsage = async (key, provider) => {
+    provider = await resolveProvider(provider);
     if (key === 'toolSuccess') runtimeSession.toolSuccess++;
     else if (key === 'toolFailure') runtimeSession.toolFailure++;
     else if (key === 'toolDenied') runtimeSession.toolDenied++;
@@ -402,6 +426,7 @@ export const runtimeSession = {
  * Adds a specific amount to a usage key in memory and forwards to daemon
  */
 export const addToUsage = async (key, amount, provider, model) => {
+    provider = await resolveProvider(provider);
     if (key === 'linesAdded') {
         runtimeSession.linesAdded += amount;
     } else if (key === 'linesRemoved') {

@@ -1060,7 +1060,7 @@ export default function SettingsMenu({
                                                         }}
                                                     />
                                                 </Box>
-                                                <Text color="gray" italic>  {editingItem === 'customOpenAIBaseUrl' ? 'Enter Base URL (.../v1) • Press Enter to save, Esc to cancel' : (editingItem === 'customOpenAIKey' ? 'Enter API Key • Press Enter to save, Esc to cancel • Restart Required' : 'Comma separated • Press Enter to save, Esc to cancel')}</Text>
+                                                <Text color="gray" italic>  {editingItem === 'customOpenAIBaseUrl' ? 'Enter Base URL (.../v1) • Press Enter to save, Esc to cancel • Restart Required' : (editingItem === 'customOpenAIKey' ? 'Enter API Key • Press Enter to save, Esc to cancel • Restart Required' : 'Comma separated • Press Enter to save, Esc to cancel')}</Text>
                                             </Box>
                                         )}
                                     </Box>

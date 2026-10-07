@@ -5188,7 +5188,7 @@ export default function App({ args = [] }) {
     // Effect: initialize pbsSelected when entering providerBudgetSelect, pre-checking already-configured providers
     useEffect(() => {
         if (activeView !== 'providerBudgetSelect') return;
-        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'];
+        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'];
         const existingBudgets = quotas.providerBudgets || {};
         const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
             acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit || existingBudgets[p].monthlyTokenLimit));

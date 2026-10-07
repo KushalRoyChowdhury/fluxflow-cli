@@ -1,6 +1,6 @@
 import http from 'http';
 import { exec } from 'child_process';
-import { getAllUsageData, getTimedUsage } from './usage.js';
+import { getAllUsageData, getTimedUsage, purgeTimedUsage } from './usage.js';
 import { DATA_DIR } from './paths.js';
 import { FLUXFLOW_LOGO_BASE64 } from './logoBase64.js';
 
@@ -244,6 +244,64 @@ function generateDashboardHtml() {
             color: var(--accent-cyan);
             border: 1px solid rgba(56, 189, 248, 0.3);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .date-link {
+            font-weight: 600;
+            color: var(--accent-cyan);
+            text-decoration: none;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .date-link:hover {
+            transform: translateY(-1px);
+            color: #fff;
+        }
+
+        .date-link.active {
+            color: #f43f5e;
+        }
+
+        .date-link.active:hover {
+            color: #fb7185;
+        }
+
+        .date-picker-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 3px 8px;
+            transition: all 0.2s ease;
+        }
+
+        .date-picker-group:focus-within, .date-picker-group.active {
+            border-color: rgba(56, 189, 248, 0.4);
+            background: rgba(56, 189, 248, 0.08);
+        }
+
+        .date-input {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            outline: none;
+            cursor: pointer;
+            color-scheme: dark;
+        }
+
+        .date-input::-webkit-calendar-picker-indicator {
+            filter: invert(0.8) sepia(100%) hue-rotate(170deg) brightness(1.2);
+            cursor: pointer;
         }
 
         .metrics-grid {
@@ -783,11 +841,7 @@ function generateDashboardHtml() {
             </div>
         </div>
         <div class="header-actions">
-            <button class="btn" id="btn-export-json" title="Export Token Usage as JSON">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Export JSON
-            </button>
-            <button class="btn" id="btn-export-csv" title="Export Token Usage as CSV">
+            <button class="btn" id="btn-export-csv" title="Export Selected Token Usage as CSV">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 Export CSV
             </button>
@@ -808,6 +862,13 @@ function generateDashboardHtml() {
                     <button class="tab-btn active" data-range="7d">Last 7 Days</button>
                     <button class="tab-btn" data-range="14d">Last 14 Days</button>
                     <button class="tab-btn" data-range="30d">Last 30 Days</button>
+                    <button class="tab-btn" data-range="custom">Custom</button>
+                </div>
+                <div class="date-picker-group" id="custom-date-container" style="display: none;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-cyan)" stroke-width="2" style="flex-shrink:0;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <input type="date" id="date-from" class="date-input" title="From Date">
+                    <span style="color: var(--text-dim); font-size: 0.75rem;">→</span>
+                    <input type="date" id="date-to" class="date-input" title="To Date">
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
@@ -971,7 +1032,7 @@ function generateDashboardHtml() {
                     <div class="tabs-group" id="table-mode-tabs">
                         <button class="tab-btn active" data-table-mode="daily">Daily Records</button>
                         <button class="tab-btn" data-table-mode="models">Model Stats</button>
-            <button class="tab-btn" data-table-mode="providers">Provider Stats</button>
+                        <button class="tab-btn" data-table-mode="providers">Provider Stats</button>
                         <button class="tab-btn" data-table-mode="timed">Timed (Per-Call)</button>
                     </div>
                     <input type="text" id="table-search" placeholder="Search..." style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); height: 37px; color: var(--text-main); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.8rem; outline: none;">
@@ -1023,6 +1084,9 @@ function generateDashboardHtml() {
         let toolChart = null;
         let codeChart = null;
 
+        let customStartDate = null;
+        let customEndDate = null;
+
         function getModelBaseName(modelStr) {
             if (!modelStr || typeof modelStr !== 'string') return modelStr || '';
             const slashIdx = Math.max(modelStr.lastIndexOf('/'), modelStr.lastIndexOf(String.fromCharCode(92)));
@@ -1040,6 +1104,19 @@ function generateDashboardHtml() {
             if (!timeline || timeline.length === 0) return [];
             const todayStr = rawData.currentDate || new Date().toISOString().split('T')[0];
             const todayTime = new Date(todayStr).getTime();
+
+            if (range === 'custom') {
+                const startStr = customStartDate || document.getElementById('date-from')?.value;
+                const endStr = customEndDate || document.getElementById('date-to')?.value || todayStr;
+                const min30Limit = todayTime - 29 * 24 * 60 * 60 * 1000;
+                const startTime = startStr ? Math.max(new Date(startStr).getTime(), min30Limit) : min30Limit;
+                const endTime = endStr ? new Date(endStr).getTime() : todayTime;
+
+                return timeline.filter(item => {
+                    const itemTime = new Date(item.date).getTime();
+                    return itemTime >= startTime && itemTime <= endTime;
+                });
+            }
 
             let days = 7;
             if (range === 'today') days = 1;
@@ -1238,7 +1315,31 @@ function generateDashboardHtml() {
                 return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                     <path d="M14.5 3L8 21h3.5l1.3-3.8h4.4L18.5 21H22L15.5 3h-1zm.3 4.2l1.6 6.8h-3.2l1.6-6.8zM2 21h3.5L9.5 3H6L2 21z" fill="#D97757"/>
                 </svg>\`;
-            } else if (p.includes('openai') || p.includes('custom')) {
+            } else if (p.includes('infron')) {
+                return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 8.5L21 11.5L21 12.8L3 9.8Z" fill="#38BDF8"/>
+                    <path d="M3 11.2L21 14.2L21 15.8L3 12.8Z" fill="#38BDF8"/>
+                    <path d="M3 14.2L21 17.2L16 20.5L6 20.5L3 16.5Z" fill="#38BDF8"/>
+                </svg>\`;
+            } else if (p.includes('tokenharbor') || p.includes('token') || p.includes('harbor')) {
+                return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2.5L16 6.5H13.5V14.5H10.5V6.5H8L12 2.5Z" fill="#38BDF8"/>
+                    <path d="M5 8.5V14C5 17.866 8.134 21 12 21C15.866 21 19 17.866 19 14V8.5" stroke="#38BDF8" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 14.5V18.5" stroke="#38BDF8" stroke-width="2.3" stroke-linecap="round"/>
+                </svg>\`;
+            } else if (p.includes('explabs') || p.includes('experiential')) {
+                return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M6 3.5C10.5 3.5 12 8 12 12C12 16 10.5 20.5 6 20.5" stroke="#A855F7" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M18 3.5C13.5 3.5 12 8 12 12C12 16 13.5 20.5 18 20.5" stroke="#A855F7" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M12 12C12.5 8.5 16 6 18.5 6.5C19 9 16.5 12.5 12 12Z" fill="#A855F7" stroke="#A855F7" stroke-width="0.8" stroke-linejoin="round"/>
+                </svg>\`;
+            } else if (p.includes('apinex')) {
+                return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="2" width="20" height="20" rx="6" fill="#18191C"/>
+                    <path d="M7 6.5L10.5 11.2L9.2 13L6 17.5H8.2L10.4 14.3L11.5 15.8L10.8 17.5H13L11.8 14.8L14.2 11.5L13 9.8L10.2 6.5H7Z" fill="#EAB308"/>
+                    <path d="M17 6.5L12.2 13.2L13.5 15L17.8 17.5H15.4L12.3 14.1L13.8 11.8L14.8 10L14.2 6.5H17Z" fill="#EAB308"/>
+                </svg>\`;
+            } else if (p.includes('openai') || p.includes('custom') || (p.startsWith('http') && p.endsWith('v1'))) {
                 return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                     <path d="M20.5 10.3a5.5 5.5 0 0 0-.4-4.5 5.6 5.6 0 0 0-5.8-2.6A5.5 5.5 0 0 0 9.8 1.8a5.6 5.6 0 0 0-5.3 3.9 5.5 5.5 0 0 0-3.3 3.6 5.6 5.6 0 0 0 .9 6.2 5.5 5.5 0 0 0 .4 4.5 5.6 5.6 0 0 0 5.8 2.6 5.5 5.5 0 0 0 4.5 1.4 5.6 5.6 0 0 0 5.3-3.9 5.5 5.5 0 0 0 3.3-3.6 5.6 5.6 0 0 0-.9-6.2z" stroke="#10A37F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>\`;
@@ -1248,7 +1349,6 @@ function generateDashboardHtml() {
 
         function formatProviderName(providerName) {
             if (!providerName) return 'Unknown';
-            if (providerName === 'c_openai' || providerName.toLowerCase() === 'c_openai') return 'Custom';
             return providerName;
         }
 
@@ -1799,9 +1899,12 @@ function generateDashboardHtml() {
 
             if (tableMode === 'daily') {
                 if (paginationContainer) paginationContainer.style.display = 'none';
-                titleEl.textContent = 'Daily Detailed Token Records';
-                subtitleEl.textContent = 'Itemized log of daily stats';
+                titleEl.textContent = 'Daily Detailed Token Records (All 30 Days)';
+                subtitleEl.textContent = 'Click any date to focus dashboard on that specific day';
                 searchInput.placeholder = 'Filter by date...';
+
+                // Daily table always shows all historical days (up to 30 days) unaffected by top time range filter
+                const dailyData = (rawData && rawData.timeline) ? rawData.timeline : timeline;
 
                 thead.innerHTML = \`
                     <tr>
@@ -1815,7 +1918,7 @@ function generateDashboardHtml() {
                     </tr>
                 \`;
 
-                let rows = [...timeline].filter(item => {
+                let rows = [...dailyData].filter(item => {
                     return !filterText || item.date.toLowerCase().includes(filterText);
                 });
 
@@ -1842,16 +1945,25 @@ function generateDashboardHtml() {
                     return;
                 }
 
+                // Collect all dates that fall inside the current active filter range for visual highlight
+                const activeDatesSet = new Set(filterTimelineByRange((rawData && rawData.timeline) ? rawData.timeline : timeline, activeRange).map(d => d.date));
+
                 tbody.innerHTML = rows.map(item => {
                     const total = item.tokens || 0;
                     const cached = item.cachedTokens || 0;
                     const prompt = item.promptTokens || 0;
                     const cand = item.candidateTokens || 0;
                     const cachePct = prompt > 0 ? ((cached / prompt) * 100).toFixed(1) : '0.0';
+                    const isSelected = activeDatesSet.has(item.date);
 
                     return \`
                         <tr>
-                            <td class="mono" style="font-weight: 600; color: var(--accent-cyan);">\${item.date}</td>
+                            <td class="mono">
+                                <span class="date-link \${isSelected ? 'active' : ''}" onclick="selectCustomDate('\${item.date}')" title="Click to filter dashboard by \${item.date}">
+                                    \${item.date}
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: \${isSelected ? '0.9' : '0.6'};"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                </span>
+                            </td>
                             <td class="mono" style="color: var(--accent-emerald);">\${formatNumber(prompt)}\${cached > 0 ? ' <span style="color: #059669; font-size: 0.85em;">(' + formatNumber(cached) + ' cached)</span>' : ''}</td>
                             <td>
                                 <span class="badge-positive" style="font-size: 0.75rem;">\${cachePct}%</span>
@@ -1991,7 +2103,7 @@ function generateDashboardHtml() {
                 }).join('');
             } else if (tableMode === 'providers') {
                 if (paginationContainer) paginationContainer.style.display = 'none';
-                titleEl.textContent = 'Provider Statistics';
+                titleEl.textContent = 'Used Providers Statistics';
                 subtitleEl.textContent = 'Stats per provider';
                 searchInput.placeholder = 'Filter by provider...';
 
@@ -2202,6 +2314,30 @@ function generateDashboardHtml() {
             }
         }
 
+        window.selectCustomDate = function(targetDate) {
+            if (!targetDate) return;
+            const fromInput = document.getElementById('date-from');
+            const toInput = document.getElementById('date-to');
+            if (fromInput) fromInput.value = targetDate;
+            if (toInput) toInput.value = targetDate;
+            customStartDate = targetDate;
+            customEndDate = targetDate;
+
+            document.querySelectorAll('#range-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+            const customBtn = document.querySelector('#range-tabs .tab-btn[data-range="custom"]');
+            if (customBtn) customBtn.classList.add('active');
+
+            activeRange = 'custom';
+            const customContainer = document.getElementById('custom-date-container');
+            if (customContainer) {
+                customContainer.style.display = 'flex';
+                customContainer.classList.add('active');
+            }
+
+            renderDashboard();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
         window.goToTimedPage = function(page) {
             timedCurrentPage = page;
             if (rawData && rawData.timeline) {
@@ -2209,23 +2345,13 @@ function generateDashboardHtml() {
             }
         };
 
-        function exportJson() {
-            if (!rawData) return;
-            const blob = new Blob([JSON.stringify(rawData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = \`fluxflow-token-usage-\${new Date().toISOString().split('T')[0]}.json\`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
         function exportCsv() {
             if (!rawData || !rawData.timeline) return;
-            const headers = ['Date', 'TotalTokens', 'PromptTokens', 'CandidateTokens', 'CachedTokens', 'CachePercent', 'AgentRequests', 'BackgroundRequests', 'SearchRequests', 'ToolSuccess', 'ToolFailure', 'ToolDenied', 'LinesAdded', 'LinesRemoved'];
+            const filtered = filterTimelineByRange(rawData.timeline, activeRange);
+            const headers = ['Date', 'TotalTokens', 'PromptTokens', 'CandidateTokens', 'CachedTokens', 'CachePercent', 'AgentRequests', 'BackgroundRequests', 'ToolSuccess', 'ToolFailure', 'ToolDenied', 'LinesAdded', 'LinesRemoved'];
             const csvRows = [headers.join(',')];
 
-            rawData.timeline.forEach(t => {
+            filtered.forEach(t => {
                 const total = t.tokens || 0;
                 const cached = t.cachedTokens || 0;
                 const cachePct = total > 0 ? ((cached / total) * 100).toFixed(1) : '0.0';
@@ -2238,7 +2364,6 @@ function generateDashboardHtml() {
                     cachePct,
                     t.agent || 0,
                     t.background || 0,
-                    t.search || 0,
                     t.toolSuccess || 0,
                     t.toolFailure || 0,
                     t.toolDenied || 0,
@@ -2248,13 +2373,54 @@ function generateDashboardHtml() {
                 csvRows.push(row.join(','));
             });
 
+            const rangeLabel = activeRange === 'custom' ? \`custom-\${document.getElementById('date-from')?.value || 'start'}_to_\${document.getElementById('date-to')?.value || 'end'}\` : activeRange;
             const blob = new Blob([csvRows.join('\\n')], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = \`fluxflow-token-usage-\${new Date().toISOString().split('T')[0]}.csv\`;
+            a.download = \`fluxflow-token-usage-\${rangeLabel}-\${new Date().toISOString().split('T')[0]}.csv\`;
             a.click();
             URL.revokeObjectURL(url);
+        }
+
+        function initDatePicker() {
+            const today = new Date();
+            const minDate = new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000);
+            const todayStr = today.toISOString().split('T')[0];
+            const minStr = minDate.toISOString().split('T')[0];
+
+            const fromInput = document.getElementById('date-from');
+            const toInput = document.getElementById('date-to');
+            if (fromInput && toInput) {
+                fromInput.min = minStr;
+                fromInput.max = todayStr;
+                toInput.min = minStr;
+                toInput.max = todayStr;
+
+                const defaultFrom = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                fromInput.value = defaultFrom;
+                toInput.value = todayStr;
+                customStartDate = defaultFrom;
+                customEndDate = todayStr;
+
+                fromInput.addEventListener('change', () => {
+                    customStartDate = fromInput.value;
+                    if (toInput.value && customStartDate > toInput.value) {
+                        toInput.value = customStartDate;
+                        customEndDate = customStartDate;
+                    }
+                    if (activeRange === 'custom') renderDashboard();
+                });
+
+                toInput.addEventListener('change', () => {
+                    customEndDate = toInput.value;
+                    if (fromInput.value && customEndDate < fromInput.value) {
+                        fromInput.value = customEndDate;
+                        customStartDate = customEndDate;
+                    }
+                    if (activeRange === 'custom') renderDashboard();
+                });
+            }
         }
 
         document.querySelectorAll('#range-tabs .tab-btn').forEach(btn => {
@@ -2262,6 +2428,12 @@ function generateDashboardHtml() {
                 document.querySelectorAll('#range-tabs .tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 activeRange = btn.dataset.range;
+                const customContainer = document.getElementById('custom-date-container');
+                if (customContainer) {
+                    customContainer.style.display = activeRange === 'custom' ? 'flex' : 'none';
+                    if (activeRange === 'custom') customContainer.classList.add('active');
+                    else customContainer.classList.remove('active');
+                }
                 renderDashboard();
             });
         });
@@ -2289,7 +2461,6 @@ function generateDashboardHtml() {
         });
 
         document.getElementById('btn-refresh').addEventListener('click', fetchData);
-        document.getElementById('btn-export-json').addEventListener('click', exportJson);
         document.getElementById('btn-export-csv').addEventListener('click', exportCsv);
         document.getElementById('table-search').addEventListener('input', () => {
             timedCurrentPage = 1;
@@ -2309,6 +2480,7 @@ function generateDashboardHtml() {
             }
         }, 60000);
 
+        initDatePicker();
         fetchData();
     </script>
 </body>
@@ -2337,6 +2509,7 @@ export async function startUsageServer(preferredPort = 52140) {
 
         if (url.pathname === '/api/usage') {
             try {
+                await purgeTimedUsage();
                 const data = await getAllUsageData();
                 data.timed = await getTimedUsage(30);
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });

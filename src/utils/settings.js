@@ -194,6 +194,13 @@ export const saveSettings = async (settings) => {
 
         await fs.ensureDir(path.dirname(SETTINGS_FILE));
         writeAesEncryptedJson(SETTINGS_FILE, updated);
+
+        // Bust usage module's cachedBaseUrl if custom OpenAI endpoint was configured or changed
+        try {
+            const { invalidateCachedBaseUrl } = await import('./usage.js');
+            invalidateCachedBaseUrl();
+        } catch (e) { }
+
         return true;
     } catch (err) {
         console.error('Failed to save settings:', err);
