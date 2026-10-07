@@ -284,8 +284,7 @@ export const getDailyUsage = async () => {
             stats: { ...defaultStats },
             history: purgeOldHistory(history, today)
         };
-        isDirty = true;
-        await flushUsage(); // Immediate flush for day rollover
+        await forceFlushUsage(); // Notify daemon of day rollover
     }
 
     if (cachedUsage && cachedUsage.stats && !Array.isArray(cachedUsage.stats.imageCalls)) {
