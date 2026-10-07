@@ -17,7 +17,7 @@ Flux Flow is an advanced, fully autonomous AI agent that lives directly in your 
 
 Whether you need a conversational partner or an autonomous developer that can write code, run shell commands, and read your project files, Flux Flow adapts to your needs.
 
----t6
+---
 
 ## ✨ Features
 
