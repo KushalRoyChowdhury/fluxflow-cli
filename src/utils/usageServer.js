@@ -974,7 +974,11 @@ function generateDashboardHtml() {
             <button class="tab-btn" data-table-mode="providers">Provider Stats</button>
                         <button class="tab-btn" data-table-mode="timed">Timed (Per-Call)</button>
                     </div>
-                    <input type="text" id="table-search" placeholder="Search..." style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.8rem; outline: none;">
+                    <input type="text" id="table-search" placeholder="Search..." style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); height: 37px; color: var(--text-main); padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.8rem; outline: none;">
+                    <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="show-ttft-check" style="cursor: pointer; accent-color: var(--accent-cyan);">
+                        Show TTFT
+                    </label>
                 </div>
             </div>
             <div class="table-wrapper">
@@ -1234,12 +1238,18 @@ function generateDashboardHtml() {
                 return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                     <path d="M14.5 3L8 21h3.5l1.3-3.8h4.4L18.5 21H22L15.5 3h-1zm.3 4.2l1.6 6.8h-3.2l1.6-6.8zM2 21h3.5L9.5 3H6L2 21z" fill="#D97757"/>
                 </svg>\`;
-            } else if (p.includes('openai')) {
+            } else if (p.includes('openai') || p.includes('custom')) {
                 return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                     <path d="M20.5 10.3a5.5 5.5 0 0 0-.4-4.5 5.6 5.6 0 0 0-5.8-2.6A5.5 5.5 0 0 0 9.8 1.8a5.6 5.6 0 0 0-5.3 3.9 5.5 5.5 0 0 0-3.3 3.6 5.6 5.6 0 0 0 .9 6.2 5.5 5.5 0 0 0 .4 4.5 5.6 5.6 0 0 0 5.8 2.6 5.5 5.5 0 0 0 4.5 1.4 5.6 5.6 0 0 0 5.3-3.9 5.5 5.5 0 0 0 3.3-3.6 5.6 5.6 0 0 0-.9-6.2z" stroke="#10A37F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>\`;
             }
             return \`<span style="color: var(--accent-cyan); font-size: 1.1rem; vertical-align: middle;">✦</span>\`;
+        }
+
+        function formatProviderName(providerName) {
+            if (!providerName) return 'Unknown';
+            if (providerName === 'c_openai' || providerName.toLowerCase() === 'c_openai') return 'Custom';
+            return providerName;
         }
 
         function renderBudget(budgetData) {
@@ -1334,7 +1344,7 @@ function generateDashboardHtml() {
                             <div class="budget-card-header">
                                 <div class="budget-group-title">
                                     \${getProviderBrandIcon(prov.provider, 22)}
-                                    <span>\${prov.provider}</span>
+                                    <span>\${formatProviderName(prov.provider)}</span>
                                 </div>
                             </div>
                             \${dailyBlock}
@@ -1561,7 +1571,7 @@ function generateDashboardHtml() {
             providerPieChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: providers,
+                    labels: providers.map(p => formatProviderName(p)),
                     datasets: [{
                         data: dataVals,
                         backgroundColor: colors.slice(0, providers.length),
@@ -1588,7 +1598,7 @@ function generateDashboardHtml() {
                         <div class="breakdown-header">
                             <span style="display: flex; align-items: center; gap: 8px;">
                                 \${getProviderBrandIcon(p, 16)}
-                                <strong style="color: var(--text-main);">\${p}</strong>
+                                <strong style="color: var(--text-main);">\${formatProviderName(p)}</strong>
                             </span>
                             <span class="mono" style="color: var(--text-muted);">\${formatNumber(count)} tokens (\${pct}%)</span>
                         </div>
@@ -1777,6 +1787,7 @@ function generateDashboardHtml() {
             const subtitleEl = document.getElementById('table-view-subtitle');
             const searchInput = document.getElementById('table-search');
             const filterText = (searchInput.value || '').toLowerCase();
+            const showTtft = document.getElementById('show-ttft-check')?.checked || false;
 
             if (tableEl) {
                 tableEl.className = 'table-' + tableMode;
@@ -1859,7 +1870,7 @@ function generateDashboardHtml() {
                 }).join('');
             } else if (tableMode === 'models') {
                 if (paginationContainer) paginationContainer.style.display = 'none';
-                titleEl.textContent = 'Model Token Statistics';
+                titleEl.textContent = 'Model/Provider Token Statistics';
                 subtitleEl.textContent = 'Token stats for each model';
                 searchInput.placeholder = 'Filter by model or provider...';
 
@@ -1870,8 +1881,8 @@ function generateDashboardHtml() {
                         <th class="sortable" onclick="handleSort('promptTokens')">INPUT \${getSortIndicator('promptTokens', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('cachePct')">Cache % \${getSortIndicator('cachePct', modelSortField, modelSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('candidateTokens')">OUTPUT \${getSortIndicator('candidateTokens', modelSortField, modelSortOrder)}</th>
+                        \${showTtft ? \`<th class="sortable" onclick="handleSort('avgTtft')">Avg TTFT \${getSortIndicator('avgTtft', modelSortField, modelSortOrder)}</th>\` : ''}
                         <th class="sortable" onclick="handleSort('tokens')">Total Tokens \${getSortIndicator('tokens', modelSortField, modelSortOrder)}</th>
-                        <th class="sortable" onclick="handleSort('sharePct')">Token Share \${getSortIndicator('sharePct', modelSortField, modelSortOrder)}</th>
                     </tr>
                 \`;
 
@@ -1891,7 +1902,9 @@ function generateDashboardHtml() {
                                     tokens: 0,
                                     promptTokens: 0,
                                     candidateTokens: 0,
-                                    cachedTokens: 0
+                                    cachedTokens: 0,
+                                    ttftSum: 0,
+                                    ttftCalls: 0
                                 };
                             }
                             const tTok = entry.tokens || 0;
@@ -1905,6 +1918,8 @@ function generateDashboardHtml() {
                             modelMap[key].promptTokens += tPrompt;
                             modelMap[key].candidateTokens += tCand;
                             modelMap[key].cachedTokens += tCache;
+                            modelMap[key].ttftSum += (entry.ttftSum || 0);
+                            modelMap[key].ttftCalls += (entry.ttftCalls || 0);
                             aggregateTokens += tTok;
                         }
                     }
@@ -1914,11 +1929,11 @@ function generateDashboardHtml() {
                     const cachePct = item.promptTokens > 0
                         ? ((item.cachedTokens / item.promptTokens) * 100).toFixed(1)
                         : (item.tokens > 0 ? ((item.cachedTokens / item.tokens) * 100).toFixed(1) : '0.0');
-                    const sharePct = aggregateTokens > 0 ? ((item.tokens / aggregateTokens) * 100).toFixed(1) : '0.0';
+                    const avgTtft = item.ttftCalls > 0 ? Math.round(item.ttftSum / item.ttftCalls) : 0;
                     return {
                         ...item,
-                        cachePct: parseFloat(cachePct),
-                        sharePct: parseFloat(sharePct)
+                        avgTtft,
+                        cachePct: parseFloat(cachePct)
                     };
                 });
 
@@ -1938,16 +1953,19 @@ function generateDashboardHtml() {
 
                 if (filterText) {
                     modelList = modelList.filter(m => {
-                        return m.model.toLowerCase().includes(filterText) || m.provider.toLowerCase().includes(filterText);
+                        return m.model.toLowerCase().includes(filterText) ||
+                            m.provider.toLowerCase().includes(filterText) ||
+                            formatProviderName(m.provider).toLowerCase().includes(filterText);
                     });
                 }
 
                 if (modelList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 2rem;">No matching models found.</td></tr>';
+                    tbody.innerHTML = \`<tr><td colspan="\${showTtft ? 7 : 6}" style="text-align: center; color: var(--text-dim); padding: 2rem;">No matching models found.</td></tr>\`;
                     return;
                 }
 
                 tbody.innerHTML = modelList.map(m => {
+                    const ttftVal = m.avgTtft > 0 ? (m.avgTtft >= 1000 ? (m.avgTtft / 1000).toFixed(2) + 's' : m.avgTtft + 'ms') : '-';
                     return \`
                         <tr>
                             <td class="mono" style="font-weight: 600; color: var(--text-main);">
@@ -1958,7 +1976,7 @@ function generateDashboardHtml() {
                             </td>
                             <td>
                                 <span class="badge-info" style="font-size: 0.75rem; display: inline-flex; align-items: center; gap: 5px;">
-                                    \${m.provider}
+                                    \${formatProviderName(m.provider)}
                                 </span>
                             </td>
                             <td class="mono" style="color: var(--accent-emerald);">\${formatNumber(m.promptTokens)}\${m.cachedTokens > 0 ? ' <span style="color: #059669; font-size: 0.85em;">(' + formatNumber(m.cachedTokens) + ' cached)</span>' : ''}</td>
@@ -1966,15 +1984,8 @@ function generateDashboardHtml() {
                                 <span class="badge-positive" style="font-size: 0.75rem;">\${m.cachePct}%</span>
                             </td>
                             <td class="mono" style="color: var(--accent-violet);">\${formatNumber(m.candidateTokens)}</td>
+                            \${showTtft ? \`<td class="mono" style="color: var(--accent-amber); font-size: 0.8rem;">\${ttftVal}</td>\` : ''}
                             <td class="mono" style="font-weight: 700; color: var(--text-main);">\${formatNumber(m.tokens)}</td>
-                            <td>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <div style="flex: 1; min-width: 60px; height: 6px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden;">
-                                        <div style="width: \${m.sharePct}%; height: 100%; background: linear-gradient(90deg, #38bdf8, #a855f7); border-radius: 999px;"></div>
-                                    </div>
-                                    <span class="mono" style="font-size: 0.75rem; color: var(--text-muted); min-width: 38px;">\${m.sharePct}%</span>
-                                </div>
-                            </td>
                         </tr>
                     \`;
                 }).join('');
@@ -2037,7 +2048,10 @@ function generateDashboardHtml() {
                 });
 
                 if (filterText) {
-                    provList = provList.filter(p => p.provider.toLowerCase().includes(filterText));
+                    provList = provList.filter(p =>
+                        p.provider.toLowerCase().includes(filterText) ||
+                        formatProviderName(p.provider).toLowerCase().includes(filterText)
+                    );
                 }
 
                 if (provList.length === 0) {
@@ -2048,7 +2062,7 @@ function generateDashboardHtml() {
                 tbody.innerHTML = provList.map(function(p) {
                     var sharePct = grandTokens > 0 ? ((p.tokens / grandTokens) * 100).toFixed(1) : '0.0';
                     var cachedTxt = p.cachedTokens > 0 ? ' <span style=color:#059669;font-size:0.85em;>(' + formatNumber(p.cachedTokens) + ' cached)</span>' : '';
-                    return '<tr><td><span class=badge-info style=font-size:0.75rem;display:inline-flex;align-items:center;gap:6px;>' + getProviderBrandIcon(p.provider, 16) + ' ' + p.provider + '</span></td>' +
+                    return '<tr><td><span class=badge-info style=font-size:0.75rem;display:inline-flex;align-items:center;gap:6px;>' + getProviderBrandIcon(p.provider, 16) + ' ' + formatProviderName(p.provider) + '</span></td>' +
                         '<td class=mono style=font-weight:700;color:var(--accent-amber);>' + p.requests.toLocaleString() + '</td>' +
                         '<td class=mono style=color:var(--accent-emerald);>' + formatNumber(p.promptTokens) + cachedTxt + '</td>' +
                         '<td><span class=badge-positive style=font-size:0.75rem;>' + p.cachePct + '%</span></td>' +
@@ -2068,6 +2082,7 @@ function generateDashboardHtml() {
                         <th class="sortable" onclick="handleSort('input')">Input (Cached) \${getSortIndicator('input', timedSortField, timedSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('cachePct')">Cache % \${getSortIndicator('cachePct', timedSortField, timedSortOrder)}</th>
                         <th class="sortable" onclick="handleSort('output')">Output \${getSortIndicator('output', timedSortField, timedSortOrder)}</th>
+                        \${showTtft ? \`<th class="sortable" onclick="handleSort('ttft')">TTFT \${getSortIndicator('ttft', timedSortField, timedSortOrder)}</th>\` : ''}
                         <th class="sortable" onclick="handleSort('total')">Total \${getSortIndicator('total', timedSortField, timedSortOrder)}</th>
                     </tr>
                 \`;
@@ -2080,7 +2095,8 @@ function generateDashboardHtml() {
                     input: Number(e.input) || 0,
                     cached: Number(e.cached) || 0,
                     output: Number(e.output) || 0,
-                    reasoning: Number(e.reasoning) || 0
+                    reasoning: Number(e.reasoning) || 0,
+                    ttft: Number(e.ttft) || 0
                 }));
 
                 trows.forEach(r => {
@@ -2098,7 +2114,8 @@ function generateDashboardHtml() {
                     trows = trows.filter(r =>
                         r.time.toLowerCase().includes(filterText) ||
                         r.model.toLowerCase().includes(filterText) ||
-                        r.provider.toLowerCase().includes(filterText)
+                        r.provider.toLowerCase().includes(filterText) ||
+                        formatProviderName(r.provider).toLowerCase().includes(filterText)
                     );
                 }
 
@@ -2120,7 +2137,7 @@ function generateDashboardHtml() {
                 });
 
                 if (trows.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 2rem;">No per-call records yet. Make a request and refresh.</td></tr>';
+                    tbody.innerHTML = \`<tr><td colspan="\${showTtft ? 8 : 7}" style="text-align: center; color: var(--text-dim); padding: 2rem;">No per-call records yet. Make a request and refresh.</td></tr>\`;
                     if (paginationContainer) paginationContainer.style.display = 'none';
                     return;
                 }
@@ -2135,19 +2152,21 @@ function generateDashboardHtml() {
                 const pageRows = trows.slice(startIdx, endIdx);
 
                 tbody.innerHTML = pageRows.map(r => {
+                    const ttftVal = r.ttft > 0 ? (r.ttft >= 1000 ? (r.ttft / 1000).toFixed(2) + 's' : r.ttft + 'ms') : '-';
                     return \`
                         <tr>
                             <td class="mono" style="font-size: 0.75rem; color: var(--text-muted);">\${r.timeDisplay}</td>
                             <td>
                                 <span class="badge-info" style="font-size: 0.72rem; display: inline-flex; align-items: center; gap: 5px;">
                                     \${getProviderBrandIcon(r.provider, 14)}
-                                    \${r.provider}
+                                    \${formatProviderName(r.provider)}
                                 </span>
                             </td>
                             <td class="mono" style="font-weight: 600; color: var(--text-main); font-size: 0.8rem;" title="\${r.model}">\${getModelBaseName(r.model)}</td>
                             <td class="mono" style="color: var(--accent-emerald);">\${formatNumber(r.input)}\${r.cached > 0 ? ' <span style="color: #059669;">(' + formatNumber(r.cached) + ' cached)</span>' : ''}</td>
                             <td><span class="badge-positive" style="font-size: 0.72rem;">\${r.cachePct.toFixed(1)}%</span></td>
                             <td class="mono" style="color: var(--accent-violet);">\${formatNumber(r.output)}\${r.reasoning > 0 ? ' <span style="color: #8b5cf6; font-size: 0.75rem;">(' + formatNumber(r.reasoning) + ' thinking)</span>' : ''}</td>
+                            \${showTtft ? \`<td class="mono" style="color: var(--accent-amber); font-size: 0.8rem;">\${ttftVal}</td>\` : ''}
                             <td class="mono" style="font-weight: 700;">\${formatNumber(r.total)}</td>
                         </tr>
                     \`;
@@ -2274,6 +2293,11 @@ function generateDashboardHtml() {
         document.getElementById('btn-export-csv').addEventListener('click', exportCsv);
         document.getElementById('table-search').addEventListener('input', () => {
             timedCurrentPage = 1;
+            if (rawData && rawData.timeline) {
+                renderTable(filterTimelineByRange(rawData.timeline, activeRange));
+            }
+        });
+        document.getElementById('show-ttft-check').addEventListener('change', () => {
             if (rawData && rawData.timeline) {
                 renderTable(filterTimelineByRange(rawData.timeline, activeRange));
             }

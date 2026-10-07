@@ -163,6 +163,7 @@ export const recordTimedUsage = async (d) => {
             cached: Number(d.cached) || 0,
             output: Number(d.output) || 0,
             reasoning: Number(d.reasoning) || 0,
+            ttft: Number(d.ttft) || 0,
         };
         await fs.appendFile(todayFile(), JSON.stringify(entry) + '\n', 'utf8');
 
@@ -339,7 +340,9 @@ export const getMonthlyUsage = async () => {
                             target.models[provider][model] = {
                                 tokens: 0,
                                 cachedTokens: 0,
-                                candidateTokens: 0
+                                candidateTokens: 0,
+                                ttftSum: 0,
+                                ttftCalls: 0
                             };
                         }
                         const tM = target.models[provider][model];
@@ -347,6 +350,8 @@ export const getMonthlyUsage = async () => {
                         tM.tokens += sM.tokens || 0;
                         tM.cachedTokens += sM.cachedTokens || 0;
                         tM.candidateTokens += sM.candidateTokens || 0;
+                        tM.ttftSum = (tM.ttftSum || 0) + (sM.ttftSum || 0);
+                        tM.ttftCalls = (tM.ttftCalls || 0) + (sM.ttftCalls || 0);
                     }
                 }
             } else if (typeof target[key] === 'number') {
@@ -408,7 +413,7 @@ export const addToUsage = async (key, amount, provider, model) => {
         stats[key] += Math.floor(amount);
     }
 
-    if (provider && model && (key === 'tokens' || key === 'cachedTokens' || key === 'candidateTokens')) {
+    if (provider && model && (key === 'tokens' || key === 'cachedTokens' || key === 'candidateTokens' || key === 'ttft')) {
         if (!stats.models) {
             stats.models = {};
         }
@@ -419,13 +424,19 @@ export const addToUsage = async (key, amount, provider, model) => {
             stats.models[provider][model] = {
                 tokens: 0,
                 cachedTokens: 0,
-                candidateTokens: 0
+                candidateTokens: 0,
+                ttftSum: 0,
+                ttftCalls: 0
             };
         }
         const mObj = stats.models[provider][model];
         if (key === 'tokens') mObj.tokens += Math.floor(amount);
         if (key === 'cachedTokens') mObj.cachedTokens += Math.floor(amount);
         if (key === 'candidateTokens') mObj.candidateTokens += Math.floor(amount);
+        if (key === 'ttft') {
+            mObj.ttftSum = (mObj.ttftSum || 0) + Math.floor(amount);
+            mObj.ttftCalls = (mObj.ttftCalls || 0) + 1;
+        }
     }
 
     await sendUsageWrite({ key, amount, provider, model });
@@ -492,7 +503,9 @@ export const getCustomPeriodUsage = async (resetDay = 1) => {
                             target.models[provider][model] = {
                                 tokens: 0,
                                 cachedTokens: 0,
-                                candidateTokens: 0
+                                candidateTokens: 0,
+                                ttftSum: 0,
+                                ttftCalls: 0
                             };
                         }
                         const tM = target.models[provider][model];
@@ -500,6 +513,8 @@ export const getCustomPeriodUsage = async (resetDay = 1) => {
                         tM.tokens += sM.tokens || 0;
                         tM.cachedTokens += sM.cachedTokens || 0;
                         tM.candidateTokens += sM.candidateTokens || 0;
+                        tM.ttftSum = (tM.ttftSum || 0) + (sM.ttftSum || 0);
+                        tM.ttftCalls = (tM.ttftCalls || 0) + (sM.ttftCalls || 0);
                     }
                 }
             } else if (typeof target[key] === 'number') {

@@ -236,16 +236,20 @@ export async function runUsageDaemon(port = USAGE_DAEMON_PORT) {
                         usageData.stats.providerRequests[provider] = (usageData.stats.providerRequests[provider] || 0) + Math.floor(amount);
                     }
 
-                    if (provider && model && (key === 'tokens' || key === 'cachedTokens' || key === 'candidateTokens')) {
+                    if (provider && model && (key === 'tokens' || key === 'cachedTokens' || key === 'candidateTokens' || key === 'ttft')) {
                         if (!usageData.stats.models) usageData.stats.models = {};
                         if (!usageData.stats.models[provider]) usageData.stats.models[provider] = {};
                         if (!usageData.stats.models[provider][model]) {
-                            usageData.stats.models[provider][model] = { tokens: 0, cachedTokens: 0, candidateTokens: 0 };
+                            usageData.stats.models[provider][model] = { tokens: 0, cachedTokens: 0, candidateTokens: 0, ttftSum: 0, ttftCalls: 0 };
                         }
                         const mObj = usageData.stats.models[provider][model];
                         if (key === 'tokens') mObj.tokens += Math.floor(amount);
                         if (key === 'cachedTokens') mObj.cachedTokens += Math.floor(amount);
                         if (key === 'candidateTokens') mObj.candidateTokens += Math.floor(amount);
+                        if (key === 'ttft') {
+                            mObj.ttftSum = (mObj.ttftSum || 0) + Math.floor(amount);
+                            mObj.ttftCalls = (mObj.ttftCalls || 0) + 1;
+                        }
                     }
 
                     isDirty = true;

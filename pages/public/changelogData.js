@@ -1,8 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.30.0": {
+        "note": "OCTOBER 7",
+        "added": [
+            "Added support for service tiers in Infron."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "4.29.0": {
-        "note": "OCTOBER 6",
+        "note": "OCTOBER 7",
         "added": [
             "Added support for service tiers in Infron."
         ],

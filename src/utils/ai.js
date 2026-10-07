@@ -531,6 +531,9 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                 effectiveProvider = useNvidiaFallback ? 'NVIDIA' : aiProvider;
                 // console.log(effectiveProvider); // [DEBUGGING POINT]
 
+                const janitorReqStart = Date.now();
+                let janitorTtft = null;
+
                 const streamPromise = (async () => {
                     if (aiProvider === 'OpenRouter') {
                         const janitorOpenRouterModel = getFallbackValue('janitor_open_router');
@@ -719,6 +722,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                 }
 
                 const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
+                janitorTtft = Date.now() - janitorReqStart;
                 let { value: firstChunk, done: firstDone } = firstResult;
 
                 if (!firstDone && firstChunk) {
@@ -766,7 +770,10 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     if (candidates > 0) {
                         await addToUsage('candidateTokens', candidates, effectiveProvider, jModel);
                     }
-                    recordTimedUsage({ provider: effectiveProvider, model: jModel, prompt: lastUsage.promptTokenCount || 0, cached, output: candidates, reasoning: lastUsage.thoughtsTokenCount || 0 });
+                    if (janitorTtft !== null && janitorTtft > 0) {
+                        await addToUsage('ttft', janitorTtft, effectiveProvider, jModel);
+                    }
+                    recordTimedUsage({ provider: effectiveProvider, model: jModel, prompt: lastUsage.promptTokenCount || 0, cached, output: candidates, reasoning: lastUsage.thoughtsTokenCount || 0, ttft: janitorTtft });
                 }
 
                 // const date = new Date().toLocaleString();
@@ -1336,6 +1343,9 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
             }
         }, 100);
 
+        const subagentReqStart = Date.now();
+        let subagentTtft = null;
+
         try {
             let stream;
             if (aiProvider === 'Ollama') {
@@ -1436,6 +1446,9 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
                         throw new Error('Subagent task was cancelled.');
                     }
                 }
+                if (subagentTtft === null && (chunk.candidates?.[0]?.content?.parts || chunk.text)) {
+                    subagentTtft = Date.now() - subagentReqStart;
+                }
                 let chunkText = '';
                 if (chunk.candidates?.[0]?.content?.parts) {
                     for (const part of chunk.candidates[0].content.parts) {
@@ -1467,7 +1480,10 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
             if (candidates > 0) {
                 await addToUsage('candidateTokens', candidates, aiProvider, model);
             }
-            recordTimedUsage({ provider: aiProvider, model, prompt: usageMetadata.promptTokenCount || 0, cached, output: candidates, reasoning: usageMetadata.thoughtsTokenCount || 0 });
+            if (subagentTtft !== null && subagentTtft > 0) {
+                await addToUsage('ttft', subagentTtft, aiProvider, model);
+            }
+            recordTimedUsage({ provider: aiProvider, model, prompt: usageMetadata.promptTokenCount || 0, cached, output: candidates, reasoning: usageMetadata.thoughtsTokenCount || 0, ttft: subagentTtft });
             if (settings && typeof settings.onUsage === 'function') {
                 settings.onUsage({
                     totalTokenCount: total,
@@ -2454,6 +2470,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             let success = false;
             let retryCount = 1;
             let inStreamRetryCount = 1;
+            let streamStartTime = Date.now();
+            let ttft = null;
 
             let turnText = '';
             let lastToolSniffed = null;
@@ -2803,6 +2821,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     abortPromise.catch(() => { });
 
                     let activeContents = contents;
+                    streamStartTime = Date.now();
 
                     if (aiProvider === 'Ollama') {
                         stream = (await loadProvider('Ollama'))(
@@ -3426,6 +3445,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
 
                         if (isFirstChunk) {
+                            if (ttft === null) {
+                                ttft = Date.now() - streamStartTime;
+                            }
                             yield { type: 'status', content: 'Thinking' };
                             isFirstChunk = false;
                         }
@@ -5174,9 +5196,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (candidates > 0) {
                     await addToUsage('candidateTokens', candidates, aiProvider, targetModel);
                 }
-                recordTimedUsage({ provider: aiProvider, model: targetModel, prompt: lastUsage.promptTokenCount || 0, cached, output: candidates, reasoning: lastUsage.thoughtsTokenCount || 0 });
+                if (ttft !== null && ttft > 0) {
+                    await addToUsage('ttft', ttft, aiProvider, targetModel);
+                }
+                recordTimedUsage({ provider: aiProvider, model: targetModel, prompt: lastUsage.promptTokenCount || 0, cached, output: candidates, reasoning: lastUsage.thoughtsTokenCount || 0, ttft });
 
                 yield { type: 'usage', content: lastUsage };
+            } else if (ttft !== null && ttft > 0) {
+                await addToUsage('ttft', ttft, aiProvider, targetModel);
+                recordTimedUsage({ provider: aiProvider, model: targetModel, prompt: 0, cached: 0, output: 0, reasoning: 0, ttft });
             }
 
             // Clean off any conversational filler/fluff emitted AFTER the last tool call in this turn
