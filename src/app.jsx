@@ -4066,7 +4066,7 @@ export default function App({ args = [] }) {
                             if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[ACTION RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[ACTION RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[TOOL RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.includes('...Success result truncated to save tokens')) {
+                            if (fullTextStr.startsWith('[ACTION RESULT]: ERROR') || fullTextStr.startsWith('[ACTION RESULT]: DENIED') || fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.includes('...Success result truncated to save tokens')) {
                                 return m;
                             }
                             truncatedCount++;
@@ -4625,7 +4625,7 @@ export default function App({ args = [] }) {
                                         if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[ACTION RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[ACTION RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[TOOL RESULT]: Goal') || fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[TOOL RESULT]: Skill:') || fullTextStr.includes('Skill: [') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[TOOL RESULT]: DOCs:') || fullTextStr.includes('DOCs: [') || fullTextStr.startsWith('Markdown parsed') || fullTextStr.startsWith('Search results for [') || fullTextStr.startsWith('AI Mode temporarily failed')) {
+                                        if (fullTextStr.startsWith('[ACTION RESULT]: ERROR') || fullTextStr.startsWith('[ACTION RESULT]: DENIED') || fullTextStr.startsWith('[ACTION RESULT]: Goal') ||fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed')) {
                                             return m;
                                         }
                                         return {
