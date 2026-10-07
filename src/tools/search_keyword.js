@@ -416,9 +416,7 @@ export const search_keyword = async (args) => {
             global.gc();
         }
 
-        const modeLabel = isFuzzy
-            ? '(fuzzy mode)'
-            : (regexExplicitlyTrue ? '(regex mode)' : (regexExplicitlyFalse ? '(keyword mode)' : '(standard mode)'));
+        const modeLabel = null;
 
         if (fileGroups.length === 0) {
             const zeroLocation = pathArgType === 'file'

@@ -638,7 +638,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
                             if (part.isHighlight) {
                                 return (
                                     <React.Fragment key={idx}>
-                                        {renderHighlightedLine(part.text, extension, colors.diffRemovalHighlightColor, colors.diffRemovalHighlightBg)}
+                                        {renderHighlightedLine(part.text, extension, colors.diffRemovalText, colors.diffRemovalHighlightBg)}
                                     </React.Fragment>
                                 );
                             }
@@ -648,7 +648,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
                             if (part.isHighlight) {
                                 return (
                                     <React.Fragment key={idx}>
-                                        {renderHighlightedLine(part.text, extension, colors.diffAdditionHighlightColor, colors.diffAdditionHighlightBg)}
+                                        {renderHighlightedLine(part.text, extension, colors.diffAdditionText, colors.diffAdditionHighlightBg)}
                                     </React.Fragment>
                                 );
                             }
@@ -754,7 +754,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
                                     if (part.isHighlight) {
                                         return (
                                             <React.Fragment key={sIdx}>
-                                                {renderHighlightedLine(part.text, extension, colors.diffRemovalHighlightColor, colors.diffRemovalHighlightBg)}
+                                                {renderHighlightedLine(part.text, extension, colors.diffRemovalText, colors.diffRemovalHighlightBg)}
                                             </React.Fragment>
                                         );
                                     }
@@ -764,7 +764,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
                                     if (part.isHighlight) {
                                         return (
                                             <React.Fragment key={sIdx}>
-                                                {renderHighlightedLine(part.text, extension, colors.diffAdditionHighlightColor, colors.diffAdditionHighlightBg)}
+                                                {renderHighlightedLine(part.text, extension, colors.diffAdditionText, colors.diffAdditionHighlightBg)}
                                             </React.Fragment>
                                         );
                                     }

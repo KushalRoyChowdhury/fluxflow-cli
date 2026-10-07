@@ -4916,7 +4916,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     .replaceAll('[UI_CONTEXT]', '');
                                 let processedResult = rawResult;
                                 if (processedResult.includes('[[VERIFIED]]')) {
-                                    processedResult = processedResult.replace(/\[\[VERIFIED\]\][\s\S]*?\[\[\/VERIFIED\]\]/g, '[SYSTEM NOTE]: Patch Block matched & applied successfully. Large Block omitted to conserve context.\n');
+                                    processedResult = processedResult.replace(/\[\[VERIFIED\]\][\s\S]*?\[\[\/VERIFIED\]\]/g, '[SYSTEM NOTE]: Patch Block matched & applied successfully. Large Block omitted to save tokens.\n');
                                 }
 
                                 let aiContent;
@@ -4925,7 +4925,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const lines = cleanText.split(/\r?\n/);
                                     const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
                                     const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
-                                    aiContent = `[ACTION RESULT]: ${headerPart}\n[SYSTEM NOTE]: Content verified and persisted to disk. Full preview omitted to conserve context.`;
+                                    aiContent = `[ACTION RESULT]: ${headerPart}\n[SYSTEM NOTE]: Content verified and persisted to disk. Full preview omitted to save tokens.`;
                                 } else {
                                     aiContent = `[ACTION RESULT]: ${processedResult}`;
                                 }
