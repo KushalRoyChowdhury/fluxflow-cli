@@ -163,18 +163,19 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
     const isCompactTerminal = effectiveRows <= 24;
 
     // Strict adaptive limit:
-    // When executing live: TerminalBox header + footer + borders = 5-7 lines.
-    // Together with input box & status bar (6 lines), total fixed UI is 11-13 lines.
-    const overhead = completed ? (isCompactTerminal ? 7 : 9) : (isCompactTerminal ? 11 : 14);
+    // TerminalBox header + footer + borders + input box & status bar
+    const overhead = isCompactTerminal ? 11 : 14;
     const maxAllowed = Math.max(1, effectiveRows - overhead);
 
-    // On compact/split IDE terminals:
-    // rows <= 16: max 2 lines
-    // rows <= 22: max 3 lines
-    // rows <= 28: max 4 lines
-    // taller: up to maxAllowed
+    // Dynamic tier capping for compact/split IDE terminals:
+    // rows <= 16: max 4 lines
+    // rows <= 22: max 5 lines
+    // rows <= 28: max 6 lines
+    // taller: up to 10 lines
     const liveCap = effectiveRows <= 16 ? 4 : (effectiveRows <= 22 ? 5 : (effectiveRows <= 28 ? 6 : 10));
-    const limit = completed ? Math.min(isCompactTerminal ? 4 : 10, maxAllowed) : Math.min(liveCap, maxAllowed);
+
+    // Both live and completed now share the exact same height budget!
+    const limit = Math.min(liveCap, maxAllowed);
 
     const hasCollapsibleContent = rawLines.length > limit;
     const maxScroll = Math.max(0, rawLines.length - limit);
