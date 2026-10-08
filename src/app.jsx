@@ -27,8 +27,11 @@ import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
 import ParserDownloadModal from './components/ParserDownloadModal.jsx';
 import { RevertManager } from './utils/revert.js';
-import { GEMINI_QUOTES } from './data/gemini_quotes.js';
-import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
+// Lazy-loaded phrase pools — fetched on first use, then cached
+let _geminiQuotes = null;
+let _wittyPhrases = null;
+let _meowLines = null;
+
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession, sendUsageHeartbeat, sendUsageFinalize } from './utils/usage.js';
@@ -44,9 +47,8 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens, parseMessageToBlocks, clearBlocksCache, flattenString, splitTypewriterTokens } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 import GlintText from './components/GlintText.jsx';
-import { handleExport } from './utils/export.js';
-import { openUsageDashboard } from './utils/usageServer.js';
 import { loadedFilesCount, getLoadedFilesSummary } from './utils/prompts.js';
+
 
 const shouldClearValue = (val) => {
     const s = String(val);
@@ -1442,9 +1444,18 @@ export default function App({ args = [] }) {
         let interval;
 
         if (statusText && systemSettings.loadingPhrases !== false) {
+            const applyPhrase = (phrases) => {
+                setWittyPhrase(phrases[Math.floor(Math.random() * phrases.length)]);
+            };
             const updatePhrase = () => {
-                const randomPhrase = WITTY_LOADING_PHRASES[Math.floor(Math.random() * WITTY_LOADING_PHRASES.length)];
-                setWittyPhrase(randomPhrase);
+                if (_wittyPhrases) {
+                    applyPhrase(_wittyPhrases);
+                } else {
+                    import('./data/witty_phrases.js').then(({ WITTY_LOADING_PHRASES }) => {
+                        _wittyPhrases = WITTY_LOADING_PHRASES;
+                        applyPhrase(_wittyPhrases);
+                    });
+                }
             };
             if (!wittyPhrase) updatePhrase(); // Initial pick
             interval = setInterval(updatePhrase, 10000);
@@ -2732,6 +2743,7 @@ export default function App({ args = [] }) {
         { cmd: '/truncate', desc: 'Truncate tool results in chat history' },
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
         { cmd: '/gemini', desc: 'Get a happy message from Gemini CLI' },
+        { cmd: '/meow', desc: 'Cat nonsense, delivered straight to the terminal' },
         { cmd: '/save', desc: 'Force save current chat' },
         {
             cmd: '/export',
@@ -3623,6 +3635,7 @@ export default function App({ args = [] }) {
                 case '/usage': {
                     const run = async () => {
                         try {
+                            const { openUsageDashboard } = await import('./utils/usageServer.js');
                             const { url } = await openUsageDashboard();
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
@@ -3673,6 +3686,7 @@ export default function App({ args = [] }) {
                 case '/export': {
                     const runExport = async () => {
                         try {
+                            const { handleExport } = await import('./utils/export.js');
                             const result = await handleExport(parts, { chatId, messages });
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
@@ -3860,6 +3874,7 @@ export default function App({ args = [] }) {
                     if (sub === 'web' || sub === 'gui' || sub === 'dashboard') {
                         const run = async () => {
                             try {
+                                const { openUsageDashboard } = await import('./utils/usageServer.js');
                                 const { url } = await openUsageDashboard();
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
@@ -3982,11 +3997,40 @@ export default function App({ args = [] }) {
                     break;
                 }
                 case '/gemini': {
-                    const randomQuote = GEMINI_QUOTES[Math.floor(Math.random() * GEMINI_QUOTES.length)];
-                    setMessages(prev => {
-                        setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: `✨ GEMINI CLI\n⠀⠀\x1b[2m└─\x1b[22m ${randomQuote}\n⠀` }];
-                    });
+                    const showGeminiQuote = (quotes) => {
+                        const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, { id: Date.now(), role: 'system', text: `✨ GEMINI CLI\n⠀⠀ \x1b[2m└─\x1b[22m ${randomQuote}\n⠀` }];
+                        });
+                    };
+                    if (_geminiQuotes) {
+                        showGeminiQuote(_geminiQuotes);
+                    } else {
+                        import('./data/gemini_quotes.js').then(({ GEMINI_QUOTES }) => {
+                            _geminiQuotes = GEMINI_QUOTES;
+                            showGeminiQuote(_geminiQuotes);
+                        });
+                    }
+                    setInput('');
+                    break;
+                }
+                case '/meow': {
+                    const showMeow = (lines) => {
+                        const randomMeow = lines[Math.floor(Math.random() * lines.length)];
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, { id: Date.now(), role: 'system', text: `🐱 MEOW\n⠀⠀ \x1b[2m└─\x1b[22m ${randomMeow}\n⠀` }];
+                        });
+                    };
+                    if (_meowLines) {
+                        showMeow(_meowLines);
+                    } else {
+                        import('./data/meow.js').then(({ MEOW_LINES }) => {
+                            _meowLines = MEOW_LINES;
+                            showMeow(_meowLines);
+                        });
+                    }
                     setInput('');
                     break;
                 }
@@ -4625,7 +4669,7 @@ export default function App({ args = [] }) {
                                         if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[ACTION RESULT]: ERROR') || fullTextStr.startsWith('[ACTION RESULT]: DENIED') || fullTextStr.startsWith('[ACTION RESULT]: Goal') ||fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed')) {
+                                        if (fullTextStr.startsWith('[ACTION RESULT]: ERROR') || fullTextStr.startsWith('[ACTION RESULT]: DENIED') || fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed')) {
                                             return m;
                                         }
                                         return {
