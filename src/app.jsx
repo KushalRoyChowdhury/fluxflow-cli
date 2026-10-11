@@ -1213,22 +1213,31 @@ export default function App({ args = [] }) {
     const [activeView, setActiveView] = useState('chat'); // chat, mode, thinking, model, settings, profile
     const [processList, setProcessList] = useState([]);
 
+    const isKillCommand = input.startsWith('/ki');
+
     useEffect(() => {
-        if (!input.startsWith('/')) return;
+        if (!isKillCommand) return;
+
         let isMounted = true;
+
         const fetchTree = async () => {
             try {
                 const list = await getProcessTree(process.pid);
-                if (isMounted) setProcessList(list || []);
+                // Check AFTER the async work resolves!
+                if (isMounted) {
+                    setProcessList(list || []);
+                }
             } catch (e) { }
         };
+
         fetchTree();
-        const interval = setInterval(fetchTree, 3000);
+        const interval = setInterval(fetchTree, 5000);
+
         return () => {
             isMounted = false;
             clearInterval(interval);
         };
-    }, [input]);
+    }, [isKillCommand]);
     const [apiTier, setApiTier] = useState('Free');
     const [quotas, setQuotas] = useState({ limitMode: 'Daily', agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0, providerBudgets: {} });
     const [inputConfig, setInputConfig] = useState(null); // { label, key, subKey, value, next }
@@ -5326,7 +5335,7 @@ export default function App({ args = [] }) {
         if (suggestionVisibleCount > 0 && suggestionVisibleCount < suggestions.length) {
             const t = setTimeout(() => {
                 setSuggestionVisibleCount(prev => Math.min(prev + 1, suggestions.length));
-            }, 5);
+            }, 1);
             return () => clearTimeout(t);
         }
     }, [suggestionVisibleCount, suggestions.length]);

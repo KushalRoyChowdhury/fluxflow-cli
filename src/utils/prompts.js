@@ -658,7 +658,7 @@ ${ADD_NO_INS ? '' : `${mode === "Flux" ? "" :
 
 -- REASONING GUIDANCE --
 ${((aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini))) || forcedReasoning ? `${thinkingConfig.trimEnd()}${forcedReasoning || (thinkingLevel !== 'Fast' && (((aiProvider === 'Mistral' && thinkingLevel === 'Low') && !isGemini) || (thinkingLevel !== 'High' && !isGemini))) ? `\nCritical Thinking Policy
-Use <think>...</think> for reasoning before responding any queries\n` : ''}` : `${thinkingConfig}\n`}${!keepReasoningContext ? 'Before actions, provide user facing summary of findings & decisions IN detail for next turn\n' : ''}
+Use <think>...</think> for reasoning before responding any queries` : ''}` : `${thinkingConfig.trimEnd()}`}${!keepReasoningContext ? '\nBefore actions, provide user facing summary of findings & decisions IN detail for next turn\n' : ''}
 ${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec, !!systemSettings?.disableTodo)}${isMemoryEnabled && false ? `\n\n-- MEMORY RULES --
 - Subtly Personalize with relevent contextual memories. Auto Saves` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens' : ''}
 === END SYSTEM PROMPT ===${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n\n- Read relevant skills before tasks, scope: global/project: Use ReadFile, path=\"#skills/scope?/skillName\". In-skill references: path=\"#skills/scope?/skillName/reference-folder/*.md\"' : ''}
