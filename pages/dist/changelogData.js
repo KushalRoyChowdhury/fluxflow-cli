@@ -1,6 +1,20 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.33.0": {
+        "note": "OCTOBER 11. Breaking Change for OpenRouter.",
+        "added": [
+            "Added in-app process management. Kill stale background processes or dev servers with `/kill`.",
+            "Added provider routing, quantization routing, sorting [ttft, throughput, latency, pricing] for Infron."
+        ],
+        "changed": [
+            "Improved Windows command accuracy.",
+            "Eternal fight with turn context hirarchy.",
+            "Improved Error messages for Agent.",
+            "Changed model slug syntax for openrouter.\n- model-id:provider\n+ provider::model-id"
+        ],
+        "fixes": []
+    },
     "4.32.0": {
         "note": "OCTOBER 8",
         "added": [],

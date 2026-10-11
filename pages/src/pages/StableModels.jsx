@@ -4,6 +4,7 @@ const headings = [
     { id: 'model-selection', text: 'Model Selection & Flags', level: 2 },
     { id: 'model-flags', text: 'Supported Flags', level: 3 },
     { id: 'openrouter-routing', text: 'OpenRouter Routing & Syntax', level: 2 },
+    { id: 'infron-routing', text: 'Infron Routing, Quantizations & Sorting', level: 2 },
     { id: 'supported-providers', text: 'Supported Providers', level: 2 },
 ]
 
@@ -118,13 +119,14 @@ export default function StableModels() {
                     </pre>
                 </li>
                 <li>
-                    <strong>Enforced Downstream Provider Host (<code className="font-mono text-blue-500">:&lt;provider&gt;</code>)</strong>:
+                    <strong>Enforced Downstream Provider Host (<code className="font-mono text-blue-500">&lt;provider&gt;::</code>)</strong>:
                     <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                        Append <code>:&lt;provider&gt;</code> to the model identifier to lock execution to a specific backend host with <code>allow_fallbacks: false</code>:
+                        Prefix <code>&lt;provider&gt;::</code> to the model identifier to lock execution to a specific backend host with <code>allow_fallbacks: false</code>:
                     </p>
                     <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
-{`/model meta-llama/llama-3.3-70b-instruct:together    # Forces Together AI host
-/model deepseek/deepseek-r1:deepinfra               # Forces DeepInfra host`}
+{`/model together::meta-llama/llama-3.3-70b-instruct    # Forces Together AI host
+/model deepinfra::deepseek/deepseek-r1               # Forces DeepInfra host
+/model openai::openai/gpt-5:flex                     # Forces OpenAI host with flex tier`}
                     </pre>
                 </li>
                 <li>
@@ -135,6 +137,56 @@ export default function StableModels() {
                     <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
 {`/model google/gemma-4-31b-it:free
 /model mistralai/mistral-large-2411:nitro`}
+                    </pre>
+                </li>
+            </ul>
+
+            {/* INFRON ROUTING */}
+            <h2 id="infron-routing" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                Infron Provider Routing, Quantizations &amp; Sorting
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+                When using <strong>Infron</strong>, FluxFlow gives you powerful slug-based configuration for upstream host routing, execution tiers, precision quantizations, and routing sort priorities:
+            </p>
+
+            <ul className="space-y-4 mb-6">
+                <li>
+                    <strong>Provider Host Routing (<code className="font-mono text-blue-500">&lt;provider&gt;::</code>)</strong>:
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        Lock request execution to a specific upstream host (e.g., Azure, Groq, DeepInfra):
+                    </p>
+                    <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
+{`/model azure::deepseek/deepseek-v4.1-flash:free`}
+                    </pre>
+                </li>
+                <li>
+                    <strong>Service Tiers (<code className="font-mono text-blue-500">:flex</code>, <code className="font-mono text-blue-500">:standard</code>, <code className="font-mono text-blue-500">:priority</code>)</strong>:
+                    <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
+{`/model deepseek-v4.1-flash:flex
+/model deepseek-v4.1-flash:priority`}
+                    </pre>
+                </li>
+                <li>
+                    <strong>Quantizations (<code className="font-mono text-blue-500">:fp16</code>, <code className="font-mono text-blue-500">:fp8</code>, <code className="font-mono text-blue-500">:int8</code>, <code className="font-mono text-blue-500">:int4</code>)</strong>:
+                    <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
+{`/model deepseek-v4.1-flash:fp8
+/model deepseek/deepseek-v4.1-flash:free:fp8`}
+                    </pre>
+                </li>
+                <li>
+                    <strong>Sort Priorities (<code className="font-mono text-blue-500">:throughput</code>, <code className="font-mono text-blue-500">:latency</code>, <code className="font-mono text-blue-500">:price</code>, <code className="font-mono text-blue-500">:ttft</code>)</strong>:
+                    <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
+{`/model deepseek-v4.1-flash:price
+/model deepseek-v4.1-flash:latency`}
+                    </pre>
+                </li>
+                <li>
+                    <strong>Chain in Any Order</strong>:
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        Mix provider host, model identifier (including <code>:free</code>), precision quantization, sorting, and service tier seamlessly:
+                    </p>
+                    <pre className="bg-slate-900 text-slate-100 p-3 rounded-lg text-sm my-2 font-mono">
+{`/model azure::deepseek/deepseek-v4.1-flash:free:fp8:price:flex`}
                     </pre>
                 </li>
             </ul>

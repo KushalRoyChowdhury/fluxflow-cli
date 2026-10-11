@@ -3,20 +3,64 @@ import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 // import fs from 'fs';
 
 export const getInfronStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
-    // Optional "<model>:<tier>" suffix. Only split when the suffix is a valid tier.
-    // e.g. "deepseek-v4.1-flash:flex" -> cleanModel="deepseek-v4.1-flash", tier="flex"
-    //      "deepseek-v4.1-flash:free" -> kept intact as "deepseek-v4.1-flash:free"
-    const VALID_SERVICE_TIERS = ['flex', 'standard', 'priority'];
-    let requestedTier = null;
     let cleanModel = model;
-    if (typeof model === 'string') {
-        const lastColon = model.lastIndexOf(':');
-        if (lastColon !== -1) {
-            const suffix = model.slice(lastColon + 1).trim().toLowerCase();
-            if (VALID_SERVICE_TIERS.includes(suffix)) {
-                requestedTier = suffix;
-                cleanModel = model.slice(0, lastColon);
+    let providerPayload = null;
+
+    if (typeof cleanModel === 'string') {
+        const providerConfig = {};
+
+        // 1. Check for provider prefix: provider::model
+        if (cleanModel.includes('::')) {
+            const dIdx = cleanModel.indexOf('::');
+            const onlyProvider = cleanModel.slice(0, dIdx).trim();
+            if (onlyProvider) {
+                providerConfig.only = [onlyProvider];
             }
+            cleanModel = cleanModel.slice(dIdx + 2).trim();
+        }
+
+        // 2. Token-based scanning for suffixes: :quant, :sort, :tier
+        const VALID_SERVICE_TIERS = ['flex', 'standard', 'priority'];
+        const VALID_QUANTIZATIONS = {
+            'fp16': 'fp16',
+            'f16': 'fp16',
+            'fp8': 'fp8',
+            'f8': 'fp8',
+            'int8': 'int8',
+            'in8': 'int8',
+            'int4': 'int4',
+            'in4': 'int4'
+        };
+        const VALID_SORTS = ['throughput', 'latency', 'price', 'ttft'];
+
+        if (cleanModel.includes(':')) {
+            const parts = cleanModel.split(':');
+            // Scan trailing tokens as long as they match recognized provider options
+            while (parts.length > 1) {
+                const lastToken = parts[parts.length - 1].toLowerCase().trim();
+
+                if (VALID_SERVICE_TIERS.includes(lastToken)) {
+                    providerConfig.service_tier = lastToken;
+                    providerConfig.allow_fallbacks = false;
+                    parts.pop();
+                } else if (VALID_QUANTIZATIONS[lastToken]) {
+                    providerConfig.quantizations = [VALID_QUANTIZATIONS[lastToken]];
+                    providerConfig.allow_fallbacks = false;
+                    parts.pop();
+                } else if (VALID_SORTS.includes(lastToken)) {
+                    providerConfig.sort = lastToken;
+                    providerConfig.allow_fallbacks = false;
+                    parts.pop();
+                } else {
+                    // Not a provider option (e.g. :free or model sub-identifier), stop peeling
+                    break;
+                }
+            }
+            cleanModel = parts.join(':').trim();
+        }
+
+        if (Object.keys(providerConfig).length > 0) {
+            providerPayload = providerConfig;
         }
     }
 
@@ -80,8 +124,8 @@ export const getInfronStream = async function* (apiKey, model, contents, systemI
         tool_choice: "none"
     };
 
-    if (requestedTier) {
-        requestPayload.provider = { service_tier: requestedTier };
+    if (providerPayload) {
+        requestPayload.provider = providerPayload;
     }
 
     if (effort) {

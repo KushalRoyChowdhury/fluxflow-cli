@@ -11,10 +11,16 @@ export const PROVIDERS_MD = `# FluxFlow AI Providers & Setup
 * /provider → Switch AI provider
 
 ## OpenRouter: Routing, Tiers & Model Variants
-* Provider Routing: Append :provider. /model model-id:provider
-* Service Tiers & Variants:
-  * :flex|priority. flex = cheaper, priority = faster & expensive. /model openai/gpt-5:tier or /model openai/gpt-5:openai:tier
-  * Variants :free, :nitro, :floor, :exacto
+* Provider Routing: /model provider::model-id
+* Service Tiers: :flex|priority. /model openai/gpt-5:flex or /model openai::openai/gpt-5:flex
+* Model Variants: :free, :nitro, :floor, :exacto. /model google/gemma-4-31b-it:free
+
+## Infron: Routing, Tiers, Quantizations & Sorting
+* Provider Routing: /model provider::model-id
+* Service Tiers: :flex|standard|priority. /model deepseek-v4.1-flash:flex
+* Quantizations: :fp16|fp8|int8|int4. /model deepseek-v4.1-flash:fp8
+* Sorting: :throughput|latency|price|ttft. /model deepseek-v4.1-flash:price
+* Combinations (any order): /model azure::deepseek-v4.1-flash:free:fp8:ttft:flex
 
 ## Setup Local NVIDIA NIM (OpenAI-Compatible)
 1. Environment Variables:
