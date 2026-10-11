@@ -1244,6 +1244,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.isHelpRecord) {
         const commandList = [
             { cmd: '/quit', desc: 'Exit and shutdown Flux' },
+            { cmd: '/kill', desc: 'Kill a process by PID or list active processes' },
             { cmd: '/help', desc: 'Show all available commands' },
             { cmd: '/compress', desc: 'Summarize and compress chat history' },
             { cmd: '/truncate', desc: 'Truncate tool results in chat history' },

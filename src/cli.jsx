@@ -177,6 +177,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         if (isHelpCommands) {
             console.log(`FluxFlow Chat /Commands:
   /quit                                    Exit and shutdown Flux
+  /kill [pid]                              Kill a process by PID or list active processes
   /help                                    Show help menu
   /clear                                   Clear terminal screen
   /resume                                  Load previous session

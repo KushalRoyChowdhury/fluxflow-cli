@@ -48,6 +48,7 @@ import { formatTokens, parseMessageToBlocks, clearBlocksCache, flattenString, sp
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 import GlintText from './components/GlintText.jsx';
 import { loadedFilesCount, getLoadedFilesSummary } from './utils/prompts.js';
+import { getProcessTree } from './utils/process.js';
 
 
 const shouldClearValue = (val) => {
@@ -618,7 +619,7 @@ const SubagentRow = React.memo(({ sa, showTPMEstimate = false }) => {
     return (
         <Box justifyContent="space-between" width="100%">
             <Text color="white"> • {sa.title} <Text color="white" dimColor>({sa.id})</Text></Text>
-            <Text color="white"><Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text><Text color={dotColor}> ●</Text>{showTPMEstimate && <Text color="white" dimColor bold> ({displayedWps} tok/s)</Text>}</Text>
+            <Text color="white"><Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text>{!showTPMEstimate && <Text color={dotColor}> ●</Text>}{showTPMEstimate && <Text color="white" dimColor bold> ~{displayedWps} tok/s</Text>}</Text>
         </Box>
     );
 });
@@ -1210,6 +1211,24 @@ export default function App({ args = [] }) {
     };
 
     const [activeView, setActiveView] = useState('chat'); // chat, mode, thinking, model, settings, profile
+    const [processList, setProcessList] = useState([]);
+
+    useEffect(() => {
+        if (!input.startsWith('/')) return;
+        let isMounted = true;
+        const fetchTree = async () => {
+            try {
+                const list = await getProcessTree(process.pid);
+                if (isMounted) setProcessList(list || []);
+            } catch (e) { }
+        };
+        fetchTree();
+        const interval = setInterval(fetchTree, 3000);
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
+    }, [input]);
     const [apiTier, setApiTier] = useState('Free');
     const [quotas, setQuotas] = useState({ limitMode: 'Daily', agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0, providerBudgets: {} });
     const [inputConfig, setInputConfig] = useState(null); // { label, key, subKey, value, next }
@@ -2735,6 +2754,26 @@ export default function App({ args = [] }) {
 
     const COMMANDS = [
         { cmd: '/quit', desc: 'Exit and shutdown Flux' },
+        {
+            cmd: '/kill',
+            desc: 'Kill a process by PID',
+            subs: processList.map(p => {
+                let rightSide;
+                if (p.isRoot) {
+                    rightSide = 'FluxFlow';
+                } else if (p.url && (p.url.includes(':52991') || p.url.includes(':52145') || p.url.includes(':52140'))) {
+                    rightSide = 'Internal';
+                } else {
+                    rightSide = p.url || p.name;
+                }
+                return {
+                    cmd: String(p.pid),
+                    display: `PID: ${p.pid}`,
+                    rightDesc: rightSide,
+                    desc: rightSide
+                };
+            })
+        },
         { cmd: '/help', desc: 'Show all available commands' },
         ...(parsedArgs.playground ? [{ cmd: '/move', desc: 'Move playground directory to original CWD/playground-export' }] : []),
         { cmd: '/resume', desc: 'Load previous session' },
@@ -4110,7 +4149,7 @@ export default function App({ args = [] }) {
                             if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[ACTION RESULT]: ERROR') || fullTextStr.startsWith('[ACTION RESULT]: DENIED') || fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.includes('...Success result truncated to save tokens')) {
+                            if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.includes('...Success result truncated to save tokens')) {
                                 return m;
                             }
                             truncatedCount++;
@@ -4130,6 +4169,69 @@ export default function App({ args = [] }) {
                         setCompletedIndex(finalMsgs.length);
                         return finalMsgs;
                     });
+                    break;
+                }
+                case '/kill': {
+                    const runKill = async () => {
+                        const targetPid = parts[1] ? parseInt(parts[1], 10) : null;
+                        const { getProcessTree, killProcess } = await import('./utils/process.js');
+
+                        if (!targetPid || isNaN(targetPid)) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: Date.now(),
+                                    role: 'system',
+                                    text: `✦ Usage: \x1b[36m/kill <pid>\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Select an active process PID from the autocomplete list.\n⠀`,
+                                    isMeta: true
+                                }];
+                            });
+                        } else {
+                            // Check if target PID is protected (main process or internal usageDaemon)
+                            const isMainProcess = targetPid === process.pid;
+                            const isInternalDaemon = processList.some(p => p.pid === targetPid && (
+                                p.isRoot ||
+                                (p.url && p.url.includes(':52991')) ||
+                                (p.cmd && p.cmd.includes('usage-daemon-worker'))
+                            ));
+
+                            if (isMainProcess || isInternalDaemon) {
+                                const procLabel = isMainProcess ? 'FluxFlow (Main Process)' : 'Internal Process';
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, {
+                                        id: Date.now(),
+                                        role: 'system',
+                                        text: `✦ \x1b[31mPROTECTED PROCESS\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m PID: \x1b[33m${targetPid}\x1b[0m (${procLabel})\n⠀⠀\x1b[2m└─\x1b[22m Unable to kill protected core process. Use \x1b[36m/quit\x1b[0m to safely shutdown FluxFlow.\n⠀`,
+                                        isMeta: true
+                                    }];
+                                });
+                                return;
+                            }
+
+                            // Terminate process with targetPid
+                            try {
+                                const res = await killProcess(targetPid);
+                                if (res.success) {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `✦ Process Terminated:\n⠀⠀\x1b[2m└─\x1b[22m PID: \x1b[31m${targetPid}\x1b[0m (${res.message})\n⠀`, isMeta: true }];
+                                    });
+                                } else {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `✦ \x1b[31mFAILED TO KILL PROCESS\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m PID: ${targetPid}\n⠀⠀\x1b[2m└─\x1b[22m Reason: ${res.message}\n⠀`, isMeta: true }];
+                                    });
+                                }
+                            } catch (err) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: `✦ \x1b[31mERROR\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m ${err.message}\n⠀`, isMeta: true }];
+                                });
+                            }
+                        }
+                    };
+                    runKill();
                     break;
                 }
                 case '/help': {
@@ -4669,7 +4771,7 @@ export default function App({ args = [] }) {
                                         if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[ACTION RESULT]: ERROR') || fullTextStr.startsWith('[ACTION RESULT]: DENIED') || fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed')) {
+                                        if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed')) {
                                             return m;
                                         }
                                         return {
@@ -7253,11 +7355,11 @@ export default function App({ args = [] }) {
                                         return (
                                             <Box>
                                                 <GlintText
-                                                    text="Waiting for API"
+                                                    text="Waiting for API Response"
                                                     baseColor={colors.text}
                                                     glintColor={colors.textMuted}
                                                     glintWidth={4}
-                                                    speed={80}
+                                                    speed={100}
                                                 />
                                                 <Text color={colors.textMuted} dimColor> ┃ </Text>
                                             </Box>
@@ -7272,7 +7374,7 @@ export default function App({ args = [] }) {
                                                     baseColor={colors.text}
                                                     glintColor={colors.textMuted}
                                                     italic
-                                                    speed={80}
+                                                    speed={85}
                                                     typeSpeed={15}
                                                 />
                                                 <Text color={colors.textMuted} dimColor> ┃ </Text>
@@ -7288,6 +7390,7 @@ export default function App({ args = [] }) {
                                     baseColor={colors.text}
                                     glintColor={colors.textMuted}
                                     glintWidth={3}
+                                    speed={80}
                                 />
                                 <Text color={colors.textMuted}> {activeModel.length > 0 ? thinkingLevel.toLocaleLowerCase().includes('xhigh') ? `` : `(${thinkingLevel})` : ''}</Text>
                                 {loadedFilesCount > 0 && (
@@ -7526,6 +7629,7 @@ export default function App({ args = [] }) {
                             const remaining = suggestions.length - (startIdx + visible.length);
                             const isFileSug = suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@");
                             const isModelSug = input.startsWith("/model");
+                            const isKillSug = input.startsWith("/kill");
                             const isThinkingSug = input.startsWith("/thinking");
                             const totalCount = suggestions.length;
                             const currentPos = Math.min(totalCount, selectedIndex + 1);
@@ -7541,7 +7645,7 @@ export default function App({ args = [] }) {
                                     <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
                                         <Box flexDirection="row">
                                             <Text color={colors.primary || colors.text} bold>
-                                                {isFileSug ? "WORKSPACE FILES" : isModelSug ? "SAVED MODELS" : isThinkingSug ? "THINKING LEVELS" : "COMMANDS"}
+                                                {isFileSug ? "WORKSPACE FILES" : isModelSug ? "SAVED MODELS" : isKillSug ? "ACTIVE PROCESSES" : isThinkingSug ? "THINKING LEVELS" : "COMMANDS"}
                                             </Text>
                                             <Text color={colors.textMuted}> ({totalCount})</Text>
                                         </Box>
@@ -7571,10 +7675,10 @@ export default function App({ args = [] }) {
                                         const isGemmaDisabled = s.cmd === getDefaultModel("Google", "Free") && apiTier !== "Free";
 
                                         const label = s.display || (s.cmd && (s.cmd.startsWith("@[") || s.cmd.startsWith("\\@[")) && s.cmd.endsWith("]") ? (() => {
-                                            const pathPart = s.cmd.startsWith("\\@[") ? s.cmd.slice(3, -1) : s.cmd.slice(2, -1);
-                                            const parts = pathPart.split(/[\/\\]/);
-                                            return parts[parts.length - 1];
-                                        })() : (!isModelSug && s.cmd && s.cmd.includes("/") ? s.cmd.split("/").pop() : s.cmd));
+                                             const pathPart = s.cmd.startsWith("\\@[") ? s.cmd.slice(3, -1) : s.cmd.slice(2, -1);
+                                             const parts = pathPart.split(/[\/\\]/);
+                                             return parts[parts.length - 1];
+                                         })() : (!isModelSug && !isKillSug && s.cmd && s.cmd.includes("/") ? s.cmd.split("/").pop() : s.cmd));
 
                                         if (isModelSug) {
                                             const isMulti = s.multimodal === true || isModelMultimodal(s.cmd || s);
@@ -7605,6 +7709,39 @@ export default function App({ args = [] }) {
                                                     <Box flexShrink={0} marginLeft={2}>
                                                         <Text color={isActive ? colors.text : colors.textMuted} italic={!isActive}>
                                                             {badgeText}
+                                                        </Text>
+                                                    </Box>
+                                                </Box>
+                                            );
+                                        }
+
+                                        if (isKillSug && s.rightDesc) {
+                                            return (
+                                                <Box
+                                                    key={s.cmd || i}
+                                                    flexDirection="row"
+                                                    backgroundColor={isActive ? colors.highlightBg : undefined}
+                                                    paddingX={1}
+                                                    height={1}
+                                                    alignItems="center"
+                                                    justifyContent="space-between"
+                                                >
+                                                    <Box flexDirection="row" alignItems="center" flexGrow={1} overflow="hidden">
+                                                        <Box width={3} flexShrink={0}>
+                                                            <Text color={isActive ? (colors.primary || colors.text) : colors.textMuted} bold={isActive}>
+                                                                {isActive ? "❯ " : "  "}
+                                                            </Text>
+                                                        </Box>
+                                                        <Text
+                                                            color={isActive ? (colors.inputText || colors.text) : colors.text}
+                                                            bold={isActive}
+                                                        >
+                                                            {label}
+                                                        </Text>
+                                                    </Box>
+                                                    <Box flexShrink={0} marginLeft={2}>
+                                                        <Text color={isActive ? colors.text : colors.textMuted} italic={!isActive}>
+                                                            {s.rightDesc}
                                                         </Text>
                                                     </Box>
                                                 </Box>

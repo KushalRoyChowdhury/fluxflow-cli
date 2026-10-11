@@ -5,6 +5,7 @@ Trigger in chat via /command
 
 ## Session & Navigation
 * /quit → Exit and shutdown FluxFlow
+* /kill pid → Kill a process by PID or show active process tree under current session
 * /help → Show help menu & actions
 * /clear → Clear terminal viewport
 * /chats → List stored chat sessions

@@ -8,7 +8,7 @@ import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@g
 import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';
 import { getTruncatedHistory, loadHistory } from './history.js';
 import { checkQuota, checkQuotaDetailed, incrementUsage, addToUsage, recordTimedUsage } from './usage.js';
-import { dispatchTool } from './tools.js';
+import { dispatchTool, isKnownTool } from './tools.js';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
 import { parseArgs } from './arg_parser.js';
 import { fileURLToPath } from 'url';
@@ -135,8 +135,8 @@ const RE_STRIP_THINK_CLOSED = /(?:<(think|thought|thoughts)>|<\|channel>thought|
 const RE_STRIP_THINK_OPEN = /(?:<(think|thought|thoughts)>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*$/gi;
 const RE_STRIP_THINK_SIMPLE = /(?:<think>|<\|channel>thought|\[think\])[\s\S]*?(?:<\/think>|<channel\|>|\[\/think\]|$)/gi;
 const RE_STRIP_THINK_FULL = /(?:<(think|thought|thoughts)>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\]|$)/gi;
-const RE_BACKTICK_SPAN = /`[^`]*`/g;
-const RE_BACKTICK_OPEN = /`[^`]*$/;  // unclosed span — handles streaming (closing backtick not yet received)
+const RE_BACKTICK_SPAN = /`[^`\r\n]*`/g;
+const RE_BACKTICK_OPEN = /`[^`\r\n]*$/;  // unclosed same-line span — handles streaming on the current line only
 const RE_KIMI_TOOL_CALL = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
 const RE_KIMI_JSON_PAIR = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
 const RE_KIMI_SECTION_BEGIN = /<\|\s*tool_calls_section_begin\s*\|>/gi;
@@ -179,7 +179,7 @@ let systemInstructionCache = { key: null, value: null };
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked|Located|Dragged|Scrolled|Typed|Pressed Key|Recaptured Screen|Created|Read Skill|Read Documentation|Searched Documentation|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Execution Error|Loop Detected|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked|Located|Dragged|Scrolled|Typed|Pressed Key|Recaptured Screen|Created|Read Skill|Read Documentation|Searched Documentation|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Model produced malformed tool call|Loop Detected|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -893,16 +893,74 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     }
 };
 
+const maskCodeSpans = (text) => {
+    if (!text || typeof text !== 'string') return text;
+    const chars = text.split('');
+    let inFence = false;
+    let inInlineBacktick = false;
+    let i = 0;
+
+    while (i < chars.length) {
+        // Check for triple-backtick fence toggle
+        if (chars[i] === '`' && chars[i + 1] === '`' && chars[i + 2] === '`') {
+            if (inFence) {
+                // Closing fence: mask the 3 backticks and exit fence
+                chars[i] = ' ';
+                chars[i + 1] = ' ';
+                chars[i + 2] = ' ';
+                inFence = false;
+            } else {
+                // Opening fence: mask the 3 backticks and enter fence
+                chars[i] = ' ';
+                chars[i + 1] = ' ';
+                chars[i + 2] = ' ';
+                inFence = true;
+            }
+            i += 3;
+            continue;
+        }
+
+        if (inFence) {
+            // Mask everything inside the open code fence (preserving newlines if desired, or replacing all with spaces)
+            if (chars[i] !== '\n' && chars[i] !== '\r') {
+                chars[i] = ' ';
+            }
+            i++;
+            continue;
+        }
+
+        // Check for single backtick inline span (when not in fence)
+        if (chars[i] === '`') {
+            inInlineBacktick = !inInlineBacktick;
+            chars[i] = ' ';
+            i++;
+            continue;
+        }
+
+        if (inInlineBacktick) {
+            if (chars[i] === '\n' || chars[i] === '\r') {
+                // Inline backtick cannot cross newlines
+                inInlineBacktick = false;
+            } else {
+                chars[i] = ' ';
+            }
+            i++;
+            continue;
+        }
+
+        i++;
+    }
+
+    return chars.join('');
+};
+
 const getActiveToolContext = (text) => {
     // Strip leading thinking block ONLY so live tool sniffing ignores tool syntax drafted inside thinking
     const cleanText = stripLeadingThinking(text);
 
-    // Blank out backtick-delimited inline-code spans (equal-length spaces) so that
-    // tool triggers written inside backticks are invisible to the regex while all
-    // character offsets remain valid for subsequent index math.
-    const scanText = bypassBacktick ? cleanText : cleanText
-        .replace(RE_BACKTICK_SPAN, (m) => ' '.repeat(m.length))
-        .replace(RE_BACKTICK_OPEN, (m) => ' '.repeat(m.length));
+    // Blank out all open & closed code fences (```...```) and inline backtick spans using balance tracking
+    // so any tool triggers drafted inside code blocks or backticks are 100% invisible to live tool sniffing.
+    const scanText = maskCodeSpans(cleanText);
 
     RE_TOOL_CALL_FUNC.lastIndex = 0;
     let match;
@@ -914,7 +972,7 @@ const getActiveToolContext = (text) => {
         let closed = false;
 
         for (let i = startIdx; i < scanText.length; i++) {
-            const char = cleanText[i];
+            const char = scanText[i];
             if (!inString && (char === '"' || char === "'" || char === '`')) {
                 inString = char;
                 isEscaped = false;
@@ -1159,14 +1217,6 @@ const translateKimiToolCalls = (text) => {
     return result;
 };
 
-const REGEX_PLACEHOLDER_ARG = /(?:path|query|url|keyword|command|method|title|task|id)\s*=\s*['"`]?\s*\.\.\.\s*['"`]?/i;
-const REGEX_PLACEHOLDER_VAL = /^['"`]?\s*\.\.\.\s*['"`]?$/;
-
-const isPlaceholderVal = (val) => {
-    if (val === undefined || val === null) return false;
-    const str = String(val).trim();
-    return str === '...' || str === '…' || REGEX_PLACEHOLDER_VAL.test(str);
-};
 
 const detectToolCalls = (text) => {
     if (!text) return [];
@@ -1174,12 +1224,9 @@ const detectToolCalls = (text) => {
     // Strip leading thinking block ONLY if the response starts with thinking
     const cleanText = stripLeadingThinking(translatedText);
     const results = [];
-    // Replace backtick-delimited inline-code spans with spaces of equal length so that
-    // tool triggers written inside backticks (e.g. `[tool:functions.foo()]`) are ignored
-    // while all character offsets remain valid for subsequent index math.
-    const scanText = bypassBacktick ? cleanText : cleanText
-        .replace(RE_BACKTICK_SPAN, (m) => ' '.repeat(m.length))
-        .replace(RE_BACKTICK_OPEN, (m) => ' '.repeat(m.length));
+    // Blank out all open & closed code fences (```...```) and inline backtick spans using balance tracking
+    // so any tool triggers written inside code blocks or backticks are completely ignored.
+    const scanText = maskCodeSpans(cleanText);
     const toolRegex = RE_TOOL_CALL_ANY;
     toolRegex.lastIndex = 0;
 
@@ -1194,13 +1241,13 @@ const detectToolCalls = (text) => {
         let closingParenIdx = -1;
 
         for (let i = startIdx; i < scanText.length; i++) {
-            const char = cleanText[i];
+            const char = scanText[i];
 
             if (inString) {
                 if (char === inString) {
                     // Check if escaped: count backslashes preceding this quote
                     let backslashCount = 0;
-                    for (let j = i - 1; j >= 0 && cleanText[j] === '\\'; j--) {
+                    for (let j = i - 1; j >= 0 && scanText[j] === '\\'; j--) {
                         backslashCount++;
                     }
                     if (backslashCount % 2 === 0) {
@@ -1208,6 +1255,11 @@ const detectToolCalls = (text) => {
                     }
                 }
             } else {
+                // If we encounter a new unescaped tool/action invocation prefix before this one closed, abort this broken one
+                if (i > startIdx && (scanText.substring(i).startsWith('[action:') || scanText.substring(i).startsWith('[tool:'))) {
+                    break;
+                }
+
                 if (char === '"' || char === "'" || char === '`') {
                     inString = char;
                 } else if (char === '(') {
@@ -1232,33 +1284,132 @@ const detectToolCalls = (text) => {
             const finalArgsText = cleanText.substring(startIdx + 1, closingParenIdx);
             const finalFullMatch = cleanText.substring(match.index, endIdx + 1);
 
-            // Filter out dummy/placeholder tool calls where path, query, url, keyword, command, method, title, task, or id is '...'
-            const parsed = parseArgs(finalArgsText);
-            const hasPlaceholderArg =
-                isPlaceholderVal(parsed.path) ||
-                isPlaceholderVal(parsed.query) ||
-                isPlaceholderVal(parsed.url) ||
-                isPlaceholderVal(parsed.keyword) ||
-                isPlaceholderVal(parsed.command) ||
-                isPlaceholderVal(parsed.method) ||
-                isPlaceholderVal(parsed.title) ||
-                isPlaceholderVal(parsed.task) ||
-                isPlaceholderVal(parsed.id) ||
-                REGEX_PLACEHOLDER_ARG.test(finalArgsText);
-
-            if (!hasPlaceholderArg) {
-                results.push({
-                    fullMatch: finalFullMatch,
-                    toolName: toolName.trim(),
-                    args: finalArgsText.trim()
-                });
-            }
+            results.push({
+                fullMatch: finalFullMatch,
+                toolName: toolName.trim(),
+                args: finalArgsText.trim()
+            });
             toolRegex.lastIndex = endIdx + 1;
         }
     }
 
     return results;
 };
+
+const diagnoseUnexecutedTools = (text) => {
+    if (!text) return null;
+    const cleanText = stripLeadingThinking(text);
+    const issues = [];
+    const triggerRegex = /\[\s*(?:tool:(?:functions\.)?|action:(?:functions\.)?|action:)([a-zA-Z0-9_]+)\s*\(/gi;
+    const matches = [];
+    let m;
+    while ((m = triggerRegex.exec(cleanText)) !== null) {
+        matches.push({
+            toolName: m[1],
+            index: m.index,
+            parenIndex: m.index + m[0].length - 1
+        });
+    }
+
+    for (let k = 0; k < matches.length; k++) {
+        const item = matches[k];
+        const nextStart = k + 1 < matches.length ? matches[k + 1].index : cleanText.length;
+        const segment = cleanText.substring(item.index, nextStart);
+
+        const openParenIdx = segment.indexOf('(');
+        const argsPart = openParenIdx !== -1 ? segment.substring(openParenIdx + 1) : '';
+
+        // Check if segment is actually a validly closed tool call
+        let balance = 0;
+        let inString = null;
+        let closed = false;
+
+        for (let i = 0; i < argsPart.length; i++) {
+            const char = argsPart[i];
+            if (inString) {
+                if (char === inString) {
+                    let backslashCount = 0;
+                    for (let j = i - 1; j >= 0 && argsPart[j] === '\\'; j--) {
+                        backslashCount++;
+                    }
+                    if (backslashCount % 2 === 0) {
+                        inString = null;
+                    }
+                }
+            } else {
+                if (char === '"' || char === "'" || char === '`') {
+                    inString = char;
+                } else if (char === '(') {
+                    balance++;
+                } else if (char === ')') {
+                    if (balance > 0) {
+                        balance--;
+                    } else {
+                        // Look for closing ']'
+                        let j = i + 1;
+                        while (j < argsPart.length && /\s/.test(argsPart[j])) j++;
+                        if (j < argsPart.length && argsPart[j] === ']') {
+                            closed = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!closed) {
+            const trimmedSeg = segment.trim();
+            let reason = '';
+            if (inString) {
+                reason = `Unclosed quote string (${inString}) inside arguments`;
+            } else if (trimmedSeg.endsWith(']')) {
+                reason = `Missing closing ')' before ']' (e.g. found "...]")`;
+            } else if (trimmedSeg.endsWith(')')) {
+                reason = `Missing closing ']' after ')' (e.g. found "...)" instead of "...)]")`;
+            } else if (!trimmedSeg.includes(')') && !trimmedSeg.includes(']')) {
+                reason = `Missing closing delimiter ')]'`;
+            } else {
+                reason = `Malformed or unclosed call syntax (missing ')]')`;
+            }
+            issues.push(`• [action:${item.toolName}(...)]: ${reason}. Expected: [action:${item.toolName}(arg1="...", arg2="...")]`);
+        }
+    }
+
+    // Check for missing opening bracket '[': e.g. action:ReadFile(...) or tool:ReadFile(...)
+    const bareTriggerPattern = /(?:^|[^\w\[])(?:tool|action):(?:functions\.)?([a-zA-Z0-9_]+)\s*\(/gi;
+    let bareMatch;
+    while ((bareMatch = bareTriggerPattern.exec(cleanText)) !== null) {
+        const toolName = bareMatch[1];
+        const matchIdx = bareMatch.index + (bareMatch[0].indexOf(':') - (bareMatch[0].startsWith('action') || bareMatch[0].startsWith('tool') ? 0 : 1));
+        const prevChar = matchIdx > 0 ? cleanText[matchIdx - 1] : '';
+        if (prevChar !== '[' && isKnownTool(toolName)) {
+            issues.push(`• action:${toolName}(...): Missing opening bracket '['. Expected: [action:${toolName}(...)]`);
+        }
+    }
+
+    // Check for missing 'action:' prefix: e.g. [ReadFile(...)], [WriteFile(...)], [Run(...)]
+    const potentialToolPattern = /\[\s*(?:functions\.)?([a-zA-Z0-9_]+)\s*\(/g;
+    let potentialMatch;
+    while ((potentialMatch = potentialToolPattern.exec(cleanText)) !== null) {
+        const candidateName = potentialMatch[1];
+        if (candidateName !== 'action' && candidateName !== 'tool' && isKnownTool(candidateName)) {
+            issues.push(`• [${candidateName}(...)]: Missing 'action:' prefix. Expected: [action:${candidateName}(...)]`);
+        }
+    }
+
+    // Check if tool pattern was attempted without parenthesis: e.g. [action:ReadFile path="..."]
+    const malformedNoParenPattern = /\[\s*(?:tool|action)\s*:\s*(?:functions\.)?([a-zA-Z0-9_]+)(?!\s*\()/gi;
+    let malformedMatch;
+    while ((malformedMatch = malformedNoParenPattern.exec(cleanText)) !== null) {
+        const toolName = malformedMatch[1];
+        if (isKnownTool(toolName)) {
+            issues.push(`• [action:${toolName}...]: Missing opening '(' for tool arguments. Expected: [action:${toolName}(...)]`);
+        }
+    }
+
+    return issues.length > 0 ? issues.join('\n') : null;
+};
+
 
 /**
  * Initializes the new Gemini client
@@ -1896,7 +2047,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const month = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
         const day = String(now.getDate()).padStart(2, '0');
         const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-        const dateTimeStr = `${year}-${month}-${day}, ${timeStr}`;
+        // const dateTimeStr = `${year}-${month}-${day}, ${timeStr}`;
         const dateTimeStrExclude = `${timeStr}`;
 
 
@@ -2290,7 +2441,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (shouldCheckExclude && !hasMovingParts) {
             firstUserMsg = cleanPromptForModel.trim();
         } else {
-            firstUserMsg = `[System Metadata]\nTime: ${shouldCheckExclude ? dateTimeStrExclude : dateTimeStr}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${ideBlock}\nAction format: [action:ActionName(...)]\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+            firstUserMsg = `[System Metadata] Time: ${dateTimeStrExclude}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${ideBlock}\nAction format: [action:ActionName(...)]\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
         }
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
@@ -2532,15 +2683,27 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             return (systemSettings?.keepReasoningContext ? leadingThink : '') + text;
                         }
 
-                        // Strip YAML/code fence wrappers around tool calls: ```tool ... [tool:...] / [action:...] ... ```
+                        // Check if text has genuine unquoted/unfenced executable tool calls
+                        const executedCalls = detectToolCalls(text);
+                        if (executedCalls.length === 0) {
+                            // If no valid executable tool calls exist (e.g. only markdown code blocks, backtick mentions, or docs), preserve text as-is!
+                            const result = stripNakedXmlTags(text);
+                            return (systemSettings?.keepReasoningContext ? leadingThink : '') + result;
+                        }
+
+                        // Strip YAML/code fence wrappers around real executable tool calls: ```tool ... [tool:...] / [action:...] ... ```
                         text = text.replace(RE_TOOL_WRAPPER_CODE_FENCE, (match, inner) => {
                             if (inner.includes('[tool:') || inner.includes('[action:')) return inner.trim();
                             return match;
                         });
 
-                        // Process string segment by segment: strip naked XML tags outside [tool:...]/[action:...], keeping backtick code spans and tool content 100% untouched
+                        // Process string segment by segment: strip naked XML tags outside [tool:...]/[action:...]
+                        // Only strip conversational fluff between tool calls when multiple genuine unquoted tool calls exist
                         let result = '';
                         let i = 0;
+                        let toolCallSegments = [];
+                        let preToolText = '';
+
                         while (i < text.length) {
                             const idxTool = text.indexOf('[tool:', i);
                             const idxAction = text.indexOf('[action:', i);
@@ -2554,12 +2717,26 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
 
                             if (toolIdx === -1) {
-                                result += stripNakedXmlTags(text.substring(i));
+                                if (toolCallSegments.length === 0) {
+                                    result += stripNakedXmlTags(text.substring(i));
+                                }
                                 break;
                             }
 
-                            const beforeTool = text.substring(i, toolIdx);
-                            result += stripNakedXmlTags(beforeTool);
+                            // Check if this tool tag is wrapped in an inline backtick or code span (e.g. `[action:...]`)
+                            const charBefore = toolIdx > 0 ? text[toolIdx - 1] : '';
+                            const isInsideBacktickMention = charBefore === '`';
+
+                            if (isInsideBacktickMention) {
+                                // Keep inline backtick mentions intact without stripping them or surrounding text
+                                result += stripNakedXmlTags(text.substring(i, toolIdx + 1));
+                                i = toolIdx + 1;
+                                continue;
+                            }
+
+                            if (toolCallSegments.length === 0) {
+                                preToolText = stripNakedXmlTags(text.substring(i, toolIdx));
+                            }
 
                             // Find the true matching ']' for [tool:...(...)] or [action:...(...)]
                             let endToolIdx = -1;
@@ -2584,13 +2761,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
                             }
                             if (endToolIdx === -1) {
-                                result += text.substring(toolIdx);
+                                if (toolCallSegments.length === 0) {
+                                    result += text.substring(toolIdx);
+                                }
                                 break;
                             }
 
-                            // Append tool call intact
-                            result += text.substring(toolIdx, endToolIdx + 1);
+                            // Extract tool call intact
+                            const toolCallStr = text.substring(toolIdx, endToolIdx + 1);
+                            toolCallSegments.push(toolCallStr);
                             i = endToolIdx + 1;
+                        }
+
+                        if (toolCallSegments.length > 0) {
+                            result = preToolText.trimEnd() ? (preToolText.trimEnd() + '\n\n' + toolCallSegments.join('\n\n')) : toolCallSegments.join('\n\n');
                         }
 
                         // 2. Paste the intact leading thought block back in front if keepReasoningContext is enabled
@@ -2643,29 +2827,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             };
                         });
 
-                    // [ROLE ALTERNATION & TOOL PAIRING FIX]
-                    // 1. Re-order tool calls and tool results so each result immediately follows its tool call.
-                    for (let i = 0; i < contents.length; i++) {
-                        const msg = contents[i];
-                        const text = msg.parts?.[0]?.text || '';
-                        if (msg.role === 'model' && (/\[(?:tool|action):/i.test(text))) {
-                            // Find the first user [ACTION RESULT] / [TOOL RESULT] message *after* this index
-                            let resultIdx = -1;
-                            for (let j = i + 1; j < contents.length; j++) {
-                                const nextMsg = contents[j];
-                                const nextText = nextMsg.parts?.[0]?.text || '';
-                                if (nextMsg.role === 'user' && (nextText.startsWith('[ACTION RESULT]') || nextText.startsWith('[TOOL RESULT]'))) {
-                                    resultIdx = j;
-                                    break;
-                                }
-                            }
-                            // If found, and it is not already directly after the tool call, move it to i + 1
-                            if (resultIdx !== -1 && resultIdx !== i + 1) {
-                                const [resultMsg] = contents.splice(resultIdx, 1);
-                                contents.splice(i + 1, 0, resultMsg);
-                            }
-                        }
-                    }
+                    // [ROLE ALTERNATION FIX]
+                    // Natural execution order in modifiedHistory already maintains exact turn order.
 
                     // 1.5. Delete stranded user turns (where user is followed by system-initiated user turn without a model turn in between)
                     for (let i = contents.length - 2; i >= 0; i--) {
@@ -2697,6 +2860,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
                         }
                     }
+
+                    // 3. Strip code fences and inline backticks immediately wrapping [action:...] / [tool:...] in finalized context
+                    for (const msg of finalContents) {
+                        for (const part of msg.parts || []) {
+                            if (part && typeof part.text === 'string' && (part.text.includes('[action:') || part.text.includes('[tool:'))) {
+                                // Strip single/triple code fences immediately enclosing a tool call: ```\n[action:...]\n``` -> [action:...]
+                                part.text = part.text.replace(/```(?:[a-zA-Z0-9_-]+)?\s*\n?(\[(?:action|tool):[\s\S]*?\)\s*\])\n?```/gi, '$1');
+                                // Strip inline backticks immediately enclosing a tool call: `[action:...]` -> [action:...]
+                                part.text = part.text.replace(/`(\[(?:action|tool):[\s\S]*?\)\s*\])`/gi, '$1');
+                            }
+                        }
+                    }
+
                     contents.length = 0;
                     contents.push(...finalContents);
 
@@ -2750,7 +2926,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const ideCtxJIT = await getIDEContext();
                         const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
                         if (ideErr && lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text) {
-                            lastUserMsg.parts[0].text += `\n${ideErr} [/ERROR]`;
+                            lastUserMsg.parts[0].text += `\n\n${ideErr} [/ERROR]`;
                         }
                         yield { type: 'status', content: 'Working' };
                     }
@@ -2806,7 +2982,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         lastUserMsg.parts[0].text += `\n[system] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue. [/system]`;
                     }
 
-                    // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
+                    const isNoDev = process.env.NO_DEV === 'true' || process.env.NO_DEV === '1' || process.env.NO_DEV === true || false;
+
+                    if (!isNoDev) {
+                        // Ensure the folders exist
+                        if (!fs.existsSync(`${LOGS_DIR}/chats/${chatId}`)) {
+                            fs.mkdirSync(`${LOGS_DIR}/chats/${chatId}`, { recursive: true });
+                        }
+                        fs.writeFileSync(`${LOGS_DIR}/chats/${chatId}/context.json`, `${JSON.stringify({ contents }, null, 2)}`);
+                        fs.writeFileSync(`${LOGS_DIR}/chats/${chatId}/system.md`, `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n\n${currentSystemInstruction}`);
+                    }
+
+                    // fs.writeFileSync(`contents_context. json`, `${JSON.stringify({ contents }, null, 2)}`);
                     // fs.writeFileSync(`contents.txt`, `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n\n${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // break;
 
@@ -3295,7 +3482,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const combined = toolCallBuffer + remaining;
 
                                 // [HEURISTIC] If we're buffering a tag/tool call but it doesn't match the expected prefix, FLUSH immediately.
-                                // This prevents vanishing/frozen output when the model writes code/text like `[some_array]` or ` `<Tag />` or `| [ ] |`.
+                                // This prevents vanishing/frozen output when the model writes code/text like `[some_array]` or `<Tag />` or `| [ ] |`.
                                 const cfg = BUFFER_TYPES[activeBufferType];
                                 if (cfg) {
                                     let isMismatch = false;
@@ -3344,8 +3531,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 }
                                             }
                                         } else {
-                                            if (char === '"' || char === "'" || char === '`') {
+                                            if (char === '"' || char === "'") {
                                                 inString = char;
+                                            } else if (char === '`') {
+                                                // If tool call was started inside a backtick (e.g. `[action:...]`), closing backtick ends the span
+                                                if (isToolCallInBacktick) {
+                                                    endIdx = i;
+                                                    break;
+                                                } else {
+                                                    inString = char;
+                                                }
                                             } else if (char === '(') {
                                                 balance++;
                                                 passedParen = true;
@@ -3646,36 +3841,38 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
 
                             // [LOOP DETECTION] - Catch runaway repetitive reasoning (Monologue-Safe)
-                            // Throttled to run only every ~150 characters to prevent O(N^3) memory/CPU collapse during streaming
-                            if (turnText.length - lastLoopCheckLen > 150) {
+                            // Run the check far less aggressively (every 800+ chars instead of 150)
+                            if (turnText.length - lastLoopCheckLen > 800) {
                                 lastLoopCheckLen = turnText.length;
 
                                 const contextSafeText = getContextSafeText(turnText, false);
                                 const leadingThink = getLeadingThinkBlock(contextSafeText);
                                 const thinkContent = leadingThink ? (leadingThink.innerContent || '').trim() : '';
 
-                                // 1. Repetitive Sentence Check (The most common loop symptom)
-                                const sentences = thinkContent.split(/[.!?]\s+/);
+                                // 1. Repetitive Sentence Check
+                                const sentences = thinkContent.split(/[.!?]\s+/).filter(s => s.trim().length > 10);
                                 const uniqueSentences = new Set(sentences);
-                                const repetitionRatio = sentences.length > 10 ? (sentences.length - uniqueSentences.size) / sentences.length : 0;
+                                // Needs at least 25 substantial sentences before judging
+                                const repetitionRatio = sentences.length > 25 ? (sentences.length - uniqueSentences.size) / sentences.length : 0;
 
-                                // 2. Verbosity Check (Global rambling detection)
+                                // 2. Verbosity Check
                                 const wordCount = thinkContent.split(/\s+/).filter(w => w.length > 0).length;
 
-                                let repetitionThresholdThinking = 0.6;
-                                let repetitionThresholdResponse = 0.8;
+                                // Super relaxed thresholds (90%+ identical content needed to trigger)
+                                let repetitionThresholdThinking = 0.90;
+                                let repetitionThresholdResponse = 0.92;
 
-                                // Dynamic Thinking Cap based on tier (Only applicable for Gemma)
+                                // Generous thinking caps
                                 let isOverVerboseThinking = false;
                                 if (aiProvider.toLowerCase().includes('google') && (targetModel || "").toLowerCase().startsWith('gemma')) {
                                     const thinkingCaps = {
-                                        'low': 256,
-                                        'medium': 1024,
-                                        'high': 8192,
-                                        'max': 16384,
-                                        'xhigh': 16384,
+                                        'low': 2048,
+                                        'medium': 4096,
+                                        'high': 32768,
+                                        'max': 65536,
+                                        'xhigh': 65536,
                                     };
-                                    const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
+                                    const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 16000;
                                     isOverVerboseThinking = wordCount > cap;
                                 }
 
@@ -3684,15 +3881,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     yield { type: 'status', content: `${reason}. Re-centering...` };
                                     isThinkingLoop = true;
                                     await new Promise(resolve => setTimeout(resolve, 3000));
-                                    break; // Force close this turn's stream and proceed to next loop
+                                    break;
                                 }
 
                                 // 3. Response Repetition Check
                                 const signalSafeText = getSanitizedText(turnText);
                                 const responseContent = signalSafeText.trim();
-                                const respSentences = responseContent.split(/[.!?]\s+/);
+                                const respSentences = responseContent.split(/[.!?]\s+/).filter(s => s.trim().length > 10);
                                 const uniqueRespSentences = new Set(respSentences);
-                                const respRepetitionRatio = respSentences.length > 10 ? (respSentences.length - uniqueRespSentences.size) / respSentences.length : 0;
+                                // Needs at least 25 sentences before evaluating
+                                const respRepetitionRatio = respSentences.length > 25 ? (respSentences.length - uniqueRespSentences.size) / respSentences.length : 0;
 
                                 if (respRepetitionRatio > repetitionThresholdResponse) {
                                     yield { type: 'status', content: `Response Loop Detected. Re-centering...` };
@@ -3703,18 +3901,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 // 4. Stutter / Word Loop Check (Global)
-                                // Step 1: Strip out markdown blocks and tables so they don't cause false alarms!
-                                // Streaming-Safe Prose Extraction
                                 const proseText = contextSafeText
-                                    // 1. Remove fully completed code blocks
                                     .replace(RE_STUTTER_CODE_BLOCK_CLOSED, '')
-                                    // 2. Remove UNCLOSED code blocks currently streaming at the end!
                                     .replace(RE_STUTTER_CODE_BLOCK_OPEN, '')
-                                    // 3. Remove inline code and tables
                                     .replace(RE_STUTTER_INLINE_CODE, '')
                                     .replace(RE_STUTTER_TABLE_ROW, '');
 
-                                // Step 2: Clean up the words by ripping off attached punctuation!
                                 const allWords = proseText
                                     .toLowerCase()
                                     .split(/\s+/)
@@ -3723,16 +3915,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 let stutterDetected = false;
 
-                                // 4a. Word-level consecutive period repetition
-                                if (allWords.length >= 10) {
+                                // 4a. Word-level repetition: demands heavy consecutive repetition
+                                if (allWords.length >= 40) {
                                     for (let p = 1; p <= 15; p++) {
-                                        const R = Math.max(3, Math.ceil(10 / p));
+                                        // e.g. 1-word patterns must repeat 25 times; 5-word phrases must repeat 8 times
+                                        const R = Math.max(8, Math.ceil(25 / p));
                                         if (allWords.length < p * R) continue;
 
                                         const pattern = allWords.slice(allWords.length - p);
                                         const patternStr = pattern.join(' ');
 
-                                        // Step 4: Sub-pattern check! If it's just a smaller stutter in disguise, skip it!
                                         if (p > 1 && patternStr === pattern.slice(0, Math.floor(p / 2)).join(' ').repeat(2).trim()) {
                                             continue;
                                         }
@@ -3753,15 +3945,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                 }
 
-                                // 4b. Character-level consecutive period repetition
+                                // 4b. Character-level repetition: catches only pure token collapse
                                 if (!stutterDetected) {
                                     const cleanChars = proseText.toLowerCase().replace(RE_STUTTER_NON_ALNUM, '');
 
-                                    // We need a bigger buffer here so we don't accidentally flag short words!
-                                    if (cleanChars.length >= 20) {
+                                    if (cleanChars.length >= 80) {
                                         for (let p = 1; p <= 10; p++) {
-                                            // Step 5: Tighter thresholds to keep the AI in line!
-                                            const R = Math.max(5, Math.ceil(16 / p));
+                                            // Must repeat at least 15 to 45 times consecutively
+                                            const R = Math.max(15, Math.ceil(45 / p));
                                             if (cleanChars.length < p * R) continue;
 
                                             const pattern = cleanChars.substring(cleanChars.length - p);
@@ -5004,6 +5195,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         dedupeBuffer = '';
                     }
 
+                    if (toolCallBuffer) {
+                        const leftover = toolCallBuffer;
+                        toolCallBuffer = '';
+                        isBufferingToolCall = false;
+                        activeBufferType = null;
+                        isToolCallInBacktick = false;
+                        isToolCallInThink = false;
+                        if (aiProvider === 'Google') {
+                            pendingGoogleText += leftover;
+                        } else {
+                            yield { type: 'text', content: leftover };
+                        }
+                    }
+
                     yield* flushGoogleBuffer();
 
                     if (TERMINATION_SIGNAL) break;
@@ -5310,7 +5515,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const unexecutedToolsCount = (remainingUnclosedText.match(/\[(?:tool|action):/gi) || []).length;
                     const attemptedToolsCount = toolResults.length + unexecutedToolsCount;
                     if (toolResults.length < attemptedToolsCount) {
-                        combinedText += `\n\n[system] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper structure compliance & try failed calls again [/system]`;
+                        const diag = diagnoseUnexecutedTools(remainingUnclosedText);
+                        combinedText += `\n\n[system] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed.\n${diag ? `Parsing Issues Detected:\n${diag}\n` : ''}Verify proper structure compliance [action:ActionName(arg="value")] & try failed calls again [/system]`;
                         const missedCount = attemptedToolsCount - toolResults.length;
                         for (let i = 0; i < missedCount; i++) await incrementUsage('toolFailure');
                     }
@@ -5322,9 +5528,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/i, '');
                     const attemptedToolsCount = (toolActionableText.match(/\[(?:tool|action):/gi) || []).length;
                     if (wasToolCalledInLastLoop || detectedAnyToolCalls || attemptedToolsCount > 0) {
-                        modifiedHistory.push({ role: 'user', text: `[system] Failed to execute ${attemptedToolsCount} tool${attemptedToolsCount > 1 ? 's' : ''}. Verify proper structure compliance [action:ActionName(...)] & try again [/system]` });
+                        const diag = diagnoseUnexecutedTools(toolActionableText);
+                        const errorMsg = diag
+                            ? `[system] Failed to execute ${attemptedToolsCount > 0 ? attemptedToolsCount : 1} tool call${attemptedToolsCount > 1 ? 's' : ''} due to syntax/structure issues:\n${diag} [/system]`
+                            : `[system] Failed to execute ${attemptedToolsCount > 0 ? attemptedToolsCount : 1} tool${attemptedToolsCount > 1 ? 's' : ''}. Verify proper structure compliance [action:ActionName(arg="value")] & try again [/system]`;
+                        modifiedHistory.push({ role: 'user', text: errorMsg });
                         await incrementUsage('toolFailure');
-                        yield { type: 'visual_feedback', content: `\n ${colorMainWords(`✘  Execution Error`)}\n` };
+                        yield { type: 'visual_feedback', content: `\n ${colorMainWords(`✘  Model produced malformed tool call`)}\n` };
                     } else {
                         yield { type: 'visual_feedback', content: `\n ${colorMainWords(`✘  Loop Detected`)}\n` };
                         modifiedHistory.push({ role: 'user', text: `[system] ${isStutteringLoop && !isThinkingLoop ? `Stuttering Detected by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' Over Thinking' : ' Loop'} Detected by Internal System${isThinkingLoop ? ' for current Effort Level' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task provide a simple summary and end'}`} [/system]` });

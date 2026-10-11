@@ -238,7 +238,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 ) : null}
                 {isProcessing && showTPMEstimate && (
                     <>
-                        <Text color={colors.textMuted}>{displayedWps} tok/s</Text>
+                        <Text color={colors.textMuted}>~{displayedWps} tok/s</Text>
                         <Text color={colors.textMuted} dimColor> ┃</Text>
                     </>
                 )}

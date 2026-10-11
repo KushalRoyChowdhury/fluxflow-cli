@@ -235,6 +235,7 @@ export const exportErrorLogs = async (targetDir = process.cwd()) => {
         const items = await fs.readdir(dir);
         let files = [];
         for (const item of items) {
+            if (item === 'chats') continue;
             const fullPath = path.join(dir, item);
             const stat = await fs.stat(fullPath);
             if (stat.isDirectory()) {

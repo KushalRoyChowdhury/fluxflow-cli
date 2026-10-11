@@ -1,6 +1,18 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.33.0": {
+        "note": "OCTOBER 11",
+        "added": [
+            "Added in-app process management. Kill stale background processes or dev servers with `/kill`."
+        ],
+        "changed": [
+            "Improved Windows command accuracy.",
+            "Eternal fight with turn context hirarchy.",
+            "Improved Error messages for Agent."
+        ],
+        "fixes": []
+    },
     "4.32.0": {
         "note": "OCTOBER 8",
         "added": [],

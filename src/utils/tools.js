@@ -286,3 +286,21 @@ export const dispatchTool = async (toolName, args, context = {}) => {
         return `ERROR: Execution failed for [${toolName}]: ${errorMsg}`;
     }
 };
+
+/**
+ * Returns an array of all registered tool names and aliases in the tool registry.
+ * @returns {string[]} List of tool names.
+ */
+export const getRegisteredToolNames = () => Object.keys(TOOL_MAP);
+
+/**
+ * Checks if a given tool name exists in the tool registry (case-insensitive).
+ * @param {string} name
+ * @returns {boolean}
+ */
+export const isKnownTool = (name) => {
+    if (!name || typeof name !== 'string') return false;
+    const clean = name.trim().toLowerCase();
+    return Object.keys(TOOL_MAP).some(k => k.toLowerCase() === clean);
+};
+

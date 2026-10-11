@@ -179,6 +179,7 @@ export const terminateActiveCommand = () => {
  */
 export const adjustWindowsCommand = (command, usePowerShell = false) => {
     if (process.platform !== 'win32') return command;
+    if (process.env.ADJUST_WINDOWS_COMMAND !== 'true') return command;
 
     // Split command by space, respecting single/double quotes
     const tokens = [];
