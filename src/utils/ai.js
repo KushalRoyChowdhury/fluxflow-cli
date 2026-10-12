@@ -368,6 +368,7 @@ const TOOL_LABELS = {
     'get_progress': 'Checking Progress',
     'cancel': 'Cancelling',
     'await': 'Waiting',
+    'wait': 'Waiting',
     'EmergencyRollback': 'Don\'t Panic. Lookin\' into it',
     'answer': 'Answering Sub-Agent',
     'Answer': 'Answering Sub-Agent',
@@ -3716,20 +3717,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'FindFile': 'find_file', 'find_file': 'find_file', 'findfile': 'find_file',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory',
-                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'goal': 'todo', 'Goal': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'Await': 'await', 'Answer': 'answer', 'Steer': 'steer', 'steer': 'steer'
+                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'goal': 'todo', 'Goal': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'Await': 'await', 'wait': 'wait', 'Answer': 'answer', 'Steer': 'steer', 'steer': 'steer'
                                 };
                                 const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                                 const partialArgs = toolContext.args || '';
 
                                 // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools & Search)
                                 let detail = null;
-                                if (['write_file', 'update_file', 'view_file', 'read_folder', 'find_file', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map', 'invoke', 'invoke_sync', 'get_progress', 'await', 'answer'].includes(potentialTool)) {
+                                if (['write_file', 'update_file', 'view_file', 'read_folder', 'find_file', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map', 'invoke', 'invoke_sync', 'get_progress', 'await', 'wait', 'answer'].includes(potentialTool)) {
                                     const pArgs = parseArgs(partialArgs);
                                     const filePath = pArgs.basename || pArgs.name || pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory || pArgs.file;
                                     const keyword = pArgs.keyword;
                                     const title = pArgs.title || pArgs.task;
                                     const id = pArgs.id || pArgs.taskId;
-                                    const timeVal = pArgs.timeout || pArgs.time;
+                                    const timeVal = pArgs.timeout || pArgs.time || pArgs.seconds || pArgs.sec;
 
                                     if (keyword !== undefined && keyword !== null) {
                                         detail = String(keyword).replace(RE_STRIP_QUOTES, '');
@@ -3743,6 +3744,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         let sec = parseFloat(String(timeVal).replace(RE_STRIP_QUOTES, ''));
                                         if (!isNaN(sec)) {
                                             if (sec < 5) sec = 5;
+                                            if (sec > 120) sec = 180;
+                                            const formatTime = (s) => {
+                                                if (s >= 60) {
+                                                    const m = Math.floor(s / 60);
+                                                    const rem = s % 60;
+                                                    return `${m}m${rem > 0 ? ` ${rem}s` : ''}`;
+                                                }
+                                                return `${s}s`;
+                                            };
+                                            detail = formatTime(sec);
+                                        } else {
+                                            detail = String(timeVal).replace(RE_STRIP_QUOTES, '');
+                                        }
+                                    } else if (timeVal && potentialTool === 'wait') {
+                                        let sec = parseFloat(String(timeVal).replace(RE_STRIP_QUOTES, ''));
+                                        if (!isNaN(sec)) {
+                                            if (sec < 10) sec = 10;
                                             if (sec > 120) sec = 120;
                                             const formatTime = (s) => {
                                                 if (s >= 60) {
@@ -3816,6 +3834,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             'cancel': 'Stopping Generalist',
                                             'Await': 'Waiting',
                                             'await': 'Waiting',
+                                            'wait': 'Waiting',
                                             'EmergencyRollback': 'Rolling the Ball',
                                             'Answer': 'Answering Sub-Agent',
                                             'answer': 'Answering Sub-Agent',
@@ -3996,7 +4015,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const executionStart = Date.now();
 
                                 const NORMALIZE_MAP = {
-                                    'Ask': 'ask', 'AskUser': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'FindFile': 'find_file', 'find_file': 'find_file', 'findfile': 'find_file', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'goal': 'todo', 'Goal': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel',
+                                    'Ask': 'ask', 'AskUser': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'FindFile': 'find_file', 'find_file': 'find_file', 'findfile': 'find_file', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'goal': 'todo', 'Goal': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Wait': 'wait', 'wait': 'wait', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel',
                                     'Click': 'click', 'click': 'click', 'Drag': 'drag', 'drag': 'drag', 'Scroll': 'scroll', 'scroll': 'scroll', 'KeyboardTyping': 'keyboard_typing', 'keyboard_typing': 'keyboard_typing', 'KeyPress': 'key_press', 'key_press': 'key_press', 'RecaptureScreen': 'recapture_screen', 'recapture_screen': 'recapture_screen',
                                     'EmergencyRollback': 'EmergencyRollback'
                                 };
@@ -4127,10 +4146,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const { method } = parseArgs(toolCall.args);
                                     // forceRevert feedback is shown post-execution (see below), getCheckpoint is immediate
                                     label = method === 'forceRevert' ? '' : '✔  Rollback Point Checked';
-                                } else if (normToolName === 'await' || normToolName === 'Await') {
-                                    const { time, timeout } = parseArgs(toolCall.args);
-                                    let sec = parseFloat(timeout || time) || 0;
-                                    if (!sec) sec = 120;
+                                } else if (normToolName === 'await' || normToolName === 'Await' || normToolName === 'wait' || normToolName === 'Wait') {
+                                    const { time, timeout, seconds, sec: sVal } = parseArgs(toolCall.args);
+                                    let sec = parseFloat(seconds || sVal || timeout || time) || 45;
+                                    const maxCap = (normToolName === 'wait' || normToolName === 'Wait') ? 120 : 180;
+                                    if (sec < 10) sec = 10;
+                                    if (sec > maxCap) sec = maxCap;
                                     const formatTime = (s) => {
                                         if (s >= 60) {
                                             const m = Math.floor(s / 60);

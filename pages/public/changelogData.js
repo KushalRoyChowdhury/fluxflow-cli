@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.34.0": {
+        "note": "OCTOBER 12",
+        "added": [
+            "Added new \"Wait\" tool in Computer Use mode."
+        ],
+        "changed": [
+            "UI Stability Improvments."
+        ],
+        "fixes": []
+    },
     "4.33.0": {
         "note": "OCTOBER 11. Breaking Change for OpenRouter.",
         "added": [

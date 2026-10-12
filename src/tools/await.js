@@ -8,11 +8,7 @@ import { parseArgs } from '../utils/arg_parser.js';
  */
 export const awaitTool = async (args, context = {}) => {
     const parsed = parseArgs(args);
-    const timeStr = parsed.time;
-
-    if (!timeStr) {
-        return 'ERROR: Missing "time" argument for await.';
-    }
+    const timeStr = parsed.time ?? 45;
 
     let seconds = parseFloat(timeStr);
     if (isNaN(seconds)) {

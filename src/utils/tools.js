@@ -36,6 +36,7 @@ const loadKeyboardTyping = () => import('../tools/keyboard_typing.js').then(m =>
 const loadKeyPress = () => import('../tools/key_press.js').then(m => m.key_press);
 const loadRecaptureScreen = () => import('../tools/recapture_screen.js').then(m => m.recapture_screen);
 const loadFindFile = () => import('../tools/find_file.js').then(m => m.find_file);
+const loadWait = () => import('../tools/wait.js').then(m => m.wait);
 
 // Alias table → lazy loader (module resolved only when the tool is invoked).
 const TOOL_MAP = {
@@ -134,7 +135,9 @@ const TOOL_MAP = {
     find_file: loadFindFile,
     findFile: loadFindFile,
     FindFile: loadFindFile,
-    findfile: loadFindFile
+    findfile: loadFindFile,
+    wait: loadWait,
+    Wait: loadWait
 };
 
 /**
@@ -148,10 +151,10 @@ export const dispatchTool = async (toolName, args, context = {}) => {
     const normalized = toolName.toLowerCase();
 
     // 1. SYSTEM & COMMON TOOLS (Always Allowed)
-    const systemTools = ['memory', 'chat', 'savesummary', 'addmemscore', 'add_mem_score', 'ask', 'web_search', 'web_scrape', 'await'];
+    const systemTools = ['memory', 'chat', 'savesummary', 'addmemscore', 'add_mem_score', 'ask', 'web_search', 'web_scrape', 'await', 'wait'];
     const isSystem = systemTools.some(t => normalized.includes(t)) || normalized === 'ask';
 
-    const cuTools = ['click', 'drag', 'scroll', 'keyboardtyping', 'keyboard_typing', 'keypress', 'key_press', 'recapturescreen', 'recapture_screen', 'computer'];
+    const cuTools = ['click', 'drag', 'scroll', 'keyboardtyping', 'keyboard_typing', 'keypress', 'key_press', 'recapturescreen', 'recapture_screen', 'computer', 'wait'];
     const isCUTool = cuTools.some(t => normalized.includes(t));
 
     if (!isSystem) {
@@ -183,7 +186,7 @@ export const dispatchTool = async (toolName, args, context = {}) => {
         const CANONICAL_TOOLS = [
             'ReadFile', 'ReadFolder', 'FindFile', 'PatchFile', 'WriteFile', 'CodeSearch', 'Run', 'Goal',
             'AskUser', 'WebSearch', 'WebScrape', 'WritePDF', 'WriteDoc',
-            'Click', 'Drag', 'Scroll', 'KeyboardTyping', 'KeyPress', 'RecaptureScreen',
+            'Click', 'Drag', 'Scroll', 'KeyboardTyping', 'KeyPress', 'RecaptureScreen', 'Wait',
             'Invoke', 'InvokeSync', 'Await', 'GetProgress', 'Steer', 'Cancel', 'EmergencyRollback', 'Chat', 'Memory'
         ];
 

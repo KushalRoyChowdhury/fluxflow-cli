@@ -7332,7 +7332,7 @@ export default function App({ args = [] }) {
 
                                         {/* Look at the shine! (≧∇≦)/ */}
                                         <GlintText
-                                            text={statusText.trimEnd()}
+                                            text={statusText.trim().length > 40 ? `${statusText.trim().slice(0, 40)}...` : statusText.trim()}
                                             baseColor={colors.textExclusive || colors.text}
                                             glintColor={colors.textMutedExclusive || colors.textMuted}
                                             // baseColor="#B5B8D9"

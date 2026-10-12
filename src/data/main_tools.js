@@ -67,7 +67,7 @@ Invocations:
 • Invoke (async/background, ≤7 parallel). Parallelize tasks
 • InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens
 - InvokeSync/Invoke(title=string, task=string). Detailed task, file paths, dependencies
-- Await(id=string, timeout=int[..=180]). Event driven wait
+- Await(id=string, timeout?=int[..180]). Event driven wait
 - GetProgress(id=string). Poll sparingly; NO initial poll. Work or await
 - Steer(id=string, message=string). Inject additional instruction into active async subagent
 - Cancel(id=string). Cancel async task ONLY if stalled (2m+) or incorrect` : ''}`;
@@ -86,7 +86,8 @@ Invocations:
 - Scroll(direction="up/down", gridId=int). Scroll viewport vertically
 - KeyboardTyping(text=string, autoPressEnter?=bool). Type text string into currently active input. JSON escape literal escape sequences
 - KeyPress(key="key or ;-separated combination, eg: enter, back, backspace, clearInput, ctrl;c, alt;tab, f5, f11, alt;f4"). Press key, shortcut, function key (f1-f12), or clear active input field
-- RecaptureScreen(). Request fresh gridded screenshot`;
+- RecaptureScreen(). Request fresh gridded screenshot
+- Wait(seconds?=int[..120]). Wait for process to finish`;
 
     // =====================================================================================================
 

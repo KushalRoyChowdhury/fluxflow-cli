@@ -44,8 +44,9 @@ const useStreamingText = (targetText, isStreaming, isActiveBlock) => {
 
 const formatThinkText = (cleaned, columns = 80) => {
     if (!cleaned) return null;
+    const sanitized = cleaned.replaceAll('\t', '    ');
     const availableWidth = columns - 10;
-    const trimmed = cleaned.trim();
+    const trimmed = sanitized.trim();
 
     if (!trimmed.includes('```')) {
         return (
@@ -280,12 +281,13 @@ const renderLatexText = (content, key) => {
 
 const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
     if (!text) return null;
+    const sanitizedText = text.replaceAll('\t', '    ');
     const colors = getThemeColors(theme);
     const textColor = color || colors.text;
     const highlightColor = colors.codeText || (colors.logoGradient && colors.logoGradient[0]) || colors.info || colors.secondary || 'cyan';
 
     // Use cached regex to prevent GC thrashing during stream renders
-    const parts = text.split(REGEX_MD_TOKENS);
+    const parts = sanitizedText.split(REGEX_MD_TOKENS);
 
     return (
         <Text color={textColor} wrap="anywhere" italic={italic}>
@@ -435,10 +437,11 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80, theme = 'Dark' }
 
 const MarkdownText = React.memo(({ text, color, columns = 80, italic = false, theme = 'Dark' }) => {
     if (!text) return null;
+    const sanitizedText = text.replaceAll('\t', '    ');
     const colors = getThemeColors(theme);
     const textColor = color || colors.text;
 
-    const lines = text.split('\n');
+    const lines = sanitizedText.split('\n');
     const result = [];
     let tableBuffer = [];
     let quoteBuffer = [];
@@ -531,8 +534,9 @@ const MarkdownText = React.memo(({ text, color, columns = 80, italic = false, th
 
 const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, extension, theme = 'Dark' }) => {
     const colors = getThemeColors(theme);
-    const isContext = line.includes('[UI_CONTEXT]');
-    const cleanLine = line.replace('[UI_CONTEXT]', '');
+    const sanitizedLine = (line || '').replaceAll('\t', '    ');
+    const isContext = sanitizedLine.includes('[UI_CONTEXT]');
+    const cleanLine = sanitizedLine.replace('[UI_CONTEXT]', '');
 
     // Handle high-fidelity multi-patch separator
     if (isContext && cleanLine.includes('═')) {
@@ -543,7 +547,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
         );
     }
 
-    const parsedCurrent = parseLineInfo(line);
+    const parsedCurrent = parseLineInfo(sanitizedLine);
     if (!parsedCurrent) {
         return (
             <Box backgroundColor={colors.codeBg} paddingX={1} width={columns}>
@@ -558,7 +562,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
 
     const { isR: isRemoval, isA: isAddition, num: lineNum, content } = parsedCurrent;
 
-    let finalPairContent = pairContent;
+    let finalPairContent = pairContent ? pairContent.replaceAll('\t', '    ') : pairContent;
 
     // 🔍 1. Compute fine-grained tokens
     let words = [];
@@ -808,7 +812,8 @@ const DiffBlock = React.memo(({ text, columns = 80, extension, theme = 'Dark' })
     const diffLines = diffBody.split('\n');
 
     // Parse all lines
-    const parsedLines = diffLines.map(line => {
+    const parsedLines = diffLines.map(rawLine => {
+        const line = rawLine.replaceAll('\t', '    ');
         return {
             line,
             parsed: parseLineInfo(line),
@@ -889,7 +894,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80, theme = 'Dark' }) 
         // Split content from footer
         const footerMarker = '[SYSTEM] Check the content preview for verification [/SYSTEM]';
         const contentAndFooter = contentPart.split(footerMarker);
-        const content = contentAndFooter[0]?.trim() || '';
+        const content = (contentAndFooter[0]?.trim() || '').replaceAll('\t', '    ');
         const footer = contentAndFooter[1] ? `${footerMarker}${contentAndFooter[1]}` : '';
 
         const codeLines = content.split('\n');
@@ -953,7 +958,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80, theme = 'Dark' }) 
                     if (part.startsWith('```')) {
                         const match = part.match(/```(\w*)\n?([\s\S]*?)(?:```|$)/);
                         const lang = match ? match[1] : 'code';
-                        const raw = match ? match[2] : part.replace(/^```\w*\n?/, '').replace(/```$/, '');
+                        const raw = (match ? match[2] : part.replace(/^```\w*\n?/, '').replace(/```$/, '')).replaceAll('\t', '    ');
                         const rawLines = raw.trimEnd().split('\n');
                         const gutterWidth = String(rawLines.length).length;
                         const codeWidth = columns - 7 - gutterWidth;
@@ -1313,7 +1318,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     }
 
     const [animationDone, setAnimationDone] = React.useState(!msg.isStreaming);
-    const content = React.useMemo(() => cleanSignals(msg.text, msg.role), [msg.text, msg.role]);
+    const content = React.useMemo(() => (cleanSignals(msg.text, msg.role) || '').replaceAll('\t', '    '), [msg.text, msg.role]);
 
     // Reset animation state if message ID changes (rare but possible)
     React.useEffect(() => {
@@ -1487,7 +1492,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
             );
         }
 
-        const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
+        const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock)?.replaceAll('\t', '    ') || '';
         return (
             <Box flexDirection="row" width="100%" paddingX={1}>
                 <Text color={colors.textMuted}>│ </Text>
@@ -1512,7 +1517,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         if (!text || text.trim() === '') {
             return <Box height={1} />;
         }
-        const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
+        const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock)?.replaceAll('\t', '    ') || '';
         const trimmed = animatedText.trim();
 
         // 1. Horizontal Rule (---, ***, ___)
@@ -1723,7 +1728,8 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     if (type === 'code-line') {
         const { lineNum, lang } = block;
         const availableCodeWidth = columns - 12;
-        const wrappedLine = wrapText(text, Math.max(10, availableCodeWidth));
+        const sanitizedText = (text || '').replaceAll('\t', '    ');
+        const wrappedLine = wrapText(sanitizedText, Math.max(10, availableCodeWidth));
         const subLines = wrappedLine.split('\n');
         return (
             <Box flexDirection="column" width="100%">
@@ -1817,7 +1823,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                     <Box flexGrow={1} flexDirection="column">
                         {(wrappedLines || [text]).map((wl, idx) => (
                             <Box key={idx}>
-                                {renderHighlightedLine(wl, extension, colors.text)}
+                                {renderHighlightedLine((wl || '').replaceAll('\t', '    '), extension, colors.text)}
                             </Box>
                         ))}
                     </Box>
