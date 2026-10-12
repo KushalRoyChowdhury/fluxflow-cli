@@ -2987,11 +2987,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     if (!isNoDev) {
                         // Ensure the folders exist
-                        if (!fs.existsSync(`${LOGS_DIR}/chats/${chatId}`)) {
-                            fs.mkdirSync(`${LOGS_DIR}/chats/${chatId}`, { recursive: true });
+                        const chatDir = path.join(LOGS_DIR, 'chats', String(chatId));
+
+                        if (!fs.existsSync(chatDir)) {
+                            fs.mkdirSync(chatDir, { recursive: true });
                         }
-                        fs.writeFileSync(`${LOGS_DIR}/chats/${chatId}/context.json`, `${JSON.stringify({ contents }, null, 2)}`);
-                        fs.writeFileSync(`${LOGS_DIR}/chats/${chatId}/system.md`, `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n\n${currentSystemInstruction}`);
+
+                        fs.writeFileSync(path.join(chatDir, 'context.json'), JSON.stringify({ contents }, null, 2));
+                        fs.writeFileSync(path.join(chatDir, 'system.md'), `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n\n${currentSystemInstruction}`);
                     }
 
                     // fs.writeFileSync(`contents_context. json`, `${JSON.stringify({ contents }, null, 2)}`);

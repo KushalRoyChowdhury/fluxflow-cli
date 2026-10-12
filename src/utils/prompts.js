@@ -152,7 +152,12 @@ const parseGlobalEasterEgg = (rawContent) => {
 // AGENTS.md is loaded once at startup as pure raw byte-for-byte text
 export const readGlobalAgentsInstruction = () => {
     globalAgentsPath = getGlobalAgentsPath();
-    return globalAgentsPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['agents.md', 'agent.md']).trim() : '';
+    const raw = globalAgentsPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['agents.md', 'agent.md']).trim() : '';
+    if (raw.length === 0) {
+        globalAgentsPath = null;
+        return '';
+    }
+    return raw;
 };
 
 export const readLocalAgentsInstruction = () => {
@@ -175,12 +180,14 @@ export const readLocalAgentsInstruction = () => {
         return relA.localeCompare(relB);
     });
 
+    const validFiles = [];
     const blocks = [];
     for (const filePath of sortedFiles) {
         try {
             const rawContent = fs.readFileSync(filePath, 'utf8').trim();
-            if (!rawContent) continue;
+            if (!rawContent || rawContent.length === 0) continue;
 
+            validFiles.push(filePath);
             const relPath = path.relative(cwd, filePath).replace(/\\/g, '/');
             const isRoot = !relPath.includes('/');
 
@@ -193,6 +200,11 @@ export const readLocalAgentsInstruction = () => {
         } catch (e) { }
     }
 
+    localAgentsFiles = validFiles;
+    if (localAgentsFiles.length === 0) {
+        localAgentsPath = null;
+    }
+
     return blocks.join('\n\n').trim();
 };
 
@@ -200,12 +212,22 @@ export const readLocalAgentsInstruction = () => {
 export const readGlobalFluxflowInstruction = () => {
     globalFluxflowPath = getGlobalFluxflowPath();
     const raw = globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md']).trim() : '';
-    return parseGlobalEasterEgg(raw);
+    const parsed = parseGlobalEasterEgg(raw)?.trim() || '';
+    if (parsed.length === 0) {
+        globalFluxflowPath = null;
+        return '';
+    }
+    return parsed;
 };
 
 export const readLocalFluxflowInstruction = () => {
     localFluxflowPath = getLocalFluxflowPath();
-    return localFluxflowPath ? readCaseInsensitiveFile(process.cwd(), ['fluxflow.md']).trim() : '';
+    const raw = localFluxflowPath ? readCaseInsensitiveFile(process.cwd(), ['fluxflow.md']).trim() : '';
+    if (raw.length === 0) {
+        localFluxflowPath = null;
+        return '';
+    }
+    return raw;
 };
 
 // AGENTS.md content (read once at startup)
@@ -388,7 +410,7 @@ const isSystemDocsSkill = (s) => {
 const getUIGlobalSkills = () => (globalSkills || []).filter(s => !isSystemDocsSkill(s));
 const getUILocalSkills = () => (localSkills || []).filter(s => !isSystemDocsSkill(s));
 
-export const loadedFilesCount = (globalAgentsMD ? 1 : 0) + (localAgentsFiles?.length || (localAgentsMD ? 1 : 0)) + (globalFluxflowMD ? 1 : 0) + (localFluxflowMD ? 1 : 0) + getUIGlobalSkills().length + getUILocalSkills().length;
+export const loadedFilesCount = (globalAgentsMD?.length > 0 ? 1 : 0) + (localAgentsMD?.length > 0 ? localAgentsFiles.length : 0) + (globalFluxflowMD?.length > 0 ? 1 : 0) + (localFluxflowMD?.length > 0 ? 1 : 0) + getUIGlobalSkills().length + getUILocalSkills().length;
 
 const formatPathForUI = (filePath, scope = 'Project') => {
     if (!filePath) return '';

@@ -3517,7 +3517,10 @@ export default function App({ args = [] }) {
                                     if (res.success) {
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Default Model Set:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m Default Model: \x1b[32m${modelToDefault}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}\n⠀`, isMeta: true }];
+                                            const providerDisplay = aiProvider === 'c_openai'
+                                                ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
+                                                : aiProvider.replace('c_openai', 'Custom Endpoint');
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Default Model Set:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m Default Model: \x1b[32m${modelToDefault}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}\n⠀`, isMeta: true }];
                                         });
                                     } else {
                                         setMessages(prev => {
@@ -3622,7 +3625,10 @@ export default function App({ args = [] }) {
                                 const modelDisplayThinking = thinkingLevel === 'xHigh'
                                     ? (getMappedThinkingLevel(aiProvider, mod, 'xHigh') !== null ? `Custom (${getMappedThinkingLevel(aiProvider, mod, 'xHigh')})` : 'Custom')
                                     : thinkingLevel;
-                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m ${mod}\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${modelDisplayThinking}\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMmActive ? 'ON' : 'OFF'}\n⠀`, isMeta: true }]; });
+                                const providerDisplay = aiProvider === 'c_openai'
+                                    ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
+                                    : aiProvider.replace('c_openai', 'Custom Endpoint');
+                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m ${mod}\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${modelDisplayThinking}\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMmActive ? 'ON' : 'OFF'}\n⠀`, isMeta: true }]; });
                             }
                         }
                     } else {
@@ -7401,7 +7407,7 @@ export default function App({ args = [] }) {
                                     glintWidth={3}
                                     speed={80}
                                 />
-                                <Text color={colors.textMuted}> {activeModel.length > 0 ? thinkingLevel.toLocaleLowerCase().includes('xhigh') ? `` : `(${thinkingLevel})` : ''}</Text>
+                                <Text color={colors.textMuted}>{activeModel.length > 0 ? thinkingLevel.toLocaleLowerCase().includes('xhigh') ? `` : ` (${thinkingLevel})` : ''}</Text>
                                 {loadedFilesCount > 0 && (
                                     <Text color={colors.textMuted}> [{loadedFilesCount} {loadedFilesCount === 1 ? 'file' : 'files'}]</Text>
                                 )}
