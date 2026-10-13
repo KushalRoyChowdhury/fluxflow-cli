@@ -31,6 +31,7 @@ import { RevertManager } from './utils/revert.js';
 let _geminiQuotes = null;
 let _wittyPhrases = null;
 let _meowLines = null;
+let _spookyLines = null;
 
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
@@ -1479,10 +1480,18 @@ export default function App({ args = [] }) {
                 if (_wittyPhrases) {
                     applyPhrase(_wittyPhrases);
                 } else {
-                    import('./data/witty_phrases.js').then(({ WITTY_LOADING_PHRASES }) => {
-                        _wittyPhrases = WITTY_LOADING_PHRASES;
-                        applyPhrase(_wittyPhrases);
-                    });
+                    const isHalloween = process.env.HALLOWEEN_EEGG === 'true' || process.env.HALLOWEEN_EEGG === true;
+                    if (isHalloween) {
+                        import('./data/halloween_witty_phrases.js').then(({ HALLOWEEN_WITTY_PHRASES }) => {
+                            _wittyPhrases = HALLOWEEN_WITTY_PHRASES;
+                            applyPhrase(_wittyPhrases);
+                        });
+                    } else {
+                        import('./data/witty_phrases.js').then(({ WITTY_LOADING_PHRASES }) => {
+                            _wittyPhrases = WITTY_LOADING_PHRASES;
+                            applyPhrase(_wittyPhrases);
+                        });
+                    }
                 }
             };
             if (!wittyPhrase) updatePhrase(); // Initial pick
@@ -2792,6 +2801,7 @@ export default function App({ args = [] }) {
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
         { cmd: '/gemini', desc: 'Get a happy message from Gemini CLI' },
         { cmd: '/meow', desc: 'Cat nonsense, delivered straight to the terminal' },
+        ...(process.env.HALLOWEEN_EEGG === 'true' || process.env.HALLOWEEN_EEGG === true ? [{ cmd: '/trick-or-treat', desc: 'Halloween surprise: Trick or Treat!' }] : []),
         { cmd: '/save', desc: 'Force save current chat' },
         {
             cmd: '/export',
@@ -4083,6 +4093,26 @@ export default function App({ args = [] }) {
                         import('./data/meow.js').then(({ MEOW_LINES }) => {
                             _meowLines = MEOW_LINES;
                             showMeow(_meowLines);
+                        });
+                    }
+                    setInput('');
+                    break;
+                }
+                case '/halloween':
+                case '/trick-or-treat': {
+                    const showSpooky = (lines) => {
+                        const randomSpooky = lines[Math.floor(Math.random() * lines.length)];
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, { id: Date.now(), role: 'system', text: `🎃 TRICK OR TREAT\n⠀⠀ \x1b[2m└─\x1b[22m ${randomSpooky}\n⠀` }];
+                        });
+                    };
+                    if (_spookyLines) {
+                        showSpooky(_spookyLines);
+                    } else {
+                        import('./data/halloween.js').then(({ SPOOKY_LINES }) => {
+                            _spookyLines = SPOOKY_LINES;
+                            showSpooky(_spookyLines);
                         });
                     }
                     setInput('');
@@ -7234,6 +7264,7 @@ export default function App({ args = [] }) {
                         latest={latestVer}
                         current={versionFluxflow}
                         settings={systemSettings}
+                        theme={systemSettings.theme}
                         onClose={() => setActiveView('chat')}
                         onSuccess={() => {
                             setMessages(prev => {
@@ -7354,7 +7385,7 @@ export default function App({ args = [] }) {
                                         </Text>
                                     </Box>
                                 ) : (
-                                    <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
+                                        <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : process.env.HALLOWEEN_EEGG === "true" ? 'Listening for shadows...' : "Waiting for input..."}</Text>
                                 )}
                             </Box>
                             <Box>
@@ -7364,7 +7395,7 @@ export default function App({ args = [] }) {
                                         isProcessing &&
                                         Date.now() - lastChunkTime > 15000 &&
                                         activeSubagents.length === 0 &&
-                                        (status.includes("connecting") || status.includes("working") || status.includes("queue"));
+                                        (status.includes("connecting") || status.includes("consulting") || status.includes("working") || status.includes("haunting") || status.includes("queue"));
 
                                     if (showWaiting) {
                                         return (

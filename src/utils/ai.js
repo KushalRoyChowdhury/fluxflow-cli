@@ -1,4 +1,4 @@
-import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes } from './paths.js';
+import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes, SETTINGS_FILE } from './paths.js';
 
 // NOTE: dotenv is already fully initialised by src/cli.jsx (all 14 env paths, in
 // the same order) before this module is ever reached, so the duplicate block was
@@ -9,7 +9,7 @@ import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './
 import { getTruncatedHistory, loadHistory } from './history.js';
 import { checkQuota, checkQuotaDetailed, incrementUsage, addToUsage, recordTimedUsage } from './usage.js';
 import { dispatchTool, isKnownTool } from './tools.js';
-import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
+import { readEncryptedJson, writeEncryptedJson, readAesEncryptedJson } from './crypto.js';
 import { parseArgs } from './arg_parser.js';
 import { fileURLToPath } from 'url';
 import path, { normalize } from 'path';
@@ -22,6 +22,7 @@ import { subagentProgress } from './subagent_state.js';
 import { isModelMultimodal, getFallbackValue, hasModelReasoning } from '../data/model_config.js';
 import { getMappedThinkingLevel } from '../data/thinking_config.js';
 import { getProviderAPIKey } from './secrets.js';
+import { getThemeColors } from './theme.js';
 
 import { RevertManager } from './revert.js';
 import { AdvanceRevertManager } from './advanceRevert.js';
@@ -35,22 +36,22 @@ import { bypassBacktick } from './text.js';
 // Only the ACTIVE provider's module is parsed on first use; each resolved fn is
 // cached in _providerCache so subsequent turns are O(1). Boot-time savings: ~13 modules.
 const PROVIDER_LOADERS = {
-    Ollama:      () => import('./providers/ollama.js').then(m => m.getOllamaStream),
-    OpenRouter:  () => import('./providers/openrouter.js').then(m => m.getOpenRouterStream),
-    DeepSeek:    () => import('./providers/deepseek.js').then(m => m.getDeepSeekStream),
-    Mistral:     () => import('./providers/mistral.js').then(m => m.getMistralStream),
-    NVIDIA:      () => import('./providers/nvidia.js').then(m => m.getNVIDIAStream),
+    Ollama: () => import('./providers/ollama.js').then(m => m.getOllamaStream),
+    OpenRouter: () => import('./providers/openrouter.js').then(m => m.getOpenRouterStream),
+    DeepSeek: () => import('./providers/deepseek.js').then(m => m.getDeepSeekStream),
+    Mistral: () => import('./providers/mistral.js').then(m => m.getMistralStream),
+    NVIDIA: () => import('./providers/nvidia.js').then(m => m.getNVIDIAStream),
     NVIDIA_wrap: () => import('./providers/nvidia.js').then(m => m.wrapNvidiaStreamWithQueueDepth),
-    InferX:      () => import('./providers/inferx.js').then(m => m.getInferXStream),
-    SenseNova:   () => import('./providers/sensenova.js').then(m => m.getSenseNovaStream),
-    AIHubMix:    () => import('./providers/aihubmix.js').then(m => m.getAIHubMixStream),
-    Poolside:    () => import('./providers/poolside.js').then(m => m.getPoolsideStream),
-    NineRouter:  () => import('./providers/9router.js').then(m => m.getNineRouterStream),
-    ExpLabs:     () => import('./providers/explabs.js').then(m => m.getExpLabsStream),
+    InferX: () => import('./providers/inferx.js').then(m => m.getInferXStream),
+    SenseNova: () => import('./providers/sensenova.js').then(m => m.getSenseNovaStream),
+    AIHubMix: () => import('./providers/aihubmix.js').then(m => m.getAIHubMixStream),
+    Poolside: () => import('./providers/poolside.js').then(m => m.getPoolsideStream),
+    NineRouter: () => import('./providers/9router.js').then(m => m.getNineRouterStream),
+    ExpLabs: () => import('./providers/explabs.js').then(m => m.getExpLabsStream),
     TokenHarbor: () => import('./providers/tokenharbor.js').then(m => m.getTokenHarborStream),
-    Infron:      () => import('./providers/infron.js').then(m => m.getInfronStream),
-    APInex:      () => import('./providers/apinex.js').then(m => m.getAPInexStream),
-    c_openai:    () => import('./providers/custom_openai.js').then(m => m.getCustomOpenAIStream),
+    Infron: () => import('./providers/infron.js').then(m => m.getInfronStream),
+    APInex: () => import('./providers/apinex.js').then(m => m.getAPInexStream),
+    c_openai: () => import('./providers/custom_openai.js').then(m => m.getCustomOpenAIStream),
 };
 const _providerCache = {};
 const loadProvider = async (key) => {
@@ -179,8 +180,18 @@ let systemInstructionCache = { key: null, value: null };
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked|Located|Dragged|Scrolled|Typed|Pressed Key|Recaptured Screen|Created|Read Skill|Read Documentation|Searched Documentation|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Model produced malformed tool call|Loop Detected|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
-        return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
+    let currentTheme = globalSettings?.theme;
+    if (!currentTheme) {
+        try {
+            const savedSettings = readAesEncryptedJson(SETTINGS_FILE, {});
+            currentTheme = savedSettings?.systemSettings?.theme;
+        } catch (e) { }
+    }
+    const themeColors = getThemeColors(currentTheme || 'Dark');
+    const highlightAnsi = themeColors.toolFeedbackAnsi || '\x1b[95m';
+
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked|Located|Dragged|Scrolled|Typed|Pressed Key|Recaptured Screen|Created|Read Skill|Read Documentation|Executed|Searched Documentation|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Model produced malformed tool call|Loop Detected|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+        return `${ansiBefore || ''}${icon}${ansiAfter || ''} ${highlightAnsi}${word}\x1b[0m`;
     });
 };
 
@@ -2470,7 +2481,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const LOOP_INCREMENT = Math.floor(MAX_LOOPS / 2);
         let lastPromptedThreshold = 0;
         const MAX_RETRIES = 16;
-        yield { type: 'status', content: 'Connecting' };
+        yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Consulting the spirits' : 'Connecting' };
 
         TERMINATION_SIGNAL = false; // Reset at start of new interaction
 
@@ -2564,9 +2575,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
             }
             if (loop > 0) {
-                yield { type: 'status', content: 'Working' };
+                yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Haunting' : 'Working' };
             } else {
-                yield { type: 'status', content: 'Connecting' };
+                yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Consulting the spirits' : 'Connecting' };
             }
             if (TERMINATION_SIGNAL) {
                 try {
@@ -3647,7 +3658,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (ttft === null) {
                                 ttft = Date.now() - streamStartTime;
                             }
-                            yield { type: 'status', content: 'Thinking' };
+                            yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Performing dark ritual' : 'Thinking' };
                             isFirstChunk = false;
                         }
 
@@ -5450,7 +5461,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
             const shouldContinue = toolCallPointer > 0;
 
-            yield { type: 'status', content: 'Thinking' };
+            yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Performing dark ritual' : 'Thinking' };
 
             const cleanedTurnText = contextSafeReplace(turnText, /(\[\s*(turn\s*:)?\s*(continue|finish)\s*\]|\[\[END\]\])/gi, '')
                 .trim();

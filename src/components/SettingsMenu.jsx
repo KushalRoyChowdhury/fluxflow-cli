@@ -821,12 +821,12 @@ export default function SettingsMenu({
                         {themeOptions.map((tName, index) => {
                             const isSelected = themeIndex === index;
                             const isSaved = (systemSettings.theme || 'Dark') === tName;
-                            const isForest = tName === 'Forest Sprite';
+                            const isSpecial = tName === 'Forest Sprite' || tName === 'Spookfest';
                             return (
                                 <Box key={tName} paddingX={0}>
                                     <Text color={isSelected ? previewColors.text : previewColors.textDim} bold={isSelected}>
                                         {isSelected ? '> ' : '  '}{tName}
-                                        {isForest && <Text color={isSelected ? (previewColors.success || '#52b788') : 'green'} bold> ★</Text>}
+                                        {isSpecial && <Text color={isSelected ? (previewColors.success || '#52b788') : 'green'} bold> ★</Text>}
                                         {isSaved ? <Text color={previewColors.primary || 'cyan'} italic> (saved)</Text> : ''}
                                     </Text>
                                 </Box>

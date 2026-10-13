@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { spawn } from 'child_process';
-
+import { getThemeColors } from '../utils/theme.js';
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
-const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings, onSuccess }) => {
+const UpdateProcessor = ({ latest, current, settings, theme = 'Dark', onClose, onUpdateSettings, onSuccess }) => {
+    const colors = getThemeColors(theme);
     const [status, setStatus] = useState('initializing'); // initializing, downloading, success, error
     const [log, setLog] = useState('');
     const [error, setError] = useState(null);
@@ -22,10 +23,10 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
     useEffect(() => {
         let child;
         const runUpdate = async () => {
-            const manager = settings.updateManager || 'npm';
+            const manager = settings?.updateManager || 'npm';
 
             // If they haven't picked a manager yet, we need to send them to settings
-            if (!settings.updateManager) {
+            if (!settings?.updateManager) {
                 onUpdateSettings();
                 return;
             }
@@ -66,8 +67,6 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
                             });
                         }
                     };
-
-
 
                     // Fallback to standard spawn
                     const cp = isWin
@@ -136,27 +135,27 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
     if (status === 'initializing' || status === 'downloading') {
         const frame = SPINNER_FRAMES[Math.floor(tick / 3) % SPINNER_FRAMES.length];
         return (
-            <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1}>
+            <Box flexDirection="column" borderStyle="round" borderColor={colors.border} paddingX={2} paddingY={1}>
                 <Box>
-                    <Text color="gray">{frame}</Text>
-                    <Text marginLeft={1} bold color="white"> Updating Flux Flow to v{latest}...</Text>
+                    <Text color={colors.accent || colors.primary}>{frame}</Text>
+                    <Text marginLeft={1} bold color={colors.text}> Updating Flux Flow to v{latest}...</Text>
                 </Box>
-                <Box marginTop={1} paddingX={1} borderStyle="single" borderColor="gray">
-                    <Text color="gray" italic>{log || 'Preparing environment...'}</Text>
+                <Box marginTop={1} paddingX={1} borderStyle="single" borderColor={colors.borderMuted}>
+                    <Text color={colors.textMuted} italic>{log || 'Preparing environment...'}</Text>
                 </Box>
-                <Text marginTop={1} color="gray">(Please do not close the terminal)</Text>
+                <Text marginTop={1} color={colors.textDim || colors.textMuted}>(Please do not close the terminal)</Text>
             </Box>
         );
     }
 
     if (status === 'success') {
         return (
-            <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1}>
-                <Text color="white" bold>✅ UPDATE SUCCESSFUL!</Text>
-                <Text marginTop={1} color="white">Flux Flow has been updated to <Text color="gray">v{latest}</Text>.</Text>
-                <Text marginTop={1} color="white" bold>Please restart your terminal session to apply changes.</Text>
+            <Box flexDirection="column" borderStyle="round" borderColor={colors.success || colors.border} paddingX={2} paddingY={1}>
+                <Text color={colors.success || colors.text} bold>✅ UPDATE SUCCESSFUL!</Text>
+                <Text marginTop={1} color={colors.text}>Flux Flow has been updated to <Text color={colors.accent || colors.primary}>v{latest}</Text>.</Text>
+                <Text marginTop={1} color={colors.text} bold>Please restart your terminal session to apply changes.</Text>
                 <Box marginTop={1}>
-                    <Text color="gray">(Press ESC to return to chat)</Text>
+                    <Text color={colors.textMuted}>(Press ESC to return to chat)</Text>
                 </Box>
             </Box>
         );
@@ -164,17 +163,17 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
 
     if (status === 'error') {
         return (
-            <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1}>
-                <Text color="white" bold>❌ UPDATE FAILED</Text>
-                <Box marginTop={1} paddingX={1} borderStyle="single" borderColor="gray">
-                    <Text color="white">{error}</Text>
+            <Box flexDirection="column" borderStyle="round" borderColor={colors.danger || colors.border} paddingX={2} paddingY={1}>
+                <Text color={colors.danger || colors.text} bold>❌ UPDATE FAILED</Text>
+                <Box marginTop={1} paddingX={1} borderStyle="single" borderColor={colors.borderMuted}>
+                    <Text color={colors.danger || colors.text}>{error}</Text>
                 </Box>
-                <Text marginTop={1} color="white">Possible causes:</Text>
-                <Text color="white">• Missing permissions (Try running as Administrator/Sudo)</Text>
-                <Text color="white">• Package manager ({settings.updateManager}) not found</Text>
-                <Text color="white">• Network failure</Text>
+                <Text marginTop={1} color={colors.text} bold>Possible causes:</Text>
+                <Text color={colors.textMuted}>• Missing permissions (Try running as Administrator/Sudo)</Text>
+                <Text color={colors.textMuted}>• Package manager ({settings?.updateManager}) not found</Text>
+                <Text color={colors.textMuted}>• Network failure</Text>
                 <Box marginTop={1}>
-                    <Text color="gray">(Press ESC to return to chat)</Text>
+                    <Text color={colors.textDim || colors.textMuted}>(Press ESC to return to chat)</Text>
                 </Box>
             </Box>
         );

@@ -466,6 +466,7 @@ export const THEMES = {
         logoBodyAnsi: '\x1b[37m',
         logoMutedAnsi: '\x1b[90m',
         logoGradient: ['#0077ff', '#ff00ff'],
+        toolFeedbackAnsi: '\x1b[95m',
     },
     Light: {
         id: 'Light',
@@ -533,6 +534,7 @@ export const THEMES = {
         logoBodyAnsi: '\x1b[30m',
         logoMutedAnsi: '\x1b[38;5;244m',
         logoGradient: ['#0077ff', '#ff00ff'],
+        toolFeedbackAnsi: '\x1b[95m',
     },
     'GitHub Dark': {
         id: 'GitHub Dark',
@@ -600,6 +602,7 @@ export const THEMES = {
         logoBodyAnsi: '\x1b[37m',
         logoMutedAnsi: '\x1b[90m',
         logoGradient: ['#2ea043', '#56d364'],
+        toolFeedbackAnsi: '\x1b[95m',
     },
     'GitHub Light': {
         id: 'GitHub Light',
@@ -667,6 +670,7 @@ export const THEMES = {
         logoBodyAnsi: '\x1b[30m',
         logoMutedAnsi: '\x1b[38;5;244m',
         logoGradient: ['#1a7f37', '#2da44e'],
+        toolFeedbackAnsi: '\x1b[95m',
     },
     'Transparent Dark': {
         id: 'Transparent Dark',
@@ -734,6 +738,7 @@ export const THEMES = {
         logoBodyAnsi: '\x1b[37m',
         logoMutedAnsi: '\x1b[90m',
         logoGradient: ['#0077ff', '#ff00ff'],
+        toolFeedbackAnsi: '\x1b[95m',
     },
     'Transparent Light': {
         id: 'Transparent Light',
@@ -801,6 +806,7 @@ export const THEMES = {
         logoBodyAnsi: '\x1b[30m',
         logoMutedAnsi: '\x1b[38;5;244m',
         logoGradient: ['#0077ff', '#ff00ff'],
+        toolFeedbackAnsi: '\x1b[95m',
     },
     'Synthwave 84': {
         id: 'Synthwave 84',
@@ -853,6 +859,7 @@ export const THEMES = {
         logoBodyAnsi: '\x1b[35m',
         logoMutedAnsi: '\x1b[90m',
         logoGradient: ['#fc28a8', '#03e8fc'],
+        toolFeedbackAnsi: '\x1b[38;2;3;232;252m',
     },
     'Forest Sprite': {
         id: 'Forest Sprite',
@@ -905,6 +912,60 @@ export const THEMES = {
         logoBodyAnsi: '\x1b[32m',
         logoMutedAnsi: '\x1b[90m',
         logoGradient: ['#8feb73', '#e69835'],
+        toolFeedbackAnsi: '\x1b[38;2;143;235;115m',
+    },
+    Spookfest: {
+        id: 'Spookfest',
+        name: 'Spookfest 🎃',
+        text: '#ffeedd',
+        textMuted: '#e09858',
+        textDim: '#a6622b',
+        textInverted: '#0d0702',
+        textExclusive: '#fff3e6',
+        textMutedExclusive: '#d4a276',
+        border: '#ff7518',
+        borderMuted: '#994409',
+        borderDim: '#592502',
+        bg: undefined,
+        cardBg: '#1a0c02',
+        highlightBg: '#2a1403',
+        activeBg: '#3d1d05',
+        inputBg: '#261203',
+        inputBorder: '#261203',
+        inputText: '#ffeedd',
+        inputPlaceholder: '#a6622b',
+        inputPrompt: '#ff7518',
+        codeBg: '#120701',
+        codeBorder: '#592502',
+        userMsgBg: '#261203',
+        userMsgBorder: '#261203',
+        userMsgText: '#ffeedd',
+        diffRemovalBg: '#3d0a0a',
+        diffAdditionBg: '#1a330a',
+        diffRemovalText: '#ff5555',
+        diffAdditionText: '#73e639',
+        diffRemovalHighlightColor: '#ff2222',
+        diffRemovalHighlightBg: '#590e0e',
+        diffAdditionHighlightColor: '#88ff3b',
+        diffAdditionHighlightBg: '#244d0a',
+        diffRemovalNum: '#ff5555',
+        diffAdditionNum: '#73e639',
+        diffRemovalPrefix: '#ff3333',
+        diffAdditionPrefix: '#88ff3b',
+        primary: '#ff7518',
+        secondary: '#a855f7',
+        accent: '#22c55e',
+        success: '#22c55e',
+        warning: '#f59e0b',
+        danger: '#ef4444',
+        info: '#a855f7',
+        statusOn: '#ff7518',
+        statusOff: '#703a08',
+        logoTextAnsi: '\x1b[1;38;2;255;117;24m',
+        logoBodyAnsi: '\x1b[38;2;255;140;26m',
+        logoMutedAnsi: '\x1b[38;2;168;85;247m',
+        logoGradient: ['#ff7518', '#a855f7'],
+        toolFeedbackAnsi: '\x1b[38;2;255;117;24m',
     }
 };
 
@@ -937,11 +998,13 @@ export const getThemeColors = (themeName = 'Dark') => {
         cachedChaosPreset = null;
 
         if (THEMES[themeName]) colors = THEMES[themeName];
+        else if (themeName === 'Halloween') colors = THEMES.Spookfest;
         else if (themeName === 'GitHub') colors = THEMES['GitHub Dark'];
         else if (themeName === 'Transparent') colors = THEMES['Transparent Dark'];
         else colors = THEMES.Dark;
     }
 
     const codeColor = colors.codeText || colors.secondary || colors.info || (colors.logoGradient && colors.logoGradient[0]) || 'cyan';
-    return { ...colors, codeText: codeColor };
+    const toolFeedbackAnsi = colors.toolFeedbackAnsi || '\x1b[95m';
+    return { ...colors, codeText: codeColor, toolFeedbackAnsi };
 };

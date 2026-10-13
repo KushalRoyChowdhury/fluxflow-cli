@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.35.0": {
+        "note": "OCTOBER 14. Halloween Special.",
+        "added": [
+            "Added new special theme: Spookfest."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "4.34.0": {
         "note": "OCTOBER 12",
         "added": [

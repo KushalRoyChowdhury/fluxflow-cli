@@ -651,7 +651,8 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const dateTimeStr = `${year}-${month}-${day}`;
     const isMetadataOff = !!systemSettings?.autoExcludeMetadata;
 
-    const userHasWayyTooMuchMoney = process.env.I_HAVE_TOO_MUCH_MONEY === "true" || process.env.I_HAVE_TOO_MUCH_MONEY === true || false;
+    const userHasWayyTooMuchMoney = process.env.I_HAVE_TOO_MUCH_MONEY === "true" || false;
+    const halloween = process.env.HALLOWEEN_EEGG === 'true' || false;
 
     const cleanRawModel = (targetModel || '')
         .replace(/^.*::/, '')
@@ -666,11 +667,11 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         .replaceAll('_', ' ')
         .replace(/\b\w/g, char => char.toUpperCase().trim());
 
-    const isNoDev = process.env.NO_DEV === 'true' || process.env.NO_DEV === '1' || process.env.NO_DEV === true || false;
+    const isNoDev = process.env.NO_DEV === 'true' || false;
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT ===
-${`Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : 'Flux Flow. Sassy, CLI Assistant'}
+${`Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : `Flux Flow. Sassy, CLI Assistant${halloween ? '. Halloween Themed, Spooky' : ''}`}
 ${ADD_NO_INS ? '' : `${mode === "Flux" ? "" :
                 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
                     mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
