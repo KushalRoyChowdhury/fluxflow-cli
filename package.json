@@ -1,7 +1,7 @@
 {
     "name": "fluxflow-cli",
-    "version": "4.35.0",
-    "date": "2026-10-13",
+    "version": "4.35.1",
+    "date": "2026-10-14",
     "description": "One of the lightest, fastest, high-fidelity agentic CLI with sub-agents & advance computer use.",
     "keywords": [
         "ai",

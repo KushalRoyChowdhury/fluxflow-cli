@@ -45,6 +45,6 @@ Trigger in chat via /command
 * /changelog → Release notes
 * /update check → Check npm updates
 * /update latest → Install latest release
-* /fluxflow init → Create local FluxFlow.md project-instructions template
+* /fluxflow global/saves → Openes fluxflow storage paths in explorer
 * /move → Transfer Playground session data to CWD/playground-export
 `;

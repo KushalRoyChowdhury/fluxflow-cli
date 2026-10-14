@@ -245,12 +245,12 @@ export const filterModelConditionalTags = (content, targetModel = '', aiProvider
     const provider = aiProvider.toLowerCase().trim();
     const model = targetModel.toLowerCase().trim();
     const modelBasename = path.posix.basename(model);
-    const uniqueTarget = provider && model ? `${provider}::${model}` : '';
-    const uniqueBasenameTarget = provider && modelBasename ? `${provider}::${modelBasename}` : '';
+    const uniqueTargetAt = provider && model ? `${provider}@${model}` : '';
+    const uniqueBasenameTargetAt = provider && modelBasename ? `${provider}@${modelBasename}` : '';
 
     const isModelMatch = (tag) => {
         if (!tag || !model) return false;
-        return tag === model || tag === modelBasename || tag === uniqueTarget || tag === uniqueBasenameTarget;
+        return tag === model || tag === modelBasename || tag === uniqueTargetAt || tag === uniqueBasenameTargetAt;
     };
 
     const matchedBlocks = [];
@@ -275,11 +275,11 @@ export const filterModelConditionalTags = (content, targetModel = '', aiProvider
         return '';
     });
 
-    // 2. Standalone namespaced model blocks: <start_model_provider::model>
-    content.replace(/<start_model_([^>\r\n]+::[^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+::[^>\r\n]+)>/gi, (match, startTag, inner, endTag) => {
+    // 2. Standalone namespaced model blocks: <start_model_provider@model>
+    content.replace(/<start_model_([^>\r\n@]+@[^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n@]+@[^>\r\n]+)>/gi, (match, startTag, inner, endTag) => {
         if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
             const tag = startTag.trim().toLowerCase();
-            if (uniqueTarget && (tag === uniqueTarget || (uniqueBasenameTarget && tag === uniqueBasenameTarget))) {
+            if (isModelMatch(tag)) {
                 const trimmed = inner.trim();
                 if (trimmed) matchedBlocks.push(trimmed);
             }
@@ -289,7 +289,7 @@ export const filterModelConditionalTags = (content, targetModel = '', aiProvider
 
     // 3. Standalone generic model blocks: <start_model_model-id>
     content.replace(/<start_model_([^>\r\n]+)>([\s\S]*?)<end_model_([^>\r\n]+)>/gi, (match, startTag, inner, endTag) => {
-        if (startTag.includes('::')) return '';
+        if (startTag.includes('@')) return '';
         if (startTag.trim().toLowerCase() === endTag.trim().toLowerCase()) {
             const tag = startTag.trim().toLowerCase();
             if (model && (tag === model || tag === modelBasename)) {
@@ -304,7 +304,7 @@ export const filterModelConditionalTags = (content, targetModel = '', aiProvider
 };
 
 export const refreshInstructionsForTarget = (aiProvider = '', targetModel = '') => {
-    const currentTargetKey = `${aiProvider || ''}::${targetModel || ''}`.toLowerCase().trim();
+    const currentTargetKey = `${aiProvider || ''}@${targetModel || ''}`.toLowerCase().trim();
     if (cachedTargetKey !== currentTargetKey) {
         cachedTargetKey = currentTargetKey;
         globalFluxflowMD = readGlobalFluxflowInstruction();

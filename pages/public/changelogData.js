@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.35.1": {
+        "note": "OCTOBER 14.",
+        "added": [],
+        "changed": [
+            "Small **breaking change** in FLUXFLOW.md. Use syntax `‹provider@model›` instead of `‹provider::model›`."
+        ],
+        "fixes": []
+    },
     "4.35.0": {
         "note": "OCTOBER 14. Halloween Special.",
         "added": [

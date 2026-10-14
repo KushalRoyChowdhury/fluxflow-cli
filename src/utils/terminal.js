@@ -119,8 +119,8 @@ export const getFluxLogo = (version = '...', provider = 'Loading...', theme = 'D
     const month = now.getMonth();
     const date = now.getDate();
 
-    // If date is OCT 20 - NOV 2
-    const validHalloweenDate = (month === 9 && date >= 20) || (month === 10 && date <= 2);
+    // If date is OCT 15 - NOV 2
+    const validHalloweenDate = (month === 9 && date >= 15) || (month === 10 && date <= 5);
     const spookfestMode = (isHalloween && validHalloweenDate) || (process.env.SPOOKFEST === "true" && isHalloween);
     const art = spookfestMode ? (Math.random() > 0.5 ? halloweenArtSide : halloweenArtUser) : defaultArt;
     if (spookfestMode) process.env.HALLOWEEN_EEGG = true;

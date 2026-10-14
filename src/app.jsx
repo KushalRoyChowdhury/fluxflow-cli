@@ -3859,7 +3859,7 @@ export default function App({ args = [] }) {
                 case '/target': {
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: 'target-' + Date.now(), role: 'system', text: `✦ Unique Model Id for FluxFlow\n⠀⠀\x1b[2m└─\x1b[22m ${aiProvider}::${activeModel}\n⠀`, isMeta: true }];
+                        return [...prev, { id: 'target-' + Date.now(), role: 'system', text: `✦ Unique Model Id for FluxFlow\n⠀⠀\x1b[2m└─\x1b[22m ${aiProvider}@${activeModel}\n⠀`, isMeta: true }];
                     });
                     break;
                 }
