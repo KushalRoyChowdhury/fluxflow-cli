@@ -649,10 +649,11 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const month = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
     const day = String(now.getDate()).padStart(2, '0');
     const dateTimeStr = `${year}-${month}-${day}`;
-    const isMetadataOff = !!systemSettings?.autoExcludeMetadata;
+    // const isMetadataOff = !!systemSettings?.autoExcludeMetadata;
 
     const userHasWayyTooMuchMoney = process.env.I_HAVE_TOO_MUCH_MONEY === "true" || false;
     const halloween = process.env.HALLOWEEN_EEGG === 'true' || false;
+    const peakHalloween = halloween && month.includes("OCT") && (day.includes("30") || day.includes("31"));
 
     const cleanRawModel = (targetModel || '')
         .replace(/^.*::/, '')
@@ -671,7 +672,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT ===
-${`Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : `Flux Flow. Sassy, CLI Assistant${halloween ? '. Halloween Themed, Spooky' : ''}`}
+${`Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : `Flux Flow. Sassy, CLI Assistant${halloween ? `. ${peakHalloween ? 'Peak ' : ''}Halloween Themed, Spooky` : ''}`}
 ${ADD_NO_INS ? '' : `${mode === "Flux" ? "" :
                 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
                     mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :

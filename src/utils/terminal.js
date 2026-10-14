@@ -38,6 +38,17 @@ export const emojiSpace = (baseSpaces = 2) => {
     return ' '.repeat(baseSpaces);
 };
 
+const now = new Date();
+const month = now.getMonth();
+const date = now.getDate();
+const validHalloweenDate = (month === 9 && date >= 15) || (month === 10 && date <= 1);
+
+// Check if we even need the assets
+let loadedHalloweenModule = null;
+if (process.env.SPOOKFEST === "true" || validHalloweenDate) {
+    loadedHalloweenModule = await import("../data/custom-banner-art/halloween.js");
+}
+
 export const getFluxLogo = (version = '...', provider = 'Loading...', theme = 'Dark') => {
     // DONT remove these comments
     // const art = [
@@ -81,7 +92,6 @@ export const getFluxLogo = (version = '...', provider = 'Loading...', theme = 'D
     const greyColor = colors.logoMutedAnsi;
     const reset = '\x1b[0m';
 
-    const isHalloween = theme === 'Spookfest' || colors.id === 'Spookfest' || theme === 'Halloween' || colors.id === 'Halloween';
 
     const defaultArt = [
         "  ███       ",
@@ -94,36 +104,16 @@ export const getFluxLogo = (version = '...', provider = 'Loading...', theme = 'D
         " ░░░        "
     ];
 
-    const halloweenArtSide = [
-        "     ▄██▄     ",
-        "   ▄██████▄   ",
-        "  ████ ██ ██  ",
-        "  ████ ██ ██  ",
-        "  ██████████  ",
-        "  ██████████  ",
-        "  ██  ██  ██  ",
-        "  ▀▀  ▀▀  ▀▀  "
-    ];
-    const halloweenArtUser = [
-        "     ▄██▄     ",
-        "   ▄██████▄   ",
-        "  ███ ██ ███  ",
-        "  ███ ██ ███  ",
-        "  ██████████  ",
-        "  ██████████  ",
-        "  ██  ██  ██  ",
-        "  ▀▀  ▀▀  ▀▀  "
-    ];
-
-    const now = new Date();
-    const month = now.getMonth();
-    const date = now.getDate();
-
-    // If date is OCT 15 - NOV 2
-    const validHalloweenDate = (month === 9 && date >= 15) || (month === 10 && date <= 5);
+    // If date is OCT 15 - NOV 1
+    const isHalloween = theme === 'Spookfest' || colors.id === 'Spookfest' || theme === 'Halloween' || colors.id === 'Halloween';
+    const validHalloweenDate = (month === 9 && date >= 15) || (month === 10 && date <= 1);
     const spookfestMode = (isHalloween && validHalloweenDate) || (process.env.SPOOKFEST === "true" && isHalloween);
-    const art = spookfestMode ? (Math.random() > 0.5 ? halloweenArtSide : halloweenArtUser) : defaultArt;
-    if (spookfestMode) process.env.HALLOWEEN_EEGG = true;
+    let art = defaultArt;
+    if (spookfestMode && loadedHalloweenModule) {
+        process.env.HALLOWEEN_EEGG = 'true';
+        const { halloweenArtSide, halloweenBat, halloweenArtUser } = loadedHalloweenModule;
+        art = Math.random() > 0.9 && (month === 9 && date >= 30) ? halloweenBat : Math.random() > 0.5 ? halloweenArtSide : halloweenArtUser;
+    }
 
     const quotesPool = spookfestMode ? HALLOWEEN_STARTUP_QUOTES : STARTUP_QUOTES;
     const quote = quotesPool[Math.floor(Math.random() * quotesPool.length)];
