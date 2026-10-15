@@ -1,6 +1,7 @@
 import http from 'http';
 import { exec } from 'child_process';
 import { getAllUsageData, getTimedUsage, purgeTimedUsage } from './usage.js';
+import { getModelPricing, DEFAULT_MODEL_CONFIG } from '../data/model_config.js';
 import { DATA_DIR } from './paths.js';
 import { FLUXFLOW_LOGO_BASE64 } from './logoBase64.js';
 
@@ -936,6 +937,17 @@ function generateDashboardHtml() {
                     <span id="m-code-net">Net: 0 lines</span>
                 </div>
             </div>
+
+            <div class="glass-panel metric-card" style="--card-accent: #f59e0b;">
+                <div class="metric-header">
+                    <span class="metric-label">Estimated Cost</span>
+                    <div class="metric-icon">💎</div>
+                </div>
+                <div class="metric-value mono" id="m-total-cost" style="color: #fbbf24;">$0.00</div>
+                <div class="metric-sub">
+                    <span id="m-cost-sub" class="badge-info" style="font-size: 0.75rem;">Based on pricing</span>
+                </div>
+            </div>
         </div>
 
         <!-- Budget & Quota Tracking -->
@@ -1078,7 +1090,7 @@ function generateDashboardHtml() {
         let providerSortField = 'tokens';
         let providerSortOrder = 'desc';
         let timedCurrentPage = 1;
-        const timedPageSize = 69;
+        const timedPageSize = 50;
         let timelineChart = null;
         let providerPieChart = null;
         let toolChart = null;
@@ -1098,6 +1110,13 @@ function generateDashboardHtml() {
             if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + 'M';
             if (num >= 1_000) return (num / 1_000).toFixed(1) + 'k';
             return num.toLocaleString();
+        }
+
+        function formatCost(val) {
+            const num = Number(val) || 0;
+            if (num <= 0) return '-';
+            if (num < 0.001) return '<$0.001';
+            return '$' + num.toFixed(num < 0.01 ? 4 : 3);
         }
 
         function filterTimelineByRange(timeline, range) {
@@ -1160,6 +1179,7 @@ function generateDashboardHtml() {
             let toolDenied = 0;
             let linesAdded = 0;
             let linesRemoved = 0;
+            let totalCost = 0;
 
             const providerTokens = {};
             const modelTokens = {};
@@ -1177,6 +1197,7 @@ function generateDashboardHtml() {
                 toolDenied += item.toolDenied || 0;
                 linesAdded += item.linesAdded || 0;
                 linesRemoved += item.linesRemoved || 0;
+                totalCost += item.cost || 0;
 
                 const models = item.models || {};
                 for (const prov in models) {
@@ -1207,6 +1228,11 @@ function generateDashboardHtml() {
 
             document.getElementById('m-code-delta').innerHTML = \`<span style="color: #38bdf8;">+\${formatNumber(linesAdded)}</span> <span style="color: #64748b; font-size: 0.85em;">/</span> <span style="color: #f43f5e;">-\${formatNumber(linesRemoved)}</span>\`;
             document.getElementById('m-code-net').textContent = \`Net: \${linesAdded - linesRemoved >= 0 ? '+' : ''}\${formatNumber(linesAdded - linesRemoved)} lines\`;
+
+            const costEl = document.getElementById('m-total-cost');
+            if (costEl) costEl.textContent = formatCost(totalCost);
+            const costSub = document.getElementById('m-cost-sub');
+            if (costSub) costSub.textContent = totalCost > 0 ? \`Active range spend\` : 'No cost data';
 
             if (rawData && rawData.budget) {
                 renderBudget(rawData.budget);
@@ -1913,6 +1939,7 @@ function generateDashboardHtml() {
                         <th class="sortable" onclick="handleSort('cachePct')">Cache % \${getSortIndicator('cachePct', dailySortField, dailySortOrder)}</th>
                         <th class="sortable" onclick="handleSort('candidateTokens')">OUTPUT \${getSortIndicator('candidateTokens', dailySortField, dailySortOrder)}</th>
                         <th class="sortable" onclick="handleSort('tokens')">Total Tokens \${getSortIndicator('tokens', dailySortField, dailySortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('cost')">Cost \${getSortIndicator('cost', dailySortField, dailySortOrder)}</th>
                         <th class="sortable" onclick="handleSort('toolSuccessRate')">Tool Success \${getSortIndicator('toolSuccessRate', dailySortField, dailySortOrder)}</th>
                         <th class="sortable col-code" onclick="handleSort('linesAdded')">Code Lines \${getSortIndicator('linesAdded', dailySortField, dailySortOrder)}</th>
                     </tr>
@@ -1941,7 +1968,7 @@ function generateDashboardHtml() {
                 });
 
                 if (rows.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 2rem;">No matching daily token records found.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 2rem;">No matching daily token records found.</td></tr>';
                     return;
                 }
 
@@ -1955,6 +1982,7 @@ function generateDashboardHtml() {
                     const cand = item.candidateTokens || 0;
                     const cachePct = prompt > 0 ? ((cached / prompt) * 100).toFixed(1) : '0.0';
                     const isSelected = activeDatesSet.has(item.date);
+                    const costDisplay = formatCost(item.cost);
 
                     return \`
                         <tr>
@@ -1970,6 +1998,7 @@ function generateDashboardHtml() {
                             </td>
                             <td class="mono" style="color: var(--accent-violet);">\${formatNumber(cand)}</td>
                             <td class="mono" style="font-weight: 700;">\${formatNumber(total)}</td>
+                            <td class="mono" style="color: #fbbf24; font-weight: 600;">\${costDisplay}</td>
                             <td>
                                 <span class="badge-info" style="font-size: 0.75rem;">\${item.toolSuccessRate}%</span>
                             </td>
@@ -1995,6 +2024,7 @@ function generateDashboardHtml() {
                         <th class="sortable" onclick="handleSort('candidateTokens')">OUTPUT \${getSortIndicator('candidateTokens', modelSortField, modelSortOrder)}</th>
                         \${showTtft ? \`<th class="sortable" onclick="handleSort('avgTtft')">Avg TTFT \${getSortIndicator('avgTtft', modelSortField, modelSortOrder)}</th>\` : ''}
                         <th class="sortable" onclick="handleSort('tokens')">Total Tokens \${getSortIndicator('tokens', modelSortField, modelSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('cost')">Cost \${getSortIndicator('cost', modelSortField, modelSortOrder)}</th>
                     </tr>
                 \`;
 
@@ -2015,6 +2045,7 @@ function generateDashboardHtml() {
                                     promptTokens: 0,
                                     candidateTokens: 0,
                                     cachedTokens: 0,
+                                    cost: 0,
                                     ttftSum: 0,
                                     ttftCalls: 0
                                 };
@@ -2030,6 +2061,7 @@ function generateDashboardHtml() {
                             modelMap[key].promptTokens += tPrompt;
                             modelMap[key].candidateTokens += tCand;
                             modelMap[key].cachedTokens += tCache;
+                            modelMap[key].cost += (entry.cost || 0);
                             modelMap[key].ttftSum += (entry.ttftSum || 0);
                             modelMap[key].ttftCalls += (entry.ttftCalls || 0);
                             aggregateTokens += tTok;
@@ -2072,12 +2104,13 @@ function generateDashboardHtml() {
                 }
 
                 if (modelList.length === 0) {
-                    tbody.innerHTML = \`<tr><td colspan="\${showTtft ? 7 : 6}" style="text-align: center; color: var(--text-dim); padding: 2rem;">No matching models found.</td></tr>\`;
+                    tbody.innerHTML = \`<tr><td colspan="\${showTtft ? 8 : 7}" style="text-align: center; color: var(--text-dim); padding: 2rem;">No matching models found.</td></tr>\`;
                     return;
                 }
 
                 tbody.innerHTML = modelList.map(m => {
                     const ttftVal = m.avgTtft > 0 ? (m.avgTtft >= 1000 ? (m.avgTtft / 1000).toFixed(2) + 's' : m.avgTtft + 'ms') : '-';
+                    const costDisplay = formatCost(m.cost);
                     return \`
                         <tr>
                             <td class="mono" style="font-weight: 600; color: var(--text-main);">
@@ -2098,6 +2131,7 @@ function generateDashboardHtml() {
                             <td class="mono" style="color: var(--accent-violet);">\${formatNumber(m.candidateTokens)}</td>
                             \${showTtft ? \`<td class="mono" style="color: var(--accent-amber); font-size: 0.8rem;">\${ttftVal}</td>\` : ''}
                             <td class="mono" style="font-weight: 700; color: var(--text-main);">\${formatNumber(m.tokens)}</td>
+                            <td class="mono" style="color: #fbbf24; font-weight: 600;">\${costDisplay}</td>
                         </tr>
                     \`;
                 }).join('');
@@ -2114,6 +2148,7 @@ function generateDashboardHtml() {
                     '<th class=sortable onclick=handleSort(&#39;cachePct&#39;)>Cache % ' + getSortIndicator('cachePct', providerSortField, providerSortOrder) + '</th>' +
                     '<th class=sortable onclick=handleSort(&#39;candidateTokens&#39;)>OUTPUT ' + getSortIndicator('candidateTokens', providerSortField, providerSortOrder) + '</th>' +
                     '<th class=sortable onclick=handleSort(&#39;tokens&#39;)>Total Tokens ' + getSortIndicator('tokens', providerSortField, providerSortOrder) + '</th>' +
+                    '<th class=sortable onclick=handleSort(&#39;cost&#39;)>Cost ' + getSortIndicator('cost', providerSortField, providerSortOrder) + '</th>' +
                     '</tr>';
 
                 const provMap = {};
@@ -2124,7 +2159,7 @@ function generateDashboardHtml() {
                     const provSet = new Set([...Object.keys(reqs), ...Object.keys(models)]);
                     provSet.forEach(prov => {
                         if (!provMap[prov]) {
-                            provMap[prov] = { provider: prov, requests: 0, tokens: 0, cachedTokens: 0, candidateTokens: 0, promptTokens: 0 };
+                            provMap[prov] = { provider: prov, requests: 0, tokens: 0, cachedTokens: 0, candidateTokens: 0, promptTokens: 0, cost: 0 };
                         }
                         provMap[prov].requests += reqs[prov] || 0;
                         const provModels = models[prov] || {};
@@ -2136,6 +2171,7 @@ function generateDashboardHtml() {
                             provMap[prov].candidateTokens += tCand;
                             provMap[prov].cachedTokens += (entry.cachedTokens || 0);
                             provMap[prov].promptTokens += Math.max(0, tTok - tCand);
+                            provMap[prov].cost += (entry.cost || 0);
                             grandTokens += tTok;
                         }
                     });
@@ -2167,19 +2203,21 @@ function generateDashboardHtml() {
                 }
 
                 if (provList.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan=6 style=text-align:center;color:var(--text-dim);padding:2rem;>No provider data for this range.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan=7 style=text-align:center;color:var(--text-dim);padding:2rem;>No provider data for this range.</td></tr>';
                     return;
                 }
 
                 tbody.innerHTML = provList.map(function(p) {
                     var sharePct = grandTokens > 0 ? ((p.tokens / grandTokens) * 100).toFixed(1) : '0.0';
                     var cachedTxt = p.cachedTokens > 0 ? ' <span style=color:#059669;font-size:0.85em;>(' + formatNumber(p.cachedTokens) + ' cached)</span>' : '';
+                    var costTxt = formatCost(p.cost);
                     return '<tr><td><span class=badge-info style=font-size:0.75rem;display:inline-flex;align-items:center;gap:6px;>' + getProviderBrandIcon(p.provider, 16) + ' ' + formatProviderName(p.provider) + '</span></td>' +
                         '<td class=mono style=font-weight:700;color:var(--accent-amber);>' + p.requests.toLocaleString() + '</td>' +
                         '<td class=mono style=color:var(--accent-emerald);>' + formatNumber(p.promptTokens) + cachedTxt + '</td>' +
                         '<td><span class=badge-positive style=font-size:0.75rem;>' + p.cachePct + '%</span></td>' +
                         '<td class=mono style=color:var(--accent-violet);>' + formatNumber(p.candidateTokens) + '</td>' +
-                        '<td class=mono style=font-weight:700;color:var(--text-main);>' + formatNumber(p.tokens) + ' <span style=color:var(--text-muted);font-size:0.75em;font-weight:500;>(' + sharePct + '%)</span></td></tr>';
+                        '<td class=mono style=font-weight:700;color:var(--text-main);>' + formatNumber(p.tokens) + ' <span style=color:var(--text-muted);font-size:0.75em;font-weight:500;>(' + sharePct + '%)</span></td>' +
+                        '<td class=mono style="color:#fbbf24;font-weight:600;">' + costTxt + '</td></tr>';
                 }).join('');
             } else if (tableMode === 'timed') {
                 titleEl.textContent = 'Per-Request Timed Log';
@@ -2196,6 +2234,7 @@ function generateDashboardHtml() {
                         <th class="sortable" onclick="handleSort('output')">Output \${getSortIndicator('output', timedSortField, timedSortOrder)}</th>
                         \${showTtft ? \`<th class="sortable" onclick="handleSort('ttft')">TTFT \${getSortIndicator('ttft', timedSortField, timedSortOrder)}</th>\` : ''}
                         <th class="sortable" onclick="handleSort('total')">Total \${getSortIndicator('total', timedSortField, timedSortOrder)}</th>
+                        <th class="sortable" onclick="handleSort('cost')">Cost \${getSortIndicator('cost', timedSortField, timedSortOrder)}</th>
                     </tr>
                 \`;
 
@@ -2208,6 +2247,7 @@ function generateDashboardHtml() {
                     cached: Number(e.cached) || 0,
                     output: Number(e.output) || 0,
                     reasoning: Number(e.reasoning) || 0,
+                    cost: Number(e.cost) || 0,
                     ttft: Number(e.ttft) || 0
                 }));
 
@@ -2249,7 +2289,7 @@ function generateDashboardHtml() {
                 });
 
                 if (trows.length === 0) {
-                    tbody.innerHTML = \`<tr><td colspan="\${showTtft ? 8 : 7}" style="text-align: center; color: var(--text-dim); padding: 2rem;">No per-call records yet. Make a request and refresh.</td></tr>\`;
+                    tbody.innerHTML = \`<tr><td colspan="\${showTtft ? 9 : 8}" style="text-align: center; color: var(--text-dim); padding: 2rem;">No per-call records yet. Make a request and refresh.</td></tr>\`;
                     if (paginationContainer) paginationContainer.style.display = 'none';
                     return;
                 }
@@ -2265,6 +2305,7 @@ function generateDashboardHtml() {
 
                 tbody.innerHTML = pageRows.map(r => {
                     const ttftVal = r.ttft > 0 ? (r.ttft >= 1000 ? (r.ttft / 1000).toFixed(2) + 's' : r.ttft + 'ms') : '-';
+                    const costDisplay = formatCost(r.cost);
                     return \`
                         <tr>
                             <td class="mono" style="font-size: 0.75rem; color: var(--text-muted);">\${r.timeDisplay}</td>
@@ -2280,6 +2321,7 @@ function generateDashboardHtml() {
                             <td class="mono" style="color: var(--accent-violet);">\${formatNumber(r.output)}\${r.reasoning > 0 ? ' <span style="color: #8b5cf6; font-size: 0.75rem;">(' + formatNumber(r.reasoning) + ' thinking)</span>' : ''}</td>
                             \${showTtft ? \`<td class="mono" style="color: var(--accent-amber); font-size: 0.8rem;">\${ttftVal}</td>\` : ''}
                             <td class="mono" style="font-weight: 700;">\${formatNumber(r.total)}</td>
+                            <td class="mono" style="color: #fbbf24; font-weight: 600;">\${costDisplay}</td>
                         </tr>
                     \`;
                 }).join('');
@@ -2512,6 +2554,19 @@ export async function startUsageServer(preferredPort = 52140) {
                 await purgeTimedUsage();
                 const data = await getAllUsageData();
                 data.timed = await getTimedUsage(30);
+
+                if (data.timeline) {
+                    for (const day of data.timeline) {
+                        day.cost = Number((day.cost || 0).toFixed(6));
+                    }
+                }
+
+                if (Array.isArray(data.timed)) {
+                    data.timed.forEach(entry => {
+                        entry.cost = Number((entry.cost || 0).toFixed(6));
+                    });
+                }
+
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify(data));
             } catch (err) {

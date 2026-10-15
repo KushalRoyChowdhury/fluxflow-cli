@@ -4,10 +4,86 @@ import { USAGE_FILE, USAGE_FILE_OLD, USAGE_FILE_TIMED, LOGS_DIR } from './paths.
 import { encryptAes, decryptAes } from './crypto.js';
 import { loadSettings } from './settings.js';
 import { sendUsageWrite, sendUsageHeartbeat, sendUsageFinalize } from './usageDaemon.js';
+import { getModelPricing } from '../data/model_config.js';
 
 export { sendUsageHeartbeat, sendUsageFinalize };
 
 const USAGE_ERROR_LOG_FILE = path.join(LOGS_DIR, 'usage', 'usage_error.txt');
+
+// Track previous prompt/cache token state per provider+model for cache write (CW) estimation
+const lastModelCacheState = new Map();
+
+const getLastCachedTokens = (provider, model) => {
+    const key = `${provider}:${model}`;
+    if (lastModelCacheState.has(key)) {
+        return lastModelCacheState.get(key);
+    }
+
+    // In-memory state is empty (app restart/cold start): read today's timed_usage file
+    try {
+        const todayPath = todayFile();
+        if (fs.existsSync(todayPath)) {
+            const content = fs.readFileSync(todayPath, 'utf8');
+            const lines = content.split('\n').filter(Boolean);
+            const lowerModel = model ? model.trim().toLowerCase() : '';
+            const lowerProv = provider ? provider.trim().toLowerCase() : '';
+
+            // Search backwards from the last line to find the most recent entry for this provider & model
+            for (let i = lines.length - 1; i >= 0; i--) {
+                try {
+                    const parsed = JSON.parse(lines[i]);
+                    const pMatch = parsed.provider && parsed.provider.trim().toLowerCase() === lowerProv;
+                    const mMatch = parsed.model && parsed.model.trim().toLowerCase() === lowerModel;
+                    if (pMatch && mMatch && parsed.cached !== undefined) {
+                        const val = Number(parsed.cached) || 0;
+                        lastModelCacheState.set(key, val);
+                        return val;
+                    }
+                } catch { }
+            }
+        }
+    } catch { }
+
+    lastModelCacheState.set(key, 0);
+    return 0;
+};
+
+export const calculateTokenCost = (provider, model, { input = 0, cached = 0, output = 0 }) => {
+    const pricing = getModelPricing(provider, model);
+    if (!pricing) return { cost: 0, uncachedInput: Math.max(0, input - cached), estimatedCacheWrite: 0, pricing: null };
+
+    // Cached tokens are a subset of input tokens; uncached input = total input - cached tokens
+    const uncachedInput = Math.max(0, input - cached);
+
+    // Cache Write (CW) estimation:
+    // If cached tokens grew on the same model/provider, estimate the newly written cache
+    const key = `${provider}:${model}`;
+    const prevCached = getLastCachedTokens(provider, model);
+    lastModelCacheState.set(key, cached);
+
+    const estimatedCacheWrite = cached > prevCached ? (cached - prevCached) : 0;
+
+    // Rates are per million tokens ($/1M tokens)
+    const inCost = (uncachedInput / 1000000) * pricing.IN;
+    const outCost = (output / 1000000) * pricing.OUT;
+    const crCost = (cached / 1000000) * pricing.CR;
+    const cwCost = (estimatedCacheWrite / 1000000) * pricing.CW;
+
+    const totalCost = inCost + outCost + crCost + cwCost;
+
+    return {
+        cost: Number(totalCost.toFixed(6)),
+        uncachedInput,
+        estimatedCacheWrite,
+        breakdown: {
+            inputCost: Number(inCost.toFixed(6)),
+            outputCost: Number(outCost.toFixed(6)),
+            cacheReadCost: Number(crCost.toFixed(6)),
+            cacheWriteCost: Number(cwCost.toFixed(6))
+        },
+        pricing
+    };
+};
 
 let cachedBaseUrl = null;
 export const invalidateCachedBaseUrl = () => {
@@ -26,7 +102,7 @@ const resolveProvider = async (provider) => {
             cachedBaseUrl = url;
             return url;
         }
-    } catch {}
+    } catch { }
     return 'c_openai';
 };
 
@@ -58,6 +134,7 @@ const defaultStats = {
     candidateTokens: 0,
     linesAdded: 0,
     linesRemoved: 0,
+    cost: 0,
     imageCalls: []
 };
 
@@ -177,17 +254,38 @@ export const recordTimedUsage = async (d) => {
     try {
         await fs.ensureDir(USAGE_FILE_TIMED);
         const resolvedProv = await resolveProvider(d.provider);
+        const rawInput = Number(d.prompt) || 0;
+        const rawCached = Number(d.cached) || 0;
+        const rawOutput = Number(d.output) || 0;
+
+        const costCalc = calculateTokenCost(d.provider, d.model, {
+            input: rawInput,
+            cached: rawCached,
+            output: rawOutput
+        });
+
         const entry = {
             time: new Date().toISOString(),
             provider: resolvedProv || 'unknown',
             model: d.model || 'unknown',
-            input: Number(d.prompt) || 0,
-            cached: Number(d.cached) || 0,
-            output: Number(d.output) || 0,
+            input: rawInput,
+            cached: rawCached,
+            output: rawOutput,
             reasoning: Number(d.reasoning) || 0,
             ttft: Number(d.ttft) || 0,
+            cost: costCalc.cost,
+            estimatedCacheWrite: costCalc.estimatedCacheWrite
         };
+        if (costCalc.breakdown) {
+            entry.costBreakdown = costCalc.breakdown;
+        }
+
         await fs.appendFile(todayFile(), JSON.stringify(entry) + '\n', 'utf8');
+
+        // Forward cost to daily usage.json if cost > 0
+        if (costCalc.cost > 0) {
+            await addToUsage('cost', costCalc.cost, d.provider, d.model);
+        }
 
         // Throttled trim so the log stays strictly bounded
         if (++timedAppendCount >= 10) {
@@ -365,7 +463,8 @@ export const getMonthlyUsage = async () => {
                                 cachedTokens: 0,
                                 candidateTokens: 0,
                                 ttftSum: 0,
-                                ttftCalls: 0
+                                ttftCalls: 0,
+                                cost: 0
                             };
                         }
                         const tM = target.models[provider][model];
@@ -373,10 +472,13 @@ export const getMonthlyUsage = async () => {
                         tM.tokens += sM.tokens || 0;
                         tM.cachedTokens += sM.cachedTokens || 0;
                         tM.candidateTokens += sM.candidateTokens || 0;
+                        tM.cost = Number(((tM.cost || 0) + (sM.cost || 0)).toFixed(6));
                         tM.ttftSum = (tM.ttftSum || 0) + (sM.ttftSum || 0);
                         tM.ttftCalls = (tM.ttftCalls || 0) + (sM.ttftCalls || 0);
                     }
                 }
+            } else if (key === 'cost') {
+                target.cost = Number(((target.cost || 0) + (source.cost || 0)).toFixed(6));
             } else if (typeof target[key] === 'number') {
                 target[key] += source[key] || 0;
             }
@@ -419,7 +521,8 @@ export const runtimeSession = {
     linesRemoved: 0,
     toolSuccess: 0,
     toolFailure: 0,
-    toolDenied: 0
+    toolDenied: 0,
+    cost: 0
 };
 
 /**
@@ -431,14 +534,20 @@ export const addToUsage = async (key, amount, provider, model) => {
         runtimeSession.linesAdded += amount;
     } else if (key === 'linesRemoved') {
         runtimeSession.linesRemoved += amount;
+    } else if (key === 'cost') {
+        runtimeSession.cost = Number(((runtimeSession.cost || 0) + Number(amount)).toFixed(6));
     }
 
     const stats = await getDailyUsage();
     if (stats[key] !== undefined) {
-        stats[key] += Math.floor(amount);
+        if (key === 'cost') {
+            stats.cost = Number(((stats.cost || 0) + Number(amount)).toFixed(6));
+        } else {
+            stats[key] += Math.floor(amount);
+        }
     }
 
-    if (provider && model && (key === 'tokens' || key === 'cachedTokens' || key === 'candidateTokens' || key === 'ttft')) {
+    if (provider && model && (key === 'tokens' || key === 'cachedTokens' || key === 'candidateTokens' || key === 'ttft' || key === 'cost')) {
         if (!stats.models) {
             stats.models = {};
         }
@@ -451,13 +560,15 @@ export const addToUsage = async (key, amount, provider, model) => {
                 cachedTokens: 0,
                 candidateTokens: 0,
                 ttftSum: 0,
-                ttftCalls: 0
+                ttftCalls: 0,
+                cost: 0
             };
         }
         const mObj = stats.models[provider][model];
         if (key === 'tokens') mObj.tokens += Math.floor(amount);
         if (key === 'cachedTokens') mObj.cachedTokens += Math.floor(amount);
         if (key === 'candidateTokens') mObj.candidateTokens += Math.floor(amount);
+        if (key === 'cost') mObj.cost = Number(((mObj.cost || 0) + Number(amount)).toFixed(6));
         if (key === 'ttft') {
             mObj.ttftSum = (mObj.ttftSum || 0) + Math.floor(amount);
             mObj.ttftCalls = (mObj.ttftCalls || 0) + 1;
@@ -579,17 +690,21 @@ export const checkQuotaDetailed = async (key, settings = {}) => {
                 agentLimit: (typeof pb.agentLimit === 'number' && pb.agentLimit > 0) ? pb.agentLimit : 99999999,
                 tokenLimit: (typeof pb.tokenLimit === 'number' && pb.tokenLimit > 0) ? pb.tokenLimit : 99999999999999,
                 monthlyTokenLimit: (typeof pb.monthlyTokenLimit === 'number' && pb.monthlyTokenLimit > 0) ? pb.monthlyTokenLimit : 99999999999999,
+                dailyCostLimit: (typeof pb.dailyCostLimit === 'number' && pb.dailyCostLimit > 0) ? pb.dailyCostLimit : 99999999999999,
+                monthlyCostLimit: (typeof pb.monthlyCostLimit === 'number' && pb.monthlyCostLimit > 0) ? pb.monthlyCostLimit : 99999999999999
             };
         }
         return {
             agentLimit: quotas.agentLimit || 99999999,
             tokenLimit: quotas.tokenLimit || 99999999999999,
             monthlyTokenLimit: quotas.monthlyTokenLimit || 99999999999999,
+            dailyCostLimit: (typeof quotas.dailyCostLimit === 'number' && quotas.dailyCostLimit > 0) ? quotas.dailyCostLimit : 99999999999999,
+            monthlyCostLimit: (typeof quotas.monthlyCostLimit === 'number' && quotas.monthlyCostLimit > 0) ? quotas.monthlyCostLimit : 99999999999999
         };
     };
 
     if (key === 'agent') {
-        const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
+        const { agentLimit, tokenLimit, monthlyTokenLimit, dailyCostLimit, monthlyCostLimit } = resolveAgentLimits();
         const dailyUsage = await getDailyUsage();
 
         let monthlyUsage;
@@ -602,6 +717,8 @@ export const checkQuotaDetailed = async (key, settings = {}) => {
         let dailyAgentCount = 0;
         let dailyTokenCount = 0;
         let monthlyTokenCount = 0;
+        let dailyCostCount = 0;
+        let monthlyCostCount = 0;
 
         if (isPerProvider) {
             dailyAgentCount = dailyUsage.providerRequests?.[currentProvider] || 0;
@@ -609,16 +726,20 @@ export const checkQuotaDetailed = async (key, settings = {}) => {
             const dailyModels = dailyUsage.models?.[currentProvider] || {};
             for (const m in dailyModels) {
                 dailyTokenCount += dailyModels[m]?.tokens || 0;
+                dailyCostCount += dailyModels[m]?.cost || 0;
             }
 
             const monthlyModels = monthlyUsage.models?.[currentProvider] || {};
             for (const m in monthlyModels) {
                 monthlyTokenCount += monthlyModels[m]?.tokens || 0;
+                monthlyCostCount += monthlyModels[m]?.cost || 0;
             }
         } else {
             dailyAgentCount = dailyUsage.agent || 0;
             dailyTokenCount = dailyUsage.tokens || 0;
             monthlyTokenCount = monthlyUsage.tokens || 0;
+            dailyCostCount = dailyUsage.cost || 0;
+            monthlyCostCount = monthlyUsage.cost || 0;
         }
 
         if (tier === 'Free' && (dailyUsage.agent + dailyUsage.background) >= 999999) {
@@ -641,6 +762,22 @@ export const checkQuotaDetailed = async (key, settings = {}) => {
             return {
                 allowed: false,
                 reason: isPerProvider ? `Monthly Token Budget Exhausted for ${currentProvider}` : `Monthly Token Budget Exhausted`
+            };
+        }
+        if (dailyCostCount >= dailyCostLimit) {
+            return {
+                allowed: false,
+                reason: isPerProvider
+                    ? `Daily Cost Budget Exhausted for ${currentProvider} ($${dailyCostCount.toFixed(4)} >= $${dailyCostLimit.toFixed(4)})`
+                    : `Daily Cost Budget Exhausted ($${dailyCostCount.toFixed(4)} >= $${dailyCostLimit.toFixed(4)})`
+            };
+        }
+        if (monthlyCostCount >= monthlyCostLimit) {
+            return {
+                allowed: false,
+                reason: isPerProvider
+                    ? `Monthly Cost Budget Exhausted for ${currentProvider} ($${monthlyCostCount.toFixed(4)} >= $${monthlyCostLimit.toFixed(4)})`
+                    : `Monthly Cost Budget Exhausted ($${monthlyCostCount.toFixed(4)} >= $${monthlyCostLimit.toFixed(4)})`
             };
         }
 
@@ -986,6 +1123,7 @@ export const getAllUsageData = async () => {
             linesRemoved,
             netLines: linesAdded - linesRemoved,
             duration: stats.duration || 0,
+            cost: stats.cost || 0,
             imageCallsCount: imageCalls.length,
             imageCost,
             models: stats.models || {},
@@ -1065,15 +1203,21 @@ export const getAllUsageData = async () => {
         daily: {
             tokensUsed: todayStats.tokens || 0,
             tokenLimit: dailyTokenLimit,
+            cost: todayStats.cost || 0,
+            costLimit: quotas.dailyCostLimit || 0,
             agentRequests: todayStats.agent || 0,
             agentLimit: dailyAgentLimit,
             isUnlimitedTokens: dailyTokenLimit >= 9999999999999 || dailyTokenLimit === 0,
+            isUnlimitedCost: !quotas.dailyCostLimit || quotas.dailyCostLimit >= 9999999999999 || quotas.dailyCostLimit === 0,
             isUnlimitedRequests: dailyAgentLimit >= 9999999 || dailyAgentLimit === 0,
         },
         monthly: {
             tokensUsed: (quotas.resetMode === 'Custom' ? customPeriodUsage?.tokens : monthlyUsage?.tokens) || 0,
             tokenLimit: monthlyTokenLimit,
+            cost: (quotas.resetMode === 'Custom' ? customPeriodUsage?.cost : monthlyUsage?.cost) || 0,
+            costLimit: quotas.monthlyCostLimit || 0,
             isUnlimitedTokens: monthlyTokenLimit >= 9999999999999 || monthlyTokenLimit === 0,
+            isUnlimitedCost: !quotas.monthlyCostLimit || quotas.monthlyCostLimit >= 9999999999999 || quotas.monthlyCostLimit === 0,
         },
         providerBudgets
     };

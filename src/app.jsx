@@ -36,7 +36,7 @@ let _spookyLines = null;
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession, sendUsageHeartbeat, sendUsageFinalize } from './utils/usage.js';
-import { getModels, getDefaultModel, getFallbackValue, setCustomMultimodal, setOllamaMultimodal, isModelMultimodal, saveModelToProvider, removeModelFromProvider, renameModelInProvider, setDefaultModelForProvider, setModelMultimodalInProvider } from './data/model_config.js';
+import { getModels, getDefaultModel, getFallbackValue, setCustomMultimodal, setOllamaMultimodal, isModelMultimodal, saveModelToProvider, removeModelFromProvider, renameModelInProvider, setDefaultModelForProvider, setModelMultimodalInProvider, updateModelInfoInProvider, getModelPricing } from './data/model_config.js';
 import { setThinkingLevelMapping, getMappedThinkingLevel, removeThinkingLevelMapping } from './data/thinking_config.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
@@ -1214,7 +1214,7 @@ export default function App({ args = [] }) {
     const [activeView, setActiveView] = useState('chat'); // chat, mode, thinking, model, settings, profile
     const [processList, setProcessList] = useState([]);
 
-    const isKillCommand = input.startsWith('/ki');
+    const isKillCommand = input.startsWith('/k');
 
     useEffect(() => {
         if (!isKillCommand) return;
@@ -1965,34 +1965,33 @@ export default function App({ args = [] }) {
         // Provider Budget Form keyboard handling
         if (activeView === 'providerBudgetFlow') {
             const totalRows = providerBudgetQueue.length;
-            const totalFields = totalRows * 2 + 1;
+            const totalFields = totalRows * 4 + 1;
             if (key.upArrow) {
                 setPbfFieldIndex(i => {
                     if (i === totalFields - 1) {
-                        return Math.max(0, (totalRows - 1) * 2);
+                        return Math.max(0, (totalRows - 1) * 4);
                     }
-                    if (i >= 2) return i - 2;
+                    if (i >= 4) return i - 4;
                     return i;
                 });
                 return;
             } else if (key.downArrow) {
                 setPbfFieldIndex(i => {
                     if (i === totalFields - 1) return i;
-                    if (i + 2 < totalFields - 1) return i + 2;
+                    if (i + 4 < totalFields - 1) return i + 4;
                     return totalFields - 1;
                 });
                 return;
             } else if (key.leftArrow) {
                 setPbfFieldIndex(i => {
                     if (i === totalFields - 1) return i;
-                    if (i % 2 === 1) return i - 1;
+                    if (i % 4 > 0) return i - 1;
                     return i;
                 });
                 return;
             } else if (key.rightArrow || key.tab) {
                 setPbfFieldIndex(i => {
                     if (i === totalFields - 1) return i;
-                    if (i % 2 === 0) return i + 1;
                     if (i + 1 < totalFields) return i + 1;
                     return i;
                 });
@@ -2006,7 +2005,9 @@ export default function App({ args = [] }) {
                         cleaned[prov] = {
                             agentLimit: 9999999999,
                             tokenLimit: parseInt(formProv.tokenLimit, 10) || 0,
-                            monthlyTokenLimit: parseInt(formProv.monthlyTokenLimit, 10) || 0
+                            monthlyTokenLimit: parseInt(formProv.monthlyTokenLimit, 10) || 0,
+                            dailyCostLimit: parseFloat(formProv.dailyCostLimit) || 0,
+                            monthlyCostLimit: parseFloat(formProv.monthlyCostLimit) || 0
                         };
                     }
                     const finalCleanedQuotas = { ...quotas, providerBudgets: cleaned };
@@ -3501,20 +3502,61 @@ export default function App({ args = [] }) {
                 }
                 case '/model': {
                     if (parts[1]) {
-                        const rawArgs = parts.slice(1);
+                        const rawCmdStr = parts.slice(1).join(' ');
+
+                        // Extract info flag content if present: --info "..." or -i '...' or -i {...} or bare string up to next flag
+                        let parsedPricing = null;
+                        let infoArgsStr = null;
+                        let cleanedCmdStr = rawCmdStr;
+
+                        const infoRegex = /(?:^|\s)(?:--info|-i)(?:\s+(?:"([^"]*)"|'([^']*)'|\{([^}]*)\}|((?:(?!--[a-z]|-[a-z]\b).)+)))?(?=\s+--|\s+-[a-z]\b|$)/i;
+                        const infoMatch = cleanedCmdStr.match(infoRegex);
+
+                        if (infoMatch) {
+                            infoArgsStr = (infoMatch[1] ?? infoMatch[2] ?? infoMatch[3] ?? infoMatch[4] ?? '').trim();
+                            cleanedCmdStr = (cleanedCmdStr.slice(0, infoMatch.index) + ' ' + cleanedCmdStr.slice(infoMatch.index + infoMatch[0].length)).trim();
+
+                            parsedPricing = { IN: 0, OUT: 0, CR: 0, CW: 0 };
+                            if (infoArgsStr) {
+                                const segments = infoArgsStr.split(',');
+                                for (const seg of segments) {
+                                    const trimmed = seg.trim();
+                                    const m = trimmed.match(/^(IN|OUT|CR|CW)\s+([0-9]*\.?[0-9]+)$/i);
+                                    if (m) {
+                                        parsedPricing[m[1].toUpperCase()] = parseFloat(m[2]);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Parse cleaned arguments without the info token
+                        const cleanedTokens = cleanedCmdStr.split(/\s+/).filter(Boolean);
 
                         // Check for multimodal flag
-                        const isMultimodalFlag = rawArgs.some(a => a === '--multimodal' || a === '-m' || a === '--vision' || a === '-v');
+                        const isMultimodalFlag = cleanedTokens.some(a => a === '--multimodal' || a === '-m' || a === '--vision' || a === '-v');
 
                         // Check for save / remove / rename / default flags
-                        const isSave = rawArgs.some(a => a === '--save' || a === '-sv' || a === '--add');
-                        const isRemove = rawArgs.some(a => a === '--remove' || a === '-rm');
-                        const isRename = rawArgs.some(a => a === '--rename' || a === '-rn' || a === '-mv');
-                        const isDefault = rawArgs.some(a => a === '--default' || a === '-df');
+                        const isSave = cleanedTokens.some(a => a === '--save' || a === '-sv' || a === '--add');
+                        const isRemove = cleanedTokens.some(a => a === '--remove' || a === '-rm');
+                        const isRename = cleanedTokens.some(a => a === '--rename' || a === '-rn' || a === '-mv');
+                        const isDefault = cleanedTokens.some(a => a === '--default' || a === '-df');
+
+                        const nonFlagArgs = cleanedTokens.filter(a => !['--save', '-sv', '--add', '--remove', '-rm', '--rename', '-rn', '-mv', '--default', '-df', '--multimodal', '-m', '--vision', '-v'].includes(a));
+
+                        const formatPricingText = () => {
+                            if (!parsedPricing) return '';
+                            if (Object.keys(parsedPricing).length > 0) {
+                                return `\n⠀⠀\x1b[2m└─\x1b[22m Pricing:\n` +
+                                    Object.entries(parsedPricing)
+                                        .map(([k, v]) => `       \x1b[2m•\x1b[22m \x1b[36m${k}\x1b[0m: $${v}`)
+                                        .join('\n');
+                            } else if (infoArgsStr) {
+                                return `\n⠀⠀\x1b[2m└─\x1b[22m Pricing: \x1b[33mNo valid IN, OUT, CR, CW tokens parsed from: "${infoArgsStr}"\x1b[0m`;
+                            }
+                            return '';
+                        };
 
                         if (isSave || isRemove || isRename || isDefault) {
-                            const nonFlagArgs = rawArgs.filter(a => !['--save', '-sv', '--add', '--remove', '-rm', '--rename', '-rn', '-mv', '--default', '-df', '--multimodal', '-m', '--vision', '-v'].includes(a));
-
                             if (isDefault) {
                                 const modelToDefault = nonFlagArgs.join(' ').trim();
                                 if (!modelToDefault) {
@@ -3523,14 +3565,14 @@ export default function App({ args = [] }) {
                                         return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide a model ID to set as default. Example: /model my-model --default`, isMeta: true }];
                                     });
                                 } else {
-                                    const res = setDefaultModelForProvider(aiProvider, modelToDefault, isMultimodalFlag);
+                                    const res = setDefaultModelForProvider(aiProvider, modelToDefault, isMultimodalFlag, parsedPricing);
                                     if (res.success) {
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
                                             const providerDisplay = aiProvider === 'c_openai'
                                                 ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
                                                 : aiProvider.replace('c_openai', 'Custom Endpoint');
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Default Model Set:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m Default Model: \x1b[32m${modelToDefault}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}\n⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Default Model Set:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m Default Model: \x1b[32m${modelToDefault}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}${formatPricingText()}\n⠀`, isMeta: true }];
                                         });
                                     } else {
                                         setMessages(prev => {
@@ -3547,11 +3589,11 @@ export default function App({ args = [] }) {
                                         return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide a model ID to save. Example: /model my-custom-model --save`, isMeta: true }];
                                     });
                                 } else {
-                                    const res = saveModelToProvider(aiProvider, modelToSave, isMultimodalFlag);
+                                    const res = saveModelToProvider(aiProvider, modelToSave, isMultimodalFlag, parsedPricing);
                                     if (res.success) {
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Saved:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m Model: \x1b[32m${modelToSave}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}\n⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Saved:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m Model: \x1b[32m${modelToSave}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}${formatPricingText()}\n⠀`, isMeta: true }];
                                         });
                                     } else {
                                         setMessages(prev => {
@@ -3607,8 +3649,35 @@ export default function App({ args = [] }) {
                             break;
                         }
 
-                        const filteredParts = rawArgs.filter(arg => arg !== '--multimodal' && arg !== '-m' && arg !== '--vision' && arg !== '-v');
-                        const mod = filteredParts.join(' ').trim();
+                        // If user ran info command e.g. /model <id> -i "..."
+                        if (parsedPricing !== null) {
+                            const mod = nonFlagArgs.join(' ').trim();
+                            if (!mod) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide a model ID. Example: /model <id> -i "IN 0.15, OUT 0.6, CR 0.05, CW 0.1"`, isMeta: true }];
+                                });
+                            } else {
+                                if (Object.keys(parsedPricing).length > 0) {
+                                    updateModelInfoInProvider(aiProvider, mod, parsedPricing);
+                                }
+                                const providerDisplay = aiProvider === 'c_openai'
+                                    ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
+                                    : aiProvider.replace('c_openai', 'Custom Endpoint');
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, {
+                                        id: Date.now(),
+                                        role: 'system',
+                                        text: `✦ Model Info Saved:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m Model ID: \x1b[32m${mod}\x1b[0m${formatPricingText()}\n⠀`,
+                                        isMeta: true
+                                    }];
+                                });
+                            }
+                            break;
+                        }
+
+                        const mod = nonFlagArgs.join(' ').trim();
 
                         setCustomMultimodal(isMultimodalFlag);
 
@@ -5382,7 +5451,7 @@ export default function App({ args = [] }) {
         const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'];
         const existingBudgets = quotas.providerBudgets || {};
         const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
-            acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit || existingBudgets[p].monthlyTokenLimit));
+            acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit || existingBudgets[p].monthlyTokenLimit || existingBudgets[p].dailyCostLimit || existingBudgets[p].monthlyCostLimit));
             return acc;
         }, {});
         setPbsSelected(initialSelected);
@@ -5401,7 +5470,9 @@ export default function App({ args = [] }) {
             initialForm[prov] = {
                 agentLimit: getPrefilledValue(pb.agentLimit),
                 tokenLimit: getPrefilledValue(pb.tokenLimit),
-                monthlyTokenLimit: getPrefilledValue(pb.monthlyTokenLimit)
+                monthlyTokenLimit: getPrefilledValue(pb.monthlyTokenLimit),
+                dailyCostLimit: getPrefilledValue(pb.dailyCostLimit),
+                monthlyCostLimit: getPrefilledValue(pb.monthlyCostLimit)
             };
         }
         setPbfFormState(initialForm);
@@ -5439,9 +5510,11 @@ export default function App({ args = [] }) {
             barColor = colors.danger || 'red';
         }
 
-        const isTokens = label.toLowerCase().includes('token') || label.toLowerCase().includes('daily') || label.toLowerCase().includes('monthly');
-        const displayLimit = isInfinite ? '∞' : (isTokens ? formatTokens(limit) : limit);
-        const displayCurrent = isTokens ? formatTokens(current) : current;
+        const isCost = label.toLowerCase().includes('cost') || label.toLowerCase().includes('spend');
+        const isTokens = !isCost && (label.toLowerCase().includes('token') || label.toLowerCase().includes('daily') || label.toLowerCase().includes('monthly'));
+        const displayLimit = isInfinite ? '∞' : (isCost ? `$${Number(limit).toFixed(2)}` : (isTokens ? formatTokens(limit) : limit));
+        const curNum = Number(current) || 0;
+        const displayCurrent = isCost ? `$${curNum.toFixed(curNum < 0.01 && curNum > 0 ? 4 : 2)}` : (isTokens ? formatTokens(current) : current);
 
         let displayPercent;
         if (isInfinite || actualPercent === 0) {
@@ -5726,7 +5799,21 @@ export default function App({ args = [] }) {
                                         key: 'quotas',
                                         subKey: 'monthlyTokenLimit',
                                         value: getPrefilledValue(newQuotas.monthlyTokenLimit),
-                                        returnView: returnMode
+                                        returnView: budgetReturnView,
+                                        next: (newQuotas2) => ({
+                                            label: "Enter Daily Cost Limit ($ or 0 for unlimited):",
+                                            key: 'quotas',
+                                            subKey: 'dailyCostLimit',
+                                            value: getPrefilledValue(newQuotas2.dailyCostLimit),
+                                            returnView: budgetReturnView,
+                                            next: (newQuotas3) => ({
+                                                label: "Enter Monthly Cost Limit ($ or 0 for unlimited):",
+                                                key: 'quotas',
+                                                subKey: 'monthlyCostLimit',
+                                                value: getPrefilledValue(newQuotas3.monthlyCostLimit),
+                                                returnView: returnMode
+                                            })
+                                        })
                                     })
                                 });
                                 setActiveView('input');
@@ -5771,7 +5858,7 @@ export default function App({ args = [] }) {
                                     <Text color={isActive ? colors.text : colors.textMuted} bold={isActive}>
                                         {'  '}{prov}
                                     </Text>
-                                    {isChecked && (quotas.providerBudgets?.[prov]?.agentLimit || quotas.providerBudgets?.[prov]?.tokenLimit || quotas.providerBudgets?.[prov]?.monthlyTokenLimit) ? (
+                                    {isChecked && (quotas.providerBudgets?.[prov]?.agentLimit || quotas.providerBudgets?.[prov]?.tokenLimit || quotas.providerBudgets?.[prov]?.monthlyTokenLimit || quotas.providerBudgets?.[prov]?.dailyCostLimit || quotas.providerBudgets?.[prov]?.monthlyCostLimit) ? (
                                         <Text color={colors.primary || "cyan"}> (budget set)</Text>
                                     ) : null}
                                 </Box>
@@ -5787,7 +5874,7 @@ export default function App({ args = [] }) {
 
             case 'providerBudgetFlow': {
                 const totalRows = providerBudgetQueue.length;
-                const saveButtonIndex = totalRows * 2;
+                const saveButtonIndex = totalRows * 4;
 
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
@@ -5797,40 +5884,55 @@ export default function App({ args = [] }) {
                         </Box>
 
                         <Box paddingX={1} marginTop={1} flexDirection="row">
-                            <Box width={14}>
+                            <Box width={13}>
                                 <Text color={colors.textMuted} bold>PROVIDER</Text>
                             </Box>
-                            <Box width={30} paddingLeft={1}>
-                                <Text color={colors.textMuted} bold>DAILY TOKENS (/day)</Text>
+                            <Box width={20} paddingLeft={1}>
+                                <Text color={colors.textMuted} bold>DAILY TOKENS</Text>
                             </Box>
-                            <Box width={30} paddingLeft={1}>
-                                <Text color={colors.textMuted} bold>MONTHLY TOKENS (/month)</Text>
+                            <Box width={22} paddingLeft={1}>
+                                <Text color={colors.textMuted} bold>MONTHLY TOKENS</Text>
+                            </Box>
+                            <Box width={18} paddingLeft={1}>
+                                <Text color={colors.textMuted} bold>DAILY COST ($)</Text>
+                            </Box>
+                            <Box width={20} paddingLeft={1}>
+                                <Text color={colors.textMuted} bold>MONTHLY COST ($)</Text>
                             </Box>
                         </Box>
 
                         <Box paddingX={1}>
-                            <Text color={colors.borderMuted}>{'─'.repeat(74)}</Text>
+                            <Text color={colors.borderMuted}>{'─'.repeat(93)}</Text>
                         </Box>
 
                         {providerBudgetQueue.map((prov, rowIndex) => {
-                            const dailyIdx = rowIndex * 2;
-                            const monthlyIdx = rowIndex * 2 + 1;
-                            const isDailyFocused = pbfFieldIndex === dailyIdx;
-                            const isMonthlyFocused = pbfFieldIndex === monthlyIdx;
-                            const isRowActive = isDailyFocused || isMonthlyFocused;
+                            const dailyTokensIdx = rowIndex * 4;
+                            const monthlyTokensIdx = rowIndex * 4 + 1;
+                            const dailyCostIdx = rowIndex * 4 + 2;
+                            const monthlyCostIdx = rowIndex * 4 + 3;
+
+                            const isDailyTokensFocused = pbfFieldIndex === dailyTokensIdx;
+                            const isMonthlyTokensFocused = pbfFieldIndex === monthlyTokensIdx;
+                            const isDailyCostFocused = pbfFieldIndex === dailyCostIdx;
+                            const isMonthlyCostFocused = pbfFieldIndex === monthlyCostIdx;
+                            const isRowActive = isDailyTokensFocused || isMonthlyTokensFocused || isDailyCostFocused || isMonthlyCostFocused;
 
                             const dailyVal = pbfFormState[prov]?.tokenLimit ?? '';
                             const monthlyVal = pbfFormState[prov]?.monthlyTokenLimit ?? '';
+                            const dailyCostVal = pbfFormState[prov]?.dailyCostLimit ?? '';
+                            const monthlyCostVal = pbfFormState[prov]?.monthlyCostLimit ?? '';
 
                             return (
                                 <Box key={prov} flexDirection="row" paddingX={1} marginY={0} backgroundColor={isRowActive ? (colors.highlightBg || "#2a2a2a") : undefined}>
-                                    <Box width={14} flexDirection="row">
+                                    <Box width={13} flexDirection="row">
                                         <Text color={isRowActive ? (colors.primary || "cyan") : colors.text} bold={isRowActive}>
                                             {isRowActive ? '❯ ' : '  '}{prov}
                                         </Text>
                                     </Box>
-                                    <Box width={30} paddingLeft={1} flexDirection="row">
-                                        {isDailyFocused ? (
+
+                                    {/* Daily Tokens */}
+                                    <Box width={20} paddingLeft={1} flexDirection="row">
+                                        {isDailyTokensFocused ? (
                                             <Box flexDirection="row">
                                                 <Text color={colors.primary || "cyan"} bold>[ </Text>
                                                 <TextInput
@@ -5838,26 +5940,23 @@ export default function App({ args = [] }) {
                                                     onChange={(val) => {
                                                         setPbfFormState(prev => ({
                                                             ...prev,
-                                                            [prov]: {
-                                                                ...(prev[prov] || {}),
-                                                                tokenLimit: val
-                                                            }
+                                                            [prov]: { ...(prev[prov] || {}), tokenLimit: val }
                                                         }));
                                                     }}
-                                                    onSubmit={() => {
-                                                        setPbfFieldIndex(monthlyIdx);
-                                                    }}
+                                                    onSubmit={() => setPbfFieldIndex(monthlyTokensIdx)}
                                                 />
                                                 <Text color={colors.primary || "cyan"} bold> ]</Text>
                                             </Box>
                                         ) : (
                                             <Text color={dailyVal ? colors.text : colors.textMuted}>
-                                                [ {dailyVal ? dailyVal : '0 (Unlimited)'} ]
+                                                [ {dailyVal ? dailyVal : '0 (∞)'} ]
                                             </Text>
                                         )}
                                     </Box>
-                                    <Box width={30} paddingLeft={1} flexDirection="row">
-                                        {isMonthlyFocused ? (
+
+                                    {/* Monthly Tokens */}
+                                    <Box width={22} paddingLeft={1} flexDirection="row">
+                                        {isMonthlyTokensFocused ? (
                                             <Box flexDirection="row">
                                                 <Text color={colors.primary || "cyan"} bold>[ </Text>
                                                 <TextInput
@@ -5865,15 +5964,60 @@ export default function App({ args = [] }) {
                                                     onChange={(val) => {
                                                         setPbfFormState(prev => ({
                                                             ...prev,
-                                                            [prov]: {
-                                                                ...(prev[prov] || {}),
-                                                                monthlyTokenLimit: val
-                                                            }
+                                                            [prov]: { ...(prev[prov] || {}), monthlyTokenLimit: val }
+                                                        }));
+                                                    }}
+                                                    onSubmit={() => setPbfFieldIndex(dailyCostIdx)}
+                                                />
+                                                <Text color={colors.primary || "cyan"} bold> ]</Text>
+                                            </Box>
+                                        ) : (
+                                            <Text color={monthlyVal ? colors.text : colors.textMuted}>
+                                                [ {monthlyVal ? monthlyVal : '0 (∞)'} ]
+                                            </Text>
+                                        )}
+                                    </Box>
+
+                                    {/* Daily Cost */}
+                                    <Box width={18} paddingLeft={1} flexDirection="row">
+                                        {isDailyCostFocused ? (
+                                            <Box flexDirection="row">
+                                                <Text color={colors.primary || "cyan"} bold>[ $</Text>
+                                                <TextInput
+                                                    value={dailyCostVal}
+                                                    onChange={(val) => {
+                                                        setPbfFormState(prev => ({
+                                                            ...prev,
+                                                            [prov]: { ...(prev[prov] || {}), dailyCostLimit: val }
+                                                        }));
+                                                    }}
+                                                    onSubmit={() => setPbfFieldIndex(monthlyCostIdx)}
+                                                />
+                                                <Text color={colors.primary || "cyan"} bold> ]</Text>
+                                            </Box>
+                                        ) : (
+                                            <Text color={dailyCostVal ? (colors.warning || 'yellow') : colors.textMuted}>
+                                                [ {dailyCostVal ? `$${dailyCostVal}` : '0 (∞)'} ]
+                                            </Text>
+                                        )}
+                                    </Box>
+
+                                    {/* Monthly Cost */}
+                                    <Box width={20} paddingLeft={1} flexDirection="row">
+                                        {isMonthlyCostFocused ? (
+                                            <Box flexDirection="row">
+                                                <Text color={colors.primary || "cyan"} bold>[ $</Text>
+                                                <TextInput
+                                                    value={monthlyCostVal}
+                                                    onChange={(val) => {
+                                                        setPbfFormState(prev => ({
+                                                            ...prev,
+                                                            [prov]: { ...(prev[prov] || {}), monthlyCostLimit: val }
                                                         }));
                                                     }}
                                                     onSubmit={() => {
                                                         if (rowIndex + 1 < totalRows) {
-                                                            setPbfFieldIndex((rowIndex + 1) * 2);
+                                                            setPbfFieldIndex((rowIndex + 1) * 4);
                                                         } else {
                                                             setPbfFieldIndex(saveButtonIndex);
                                                         }
@@ -5882,8 +6026,8 @@ export default function App({ args = [] }) {
                                                 <Text color={colors.primary || "cyan"} bold> ]</Text>
                                             </Box>
                                         ) : (
-                                            <Text color={monthlyVal ? colors.text : colors.textMuted}>
-                                                [ {monthlyVal ? monthlyVal : '0 (Unlimited)'} ]
+                                            <Text color={monthlyCostVal ? (colors.warning || 'yellow') : colors.textMuted}>
+                                                [ {monthlyCostVal ? `$${monthlyCostVal}` : '0 (∞)'} ]
                                             </Text>
                                         )}
                                     </Box>
@@ -5954,14 +6098,18 @@ export default function App({ args = [] }) {
                 const tokenLimit = quotas.tokenLimit || 99999999999999;
                 const monthlyCurrent = quotas.resetMode === 'Custom' ? (customPeriodUsage?.tokens || 0) : (monthlyUsage?.tokens || 0);
                 const monthlyLimit = quotas.monthlyTokenLimit || 99999999999999;
+                const dailyCostCurrent = dailyUsage?.cost || 0;
+                const dailyCostLimit = quotas.dailyCostLimit || 99999999999999;
+                const monthlyCostCurrent = quotas.resetMode === 'Custom' ? (customPeriodUsage?.cost || 0) : (monthlyUsage?.cost || 0);
+                const monthlyCostLimit = quotas.monthlyCostLimit || 99999999999999;
 
                 const isFreeTier = apiTier !== 'Paid';
                 const usingProviderBudgets = !!(quotas.providerBudgets?.__useProvider);
                 const providerBudgetsMap = quotas.providerBudgets || {};
                 const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'].filter(
-                    p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
+                    p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit || providerBudgetsMap[p].dailyCostLimit || providerBudgetsMap[p].monthlyCostLimit)
                 );
-                const limitsNotSet = !usingProviderBudgets && (shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
+                const limitsNotSet = !usingProviderBudgets && (shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit)) && (shouldClearValue(dailyCostLimit) || shouldClearValue(monthlyCostLimit));
 
                 let resetInfo = '';
                 let resetCountdown = '';
@@ -6023,6 +6171,15 @@ export default function App({ args = [] }) {
                                                 provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
                                             }
 
+                                            let provDailyCost = 0;
+                                            for (const m in dailyModels) {
+                                                provDailyCost += dailyModels[m]?.cost || 0;
+                                            }
+                                            let provMonthlyCost = 0;
+                                            for (const m in monthlyModels) {
+                                                provMonthlyCost += monthlyModels[m]?.cost || 0;
+                                            }
+
                                             return (
                                                 <Box key={prov} flexDirection="column" borderStyle="single" borderColor={colors.borderMuted} paddingX={1} width="100%">
                                                     <Box marginBottom={0}>
@@ -6030,6 +6187,12 @@ export default function App({ args = [] }) {
                                                     </Box>
                                                     {renderProgressBar('Daily', provTokenCurrent, pb.tokenLimit || 99999999999999, barW, 2, 9)}
                                                     {renderProgressBar('Monthly', provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, barW, 2, 9)}
+                                                    {(!shouldClearValue(pb.dailyCostLimit) || !shouldClearValue(pb.monthlyCostLimit)) && (
+                                                        <>
+                                                            {renderProgressBar('Daily Cost', provDailyCost, pb.dailyCostLimit || 99999999999999, barW, 2, 11)}
+                                                            {renderProgressBar('Monthly Cost', provMonthlyCost, pb.monthlyCostLimit || 99999999999999, barW, 2, 11)}
+                                                        </>
+                                                    )}
                                                 </Box>
                                             );
                                         });
@@ -6057,6 +6220,15 @@ export default function App({ args = [] }) {
                                                     provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
                                                 }
 
+                                                let provDailyCost = 0;
+                                                for (const m in dailyModels) {
+                                                    provDailyCost += dailyModels[m]?.cost || 0;
+                                                }
+                                                let provMonthlyCost = 0;
+                                                for (const m in monthlyModels) {
+                                                    provMonthlyCost += monthlyModels[m]?.cost || 0;
+                                                }
+
                                                 const isFullWidth = row.length === 1;
                                                 const targetCardCols = isFullWidth ? cols : Math.floor(cols / 2);
                                                 const barW = Math.max(5, Math.min(25, targetCardCols - 36));
@@ -6068,6 +6240,12 @@ export default function App({ args = [] }) {
                                                         </Box>
                                                         {renderProgressBar('Daily', provTokenCurrent, pb.tokenLimit || 99999999999999, barW, 2, 9)}
                                                         {renderProgressBar('Monthly', provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, barW, 2, 9)}
+                                                        {(!shouldClearValue(pb.dailyCostLimit) || !shouldClearValue(pb.monthlyCostLimit)) && (
+                                                            <>
+                                                                {renderProgressBar('Daily Cost', provDailyCost, pb.dailyCostLimit || 99999999999999, barW, 2, 11)}
+                                                                {renderProgressBar('Monthly Cost', provMonthlyCost, pb.monthlyCostLimit || 99999999999999, barW, 2, 11)}
+                                                            </>
+                                                        )}
                                                     </Box>
                                                 );
                                             })}
@@ -6091,6 +6269,12 @@ export default function App({ args = [] }) {
                             <Box flexDirection="column" borderStyle="single" borderColor={colors.borderMuted} paddingX={1} width="100%">
                                 {renderProgressBar('Daily Tokens', tokenCurrent, tokenLimit, 'green')}
                                 {renderProgressBar('Monthly Tokens', monthlyCurrent, monthlyLimit, 'yellow')}
+                                {(!shouldClearValue(dailyCostLimit) || !shouldClearValue(monthlyCostLimit)) && (
+                                    <>
+                                        {renderProgressBar('Daily Cost', dailyCostCurrent, dailyCostLimit, 'cyan')}
+                                        {renderProgressBar('Monthly Cost', monthlyCostCurrent, monthlyCostLimit, 'magenta')}
+                                    </>
+                                )}
                                 {resetInfo ? (
                                     <Box marginLeft={4} marginTop={1}>
                                         <Text color={colors.textMuted}>Monthly Reset: </Text>
@@ -6136,7 +6320,14 @@ export default function App({ args = [] }) {
                                     let newSettings = {};
 
                                     if (key === 'quotas') {
-                                        let parsedValue = (subKey.toLowerCase().includes('limit') || subKey === 'resetDay') ? parseInt(val) || 0 : val;
+                                        let parsedValue;
+                                        if (subKey.toLowerCase().includes('costlimit')) {
+                                            parsedValue = parseFloat(val) || 0;
+                                        } else if (subKey.toLowerCase().includes('limit') || subKey === 'resetDay') {
+                                            parsedValue = parseInt(val) || 0;
+                                        } else {
+                                            parsedValue = val;
+                                        }
                                         if (subKey === 'resetDay') {
                                             parsedValue = Math.max(1, Math.min(30, parsedValue));
                                         }
@@ -6316,6 +6507,20 @@ export default function App({ args = [] }) {
                     );
                 };
 
+                const formatCostBracket = (val) => {
+                    const num = Number(val) || 0;
+                    if (num <= 0) return '';
+                    if (num < 0.001) return ' [<$0.001]';
+                    return ` [$${num.toFixed(num < 0.01 ? 4 : 3)}]`;
+                };
+
+                const formatCostLabel = (val) => {
+                    const num = Number(val) || 0;
+                    if (num <= 0) return '';
+                    if (num < 0.001) return '<$0.001';
+                    return `$${num.toFixed(num < 0.01 ? 4 : 3)}`;
+                };
+
                 const breakdownRows = [];
                 const usageModels = u?.models;
                 if (!usageModels || Object.keys(usageModels).length === 0) {
@@ -6364,30 +6569,65 @@ export default function App({ args = [] }) {
                             if (filteredModels.length === 0) return;
 
                             const providerTotalTokens = filteredModels.reduce((sum, [, m]) => sum + (m.tokens || 0), 0);
+                            const providerTotalCost = filteredModels.reduce((sum, [modelName, m]) => {
+                                if ((m.cost || 0) > 0) return sum + m.cost;
+                                const pricing = getModelPricing(provider, modelName);
+                                if (!pricing) return sum;
+                                const rawInput = (m.tokens || 0) - (m.candidateTokens || 0);
+                                const rawCached = m.cachedTokens || 0;
+                                const rawUncached = Math.max(0, rawInput - rawCached);
+                                const rawOutput = m.candidateTokens || 0;
+                                const cost = ((rawUncached / 1000000) * pricing.IN) + ((rawCached / 1000000) * pricing.CR) + ((rawOutput / 1000000) * pricing.OUT);
+                                return sum + cost;
+                            }, 0);
                             const providerReqs = (u?.providerRequests && u.providerRequests[provider]) || 0;
                             if (pIdx > 0 && breakdownRows.length > 0) {
                                 breakdownRows.push(<Box key={`space-prov-${provider}`}><Text>{' '}</Text></Box>);
                             }
+                            const provCostStr = formatCostBracket(providerTotalCost);
                             breakdownRows.push(
-                                renderLeaderRow(`prov-${provider}`, `${provider}:`, `${formatTokens(providerTotalTokens)} (${providerReqs})`, colors.primary, colors.text, 0, true)
+                                renderLeaderRow(`prov-${provider}`, `${provider}:`, `${formatTokens(providerTotalTokens)} (${providerReqs})${provCostStr}`, colors.primary, colors.text, 0, true)
                             );
                             filteredModels.forEach(([modelName, stats], mIdx) => {
                                 if (mIdx > 0) {
                                     breakdownRows.push(<Box key={`space-mod-${provider}-${modelName}`}><Text>{' '}</Text></Box>);
                                 }
+                                const pricing = getModelPricing(provider, modelName);
+                                const rawInput = (stats.tokens || 0) - (stats.candidateTokens || 0);
+                                const rawCached = stats.cachedTokens || 0;
+                                const rawUncached = Math.max(0, rawInput - rawCached);
+                                const rawOutput = stats.candidateTokens || 0;
+
+                                let inCost = 0;
+                                let crCost = 0;
+                                let outCost = 0;
+                                if (pricing) {
+                                    inCost = (rawUncached / 1000000) * pricing.IN;
+                                    crCost = (rawCached / 1000000) * pricing.CR;
+                                    outCost = (rawOutput / 1000000) * pricing.OUT;
+                                }
+
+                                // Use accumulated cost if available, otherwise fallback to token * pricing calculation
+                                const effectiveCost = (stats.cost || 0) > 0 ? stats.cost : (inCost + crCost + outCost);
+                                const modCostStr = formatCostBracket(effectiveCost);
                                 breakdownRows.push(
-                                    renderLeaderRow(`mod-${provider}-${modelName}`, `» ${modelName}:`, formatTokens(stats.tokens || 0), colors.secondary, colors.text, 2, true)
+                                    renderLeaderRow(`mod-${provider}-${modelName}`, `» ${modelName}:`, `${formatTokens(stats.tokens || 0)}${modCostStr}`, colors.secondary, colors.text, 2, true)
                                 );
+
+                                const inCostStr = formatCostBracket(inCost);
+                                const crCostStr = formatCostBracket(crCost);
+                                const outCostStr = formatCostBracket(outCost);
+
                                 breakdownRows.push(
-                                    renderLeaderRow(`in-${provider}-${modelName}`, '» Input Tokens:', formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)), colors.textMuted, colors.text, 5, false)
+                                    renderLeaderRow(`in-${provider}-${modelName}`, '» Input Tokens:', `${formatTokens(rawInput)}${inCostStr}`, colors.textMuted, colors.text, 5, false)
                                 );
-                                if ((stats.cachedTokens || 0) > 0) {
+                                if (rawCached > 0) {
                                     breakdownRows.push(
-                                        renderLeaderRow(`cache-${provider}-${modelName}`, '» Cached:', formatTokens(stats.cachedTokens), colors.textMuted, colors.text, 7, false)
+                                        renderLeaderRow(`cache-${provider}-${modelName}`, '» Cached:', `${formatTokens(rawCached)}${crCostStr}`, colors.textMuted, colors.text, 7, false)
                                     );
                                 }
                                 breakdownRows.push(
-                                    renderLeaderRow(`out-${provider}-${modelName}`, '» Output Tokens:', formatTokens(stats.candidateTokens || 0), colors.textMuted, colors.text, 5, false)
+                                    renderLeaderRow(`out-${provider}-${modelName}`, '» Output Tokens:', `${formatTokens(rawOutput)}${outCostStr}`, colors.textMuted, colors.text, 5, false)
                                 );
                             });
                         });
@@ -6463,6 +6703,12 @@ export default function App({ args = [] }) {
                                                 <Box width={25}><Text color={colors.secondary}>Tokens Consumed:</Text></Box>
                                                 <Text color={colors.text}>{formatTokens(sessionTotalTokens)}</Text>
                                             </Box>
+                                            {(runtimeSession?.cost || 0) > 0 && (
+                                                <Box marginLeft={2}>
+                                                    <Box width={23}><Text color={colors.textMuted}>» Cost Estimate:</Text></Box>
+                                                    <Text color={colors.success || "green"}>{formatCostLabel(runtimeSession.cost)}</Text>
+                                                </Box>
+                                            )}
                                             <Box marginLeft={2}>
                                                 <Box width={23}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
                                                 <Text color={colors.text}>{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
@@ -6570,6 +6816,12 @@ export default function App({ args = [] }) {
                                                 <Box width={25}><Text color={colors.secondary}>{tokensLabel}</Text></Box>
                                                 <Text color={colors.text}>{formatTokens(u?.tokens || 0)}</Text>
                                             </Box>
+                                            {(u?.cost || 0) > 0 && (
+                                                <Box marginLeft={2}>
+                                                    <Box width={23}><Text color={colors.textMuted}>» Cost Estimate:</Text></Box>
+                                                    <Text color={colors.success || "green"}>{formatCostLabel(u.cost)}</Text>
+                                                </Box>
+                                            )}
                                             <Box marginLeft={2}>
                                                 <Box width={23}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
                                                 <Text color={colors.text}>{formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0))}</Text>
@@ -7385,7 +7637,7 @@ export default function App({ args = [] }) {
                                         </Text>
                                     </Box>
                                 ) : (
-                                        <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : process.env.HALLOWEEN_EEGG === "true" ? 'Listening for shadows...' : "Waiting for input..."}</Text>
+                                    <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : process.env.HALLOWEEN_EEGG === "true" ? 'Listening for shadows...' : "Waiting for input..."}</Text>
                                 )}
                             </Box>
                             <Box>
@@ -7721,10 +7973,10 @@ export default function App({ args = [] }) {
                                         const isGemmaDisabled = s.cmd === getDefaultModel("Google", "Free") && apiTier !== "Free";
 
                                         const label = s.display || (s.cmd && (s.cmd.startsWith("@[") || s.cmd.startsWith("\\@[")) && s.cmd.endsWith("]") ? (() => {
-                                             const pathPart = s.cmd.startsWith("\\@[") ? s.cmd.slice(3, -1) : s.cmd.slice(2, -1);
-                                             const parts = pathPart.split(/[\/\\]/);
-                                             return parts[parts.length - 1];
-                                         })() : (!isModelSug && !isKillSug && s.cmd && s.cmd.includes("/") ? s.cmd.split("/").pop() : s.cmd));
+                                            const pathPart = s.cmd.startsWith("\\@[") ? s.cmd.slice(3, -1) : s.cmd.slice(2, -1);
+                                            const parts = pathPart.split(/[\/\\]/);
+                                            return parts[parts.length - 1];
+                                        })() : (!isModelSug && !isKillSug && s.cmd && s.cmd.includes("/") ? s.cmd.split("/").pop() : s.cmd));
 
                                         if (isModelSug) {
                                             const isMulti = s.multimodal === true || isModelMultimodal(s.cmd || s);

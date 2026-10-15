@@ -35,6 +35,7 @@ const defaultStats = {
     candidateTokens: 0,
     linesAdded: 0,
     linesRemoved: 0,
+    cost: 0,
     imageCalls: []
 };
 
@@ -226,7 +227,9 @@ export async function runUsageDaemon(port = USAGE_DAEMON_PORT) {
                     const { key, amount = 1, provider, model } = payload;
 
                     if (key && usageData.stats[key] !== undefined) {
-                        if (typeof usageData.stats[key] === 'number') {
+                        if (key === 'cost') {
+                            usageData.stats.cost = Number(((usageData.stats.cost || 0) + Number(amount)).toFixed(6));
+                        } else if (typeof usageData.stats[key] === 'number') {
                             usageData.stats[key] += Math.floor(amount);
                         }
                     }
@@ -236,16 +239,17 @@ export async function runUsageDaemon(port = USAGE_DAEMON_PORT) {
                         usageData.stats.providerRequests[provider] = (usageData.stats.providerRequests[provider] || 0) + Math.floor(amount);
                     }
 
-                    if (provider && model && (key === 'tokens' || key === 'cachedTokens' || key === 'candidateTokens' || key === 'ttft')) {
+                    if (provider && model && (key === 'tokens' || key === 'cachedTokens' || key === 'candidateTokens' || key === 'ttft' || key === 'cost')) {
                         if (!usageData.stats.models) usageData.stats.models = {};
                         if (!usageData.stats.models[provider]) usageData.stats.models[provider] = {};
                         if (!usageData.stats.models[provider][model]) {
-                            usageData.stats.models[provider][model] = { tokens: 0, cachedTokens: 0, candidateTokens: 0, ttftSum: 0, ttftCalls: 0 };
+                            usageData.stats.models[provider][model] = { tokens: 0, cachedTokens: 0, candidateTokens: 0, ttftSum: 0, ttftCalls: 0, cost: 0 };
                         }
                         const mObj = usageData.stats.models[provider][model];
                         if (key === 'tokens') mObj.tokens += Math.floor(amount);
                         if (key === 'cachedTokens') mObj.cachedTokens += Math.floor(amount);
                         if (key === 'candidateTokens') mObj.candidateTokens += Math.floor(amount);
+                        if (key === 'cost') mObj.cost = Number(((mObj.cost || 0) + Number(amount)).toFixed(6));
                         if (key === 'ttft') {
                             mObj.ttftSum = (mObj.ttftSum || 0) + Math.floor(amount);
                             mObj.ttftCalls = (mObj.ttftCalls || 0) + 1;

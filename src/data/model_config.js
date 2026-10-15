@@ -130,7 +130,7 @@ export const saveModelConfigToDisk = () => {
     }
 };
 
-export const saveModelToProvider = (provider, modelId, multimodal = false) => {
+export const saveModelToProvider = (provider, modelId, multimodal = false, info = null) => {
     if (!provider || !modelId) return { success: false, reason: 'Invalid provider or model ID' };
     const id = modelId.trim();
     if (!id) return { success: false, reason: 'Model ID cannot be empty' };
@@ -149,16 +149,58 @@ export const saveModelToProvider = (provider, modelId, multimodal = false) => {
 
     const existingItem = p.models.Free.find(m => (typeof m === 'string' ? m : m?.cmd) === id);
     if (!existingItem) {
-        p.models.Free.push({ cmd: id, multimodal: !!multimodal, desc: id });
+        const newModel = { cmd: id, multimodal: !!multimodal, desc: id };
+        if (info && Object.keys(info).length > 0) newModel.info = info;
+        p.models.Free.push(newModel);
     } else {
         if (typeof existingItem === 'string') {
             const idx = p.models.Free.indexOf(existingItem);
-            p.models.Free[idx] = { cmd: id, multimodal: !!multimodal, desc: id };
+            const updated = { cmd: id, multimodal: !!multimodal, desc: id };
+            if (info && Object.keys(info).length > 0) updated.info = info;
+            p.models.Free[idx] = updated;
         } else {
             existingItem.multimodal = !!multimodal;
+            if (info && Object.keys(info).length > 0) {
+                existingItem.info = { ...(existingItem.info || {}), ...info };
+            }
         }
     }
     rebuildMultimodalSet();
+    saveModelConfigToDisk();
+    return { success: true };
+};
+
+export const updateModelInfoInProvider = (provider, modelId, info = {}) => {
+    if (!provider || !modelId) return { success: false, reason: 'Invalid provider or model ID' };
+    const id = modelId.trim();
+    if (!id) return { success: false, reason: 'Model ID cannot be empty' };
+
+    if (!activeConfig.providers) activeConfig.providers = {};
+    if (!activeConfig.providers[provider]) {
+        activeConfig.providers[provider] = {
+            default_free: '',
+            default_paid: '',
+            models: { Free: [], Paid: [] }
+        };
+    }
+    const p = activeConfig.providers[provider];
+    if (!p.models) p.models = { Free: [], Paid: [] };
+    if (!Array.isArray(p.models.Free)) p.models.Free = [];
+
+    const lowerId = id.toLowerCase();
+    const existingItem = p.models.Free.find(m => {
+        const cmd = typeof m === 'string' ? m : m?.cmd;
+        return cmd && cmd.trim().toLowerCase() === lowerId;
+    });
+    if (!existingItem) {
+        p.models.Free.push({ cmd: id, multimodal: false, desc: id, info });
+    } else if (typeof existingItem === 'string') {
+        const idx = p.models.Free.indexOf(existingItem);
+        p.models.Free[idx] = { cmd: existingItem, multimodal: false, desc: existingItem, info };
+    } else {
+        existingItem.info = { ...(existingItem.info || {}), ...info };
+    }
+
     saveModelConfigToDisk();
     return { success: true };
 };
@@ -190,7 +232,7 @@ export const setModelMultimodalInProvider = (provider, modelId, multimodal = tru
     return { success: true };
 };
 
-export const setDefaultModelForProvider = (provider, modelId, multimodal = false) => {
+export const setDefaultModelForProvider = (provider, modelId, multimodal = false, info = null) => {
     if (!provider || !modelId) return { success: false, reason: 'Invalid provider or model ID' };
     const id = modelId.trim();
     if (!id) return { success: false, reason: 'Model ID cannot be empty' };
@@ -209,13 +251,20 @@ export const setDefaultModelForProvider = (provider, modelId, multimodal = false
 
     const existingItem = p.models.Free.find(m => (typeof m === 'string' ? m : m?.cmd) === id);
     if (!existingItem) {
-        p.models.Free.push({ cmd: id, multimodal: !!multimodal, desc: id });
-    } else if (multimodal) {
+        const newModel = { cmd: id, multimodal: !!multimodal, desc: id };
+        if (info && Object.keys(info).length > 0) newModel.info = info;
+        p.models.Free.push(newModel);
+    } else {
         if (typeof existingItem === 'string') {
             const idx = p.models.Free.indexOf(existingItem);
-            p.models.Free[idx] = { cmd: id, multimodal: true, desc: id };
+            const updated = { cmd: id, multimodal: !!multimodal, desc: id };
+            if (info && Object.keys(info).length > 0) updated.info = info;
+            p.models.Free[idx] = updated;
         } else {
-            existingItem.multimodal = true;
+            if (multimodal) existingItem.multimodal = true;
+            if (info && Object.keys(info).length > 0) {
+                existingItem.info = { ...(existingItem.info || {}), ...info };
+            }
         }
     }
     p.default_free = id;
@@ -324,6 +373,33 @@ export const getDefaultModel = (provider, apiTier) => {
     return apiTier === 'Free' ? p.default_free : p.default_paid;
 };
 
+export const getModelPricing = (provider, modelId) => {
+    if (!provider || !modelId || !activeConfig.providers) return null;
+    const p = activeConfig.providers[provider];
+    if (!p || !p.models) return null;
+
+    const id = modelId.trim().toLowerCase();
+    const tiers = ['Free', 'Paid'];
+    for (const tier of tiers) {
+        const list = p.models[tier];
+        if (Array.isArray(list)) {
+            for (const item of list) {
+                if (typeof item === 'object' && item?.cmd && item.cmd.trim().toLowerCase() === id) {
+                    if (item.info) {
+                        return {
+                            IN: Number(item.info.IN) || 0,
+                            OUT: Number(item.info.OUT) || 0,
+                            CR: Number(item.info.CR) || 0,
+                            CW: Number(item.info.CW) || 0
+                        };
+                    }
+                }
+            }
+        }
+    }
+    return null;
+};
+
 export const getFallbackValue = (key) => {
-    return activeConfig.fallbacks[key];
+    return activeConfig?.fallbacks?.[key];
 };

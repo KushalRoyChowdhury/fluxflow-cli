@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.36.0": {
+        "note": "OCTOBER 16",
+        "added": [
+            "Added new flag `--info/-i` in `/model model-id -i \"IN OUT CR CW\"` to specify a model API cost on that provider (Yes, YOU have to fill the price by yourself ...Welcome to FluxFlow). To set a estimate cost budget/tracking.\n**Note:**\n• Cost estimation can be *SPECTACULARLY* wrong as its just ✨client side estimation✨ based on token prices YOU provide. For accuracy the your provider dashboard.\n• Parameters like: Service Tiers, Peak/Off-peak, Cache retention TTL, can ruin the estimation accuracy EVEN MORE if provider gets creative.\n• Consider it ✨Vibe Based✨ metric. Use provider dashboard if vibing has consequences."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "4.35.1": {
         "note": "OCTOBER 14.",
         "added": [],
