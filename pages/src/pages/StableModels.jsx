@@ -86,6 +86,15 @@ export default function StableModels() {
                                 <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-vision-model -m</code>
                             </td>
                         </tr>
+                        <tr>
+                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--info</td>
+                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-i</td>
+                            <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
+                                <div>Configures or resets per-million token pricing info (<code>IN</code>, <code>OUT</code>, <code>CR</code>, <code>CW</code>) for cost estimation and hover breakdown tooltips in the dashboard. Pass <code>0</code> (e.g. <code>-i 0</code>) to reset/remove existing pricing info.</div>
+                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-model -i "IN 0.15, OUT 0.6, CR 0.05, CW 0.1"</code>
+                                <code className="text-xs text-slate-500 font-mono mt-0.5 block">/model my-model -i 0  # Resets pricing info</code>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -216,10 +225,11 @@ export default function StableModels() {
                     <h4 className="font-semibold text-slate-900 dark:text-white mb-2">Aggregators &amp; Proxies</h4>
                     <ul className="text-sm text-slate-600 dark:text-slate-400 space-y-1 list-disc list-inside">
                         <li><strong>OpenRouter</strong> (openrouter.ai — routing &amp; variant support)</li>
+                        <li><strong>Infron</strong> (api.infron.ai — host routing, quantizations &amp; sorting)</li>
                         <li><strong>TokenHarbor</strong> (tokenharbor.ai)</li>
                         <li><strong>AIHubMix</strong> (aihubmix.com)</li>
                         <li><strong>Experiential Labs</strong> (api.experientiallabs.ai)</li>
-                        <li><strong>9router</strong> (Local proxy for OAuth subscriptions / Copilot. Also accepts any OpenAI & Anthropic Endpoints. Set ENV ENABLE_9ROUTER=true to enable)</li>
+                        <li><strong>9router</strong> (Local proxy for OAuth subscriptions / Copilot. Also accepts any OpenAI &amp; Anthropic Endpoints. Set ENV ENABLE_9ROUTER=true to enable)</li>
                     </ul>
                 </div>
             </div>
