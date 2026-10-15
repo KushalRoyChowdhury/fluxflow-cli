@@ -26,7 +26,7 @@ Trigger in chat via /command
 * /settings → Full-screen interactive settings menu
 * /mode → Toggle Operating Mode
 * /display index → Select active screen for Computer Use mode
-* /model model-id --flags → Flags optional to customize list (--save, --remove, --default, /model old-model new-model --rename)
+* /model model-id --flags → Flags optional to customize list (--save, --remove, --default, /model old-model new-model --rename, --info "IN price, OUT price, CR price, CW price"). Info let user enter API prices for use/budget in fluxflow. --info 0 to reset, --info "metric price" to update. CR = Cache Read, CW = Cache Write. 0 default
 * /provider → Switch AI provider
 * /thinking effort → Set reasoning effort. Can be mapped based on provider & model support (/thinking effort --map provider-effort-value/'rm' to unmap). Changes the Translation Table only for the currently selected provider and model
 * /wildcard-tooling → Tool compatibility mode for non-tooling models
