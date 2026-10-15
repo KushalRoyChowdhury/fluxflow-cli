@@ -113,6 +113,10 @@ export const getFluxLogo = (version = '...', provider = 'Loading...', theme = 'D
         process.env.HALLOWEEN_EEGG = 'true';
         const { halloweenArtSide, halloweenBat, halloweenArtUser } = loadedHalloweenModule;
         art = Math.random() > 0.9 && (month === 9 && date >= 30) ? halloweenBat : Math.random() > 0.5 ? halloweenArtSide : halloweenArtUser;
+    } else {
+        // Bug fix, downstream easter egg logic was always triggering,
+        // after this IF block ran once in current session.
+        process.env.HALLOWEEN_EEGG = 'false';
     }
 
     const quotesPool = spookfestMode ? HALLOWEEN_STARTUP_QUOTES : STARTUP_QUOTES;
