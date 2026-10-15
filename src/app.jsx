@@ -3546,8 +3546,10 @@ export default function App({ args = [] }) {
                         const isRemove = cleanedTokens.some(a => a === '--remove' || a === '-rm');
                         const isRename = cleanedTokens.some(a => a === '--rename' || a === '-rn' || a === '-mv');
                         const isDefault = cleanedTokens.some(a => a === '--default' || a === '-df');
+                        const isPrice = cleanedTokens.some(a => a === '--price' || a === '-p');
+                        const isRaw = cleanedTokens.some(a => a === '--raw' || a === '-r');
 
-                        const nonFlagArgs = cleanedTokens.filter(a => !['--save', '-sv', '--add', '--remove', '-rm', '--rename', '-rn', '-mv', '--default', '-df', '--multimodal', '-m', '--vision', '-v'].includes(a));
+                        const nonFlagArgs = cleanedTokens.filter(a => !a.startsWith('-'));
 
                         const formatPricingText = (effectivePricing = parsedPricing) => {
                             if (isResetInfo) return `\n⠀⠀\x1b[2m└─\x1b[22m Pricing: \x1b[33mReset (info removed)\x1b[0m`;
@@ -3653,6 +3655,43 @@ export default function App({ args = [] }) {
                                     }
                                 }
                             }
+                            break;
+                        }
+
+                        if (isPrice) {
+                            const priceModel = nonFlagArgs.join(' ').trim() || activeModel;
+                            const pricing = getModelPricing(aiProvider, priceModel);
+                            const providerDisplay = aiProvider === 'c_openai'
+                                ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
+                                : aiProvider.replace('c_openai', 'Custom Endpoint');
+                            const hasPrice = pricing && Object.keys(pricing).length > 0;
+
+                            // #3: raw copy-friendly one-liner
+                            if (isRaw) {
+                                const rawText = hasPrice
+                                    ? Object.entries(pricing).map(([k, v]) => `${k}=${v}`).join(' ')
+                                    : `Price not set for ${priceModel}`;
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: rawText, isMeta: true }];
+                                });
+                                break;
+                            }
+
+                            const priceLines = hasPrice
+                                ? '\n' + Object.entries(pricing)
+                                    .map(([k, v]) => `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m${k}\x1b[0m: $${v}`)
+                                    .join('\n')
+                                : `\n⠀⠀\x1b[2m└─\x1b[22m \x1b[33mPrice not set\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m \x1b[2mHint: /model ${priceModel} -i 'IN 0.15, OUT 0.6, CR 0.05, CW 0.1'\n⠀⠀\x1b[2m└─\x1b[22m \x1b[2mNote: CR = Cache Read, CW = Cache Write\x1b[0m`;
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: Date.now(),
+                                    role: 'system',
+                                    text: `✦ Model Price:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m Model ID: \x1b[32m${priceModel}\x1b[0m${priceLines}\n⠀`,
+                                    isMeta: true
+                                }];
+                            });
                             break;
                         }
 
