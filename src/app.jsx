@@ -8202,6 +8202,12 @@ export default function App({ args = [] }) {
                                                     <Box width={20}><Text color={colors.secondary}>Tokens Consumed:</Text></Box>
                                                     <Text color={colors.text}>{formatTokens(sessionTotalTokens)}</Text>
                                                 </Box>
+                                                {(runtimeSession?.cost || 0) > 0 && (
+                                                    <Box marginLeft={2}>
+                                                        <Box width={18}><Text color={colors.textMuted}>» Cost Estimate:</Text></Box>
+                                                        <Text color={colors.success || "green"}>{(() => { const n = Number(runtimeSession.cost) || 0; if (n <= 0) return ''; if (n < 0.001) return '<$0.001'; return `$${n.toFixed(n < 0.01 ? 4 : 3)}`; })()}</Text>
+                                                    </Box>
+                                                )}
                                                 <Box marginLeft={2}>
                                                     <Box width={18}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
                                                     <Text color={colors.text}>{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
