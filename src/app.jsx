@@ -3506,6 +3506,7 @@ export default function App({ args = [] }) {
 
                         // Extract info flag content if present: --info "..." or -i '...' or -i {...} or bare string up to next flag
                         let parsedPricing = null;
+                        let isResetInfo = false;
                         let infoArgsStr = null;
                         let cleanedCmdStr = rawCmdStr;
 
@@ -3516,14 +3517,19 @@ export default function App({ args = [] }) {
                             infoArgsStr = (infoMatch[1] ?? infoMatch[2] ?? infoMatch[3] ?? infoMatch[4] ?? '').trim();
                             cleanedCmdStr = (cleanedCmdStr.slice(0, infoMatch.index) + ' ' + cleanedCmdStr.slice(infoMatch.index + infoMatch[0].length)).trim();
 
-                            parsedPricing = { IN: 0, OUT: 0, CR: 0, CW: 0 };
-                            if (infoArgsStr) {
-                                const segments = infoArgsStr.split(',');
-                                for (const seg of segments) {
-                                    const trimmed = seg.trim();
-                                    const m = trimmed.match(/^(IN|OUT|CR|CW)\s+([0-9]*\.?[0-9]+)$/i);
-                                    if (m) {
-                                        parsedPricing[m[1].toUpperCase()] = parseFloat(m[2]);
+                            if (infoArgsStr === '0') {
+                                isResetInfo = true;
+                                parsedPricing = null;
+                            } else {
+                                parsedPricing = {};
+                                if (infoArgsStr) {
+                                    const segments = infoArgsStr.split(',');
+                                    for (const seg of segments) {
+                                        const trimmed = seg.trim();
+                                        const m = trimmed.match(/^(IN|OUT|CR|CW)\s+([0-9]*\.?[0-9]+)$/i);
+                                        if (m) {
+                                            parsedPricing[m[1].toUpperCase()] = parseFloat(m[2]);
+                                        }
                                     }
                                 }
                             }
@@ -3543,11 +3549,12 @@ export default function App({ args = [] }) {
 
                         const nonFlagArgs = cleanedTokens.filter(a => !['--save', '-sv', '--add', '--remove', '-rm', '--rename', '-rn', '-mv', '--default', '-df', '--multimodal', '-m', '--vision', '-v'].includes(a));
 
-                        const formatPricingText = () => {
-                            if (!parsedPricing) return '';
-                            if (Object.keys(parsedPricing).length > 0) {
+                        const formatPricingText = (effectivePricing = parsedPricing) => {
+                            if (isResetInfo) return `\n⠀⠀\x1b[2m└─\x1b[22m Pricing: \x1b[33mReset (info removed)\x1b[0m`;
+                            if (!effectivePricing) return '';
+                            if (Object.keys(effectivePricing).length > 0) {
                                 return `\n⠀⠀\x1b[2m└─\x1b[22m Pricing:\n` +
-                                    Object.entries(parsedPricing)
+                                    Object.entries(effectivePricing)
                                         .map(([k, v]) => `       \x1b[2m•\x1b[22m \x1b[36m${k}\x1b[0m: $${v}`)
                                         .join('\n');
                             } else if (infoArgsStr) {
@@ -3649,8 +3656,8 @@ export default function App({ args = [] }) {
                             break;
                         }
 
-                        // If user ran info command e.g. /model <id> -i "..."
-                        if (parsedPricing !== null) {
+                        // If user ran info command e.g. /model <id> -i "..." or -i 0
+                        if (parsedPricing !== null || isResetInfo) {
                             const mod = nonFlagArgs.join(' ').trim();
                             if (!mod) {
                                 setMessages(prev => {
@@ -3658,9 +3665,12 @@ export default function App({ args = [] }) {
                                     return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide a model ID. Example: /model <id> -i "IN 0.15, OUT 0.6, CR 0.05, CW 0.1"`, isMeta: true }];
                                 });
                             } else {
-                                if (Object.keys(parsedPricing).length > 0) {
+                                if (isResetInfo) {
+                                    updateModelInfoInProvider(aiProvider, mod, null);
+                                } else if (Object.keys(parsedPricing).length > 0) {
                                     updateModelInfoInProvider(aiProvider, mod, parsedPricing);
                                 }
+                                const updatedPricing = isResetInfo ? null : getModelPricing(aiProvider, mod);
                                 const providerDisplay = aiProvider === 'c_openai'
                                     ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
                                     : aiProvider.replace('c_openai', 'Custom Endpoint');
@@ -3669,7 +3679,7 @@ export default function App({ args = [] }) {
                                     return [...prev, {
                                         id: Date.now(),
                                         role: 'system',
-                                        text: `✦ Model Info Saved:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m Model ID: \x1b[32m${mod}\x1b[0m${formatPricingText()}\n⠀`,
+                                        text: `✦ Model Info ${isResetInfo ? 'Reset' : 'Saved'}:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m Model ID: \x1b[32m${mod}\x1b[0m${formatPricingText(updatedPricing || parsedPricing)}\n⠀`,
                                         isMeta: true
                                     }];
                                 });

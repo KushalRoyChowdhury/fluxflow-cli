@@ -1119,6 +1119,21 @@ function generateDashboardHtml() {
             return '$' + num.toFixed(num < 0.01 ? 4 : 3);
         }
 
+        function buildCostTitle(breakdown, totalCost) {
+            if (!breakdown) {
+                const num = Number(totalCost) || 0;
+                return num > 0 ? 'Total: $' + num.toFixed(6) : '';
+            }
+            const parts = [];
+            if (breakdown.inputCost > 0) parts.push('Input: $' + breakdown.inputCost.toFixed(6));
+            if (breakdown.cacheReadCost > 0) parts.push('Cache Read: $' + breakdown.cacheReadCost.toFixed(6));
+            if (breakdown.cacheWriteCost > 0) parts.push('Cache Write: $' + breakdown.cacheWriteCost.toFixed(6));
+            if (breakdown.outputCost > 0) parts.push('Output: $' + breakdown.outputCost.toFixed(6));
+            const total = Number(totalCost) || 0;
+            if (total > 0) parts.push('Total: $' + total.toFixed(6));
+            return parts.join('\\n');
+        }
+
         function filterTimelineByRange(timeline, range) {
             if (!timeline || timeline.length === 0) return [];
             const todayStr = rawData.currentDate || new Date().toISOString().split('T')[0];
@@ -1983,6 +1998,7 @@ function generateDashboardHtml() {
                     const cachePct = prompt > 0 ? ((cached / prompt) * 100).toFixed(1) : '0.0';
                     const isSelected = activeDatesSet.has(item.date);
                     const costDisplay = formatCost(item.cost);
+                    const costTitle = buildCostTitle(item.costBreakdown, item.cost);
 
                     return \`
                         <tr>
@@ -1998,7 +2014,7 @@ function generateDashboardHtml() {
                             </td>
                             <td class="mono" style="color: var(--accent-violet);">\${formatNumber(cand)}</td>
                             <td class="mono" style="font-weight: 700;">\${formatNumber(total)}</td>
-                            <td class="mono" style="color: #fbbf24; font-weight: 600;">\${costDisplay}</td>
+                            <td class="mono" style="color: #fbbf24; font-weight: 600; cursor: default;" title="\${costTitle}">\${costDisplay}</td>
                             <td>
                                 <span class="badge-info" style="font-size: 0.75rem;">\${item.toolSuccessRate}%</span>
                             </td>
@@ -2062,6 +2078,14 @@ function generateDashboardHtml() {
                             modelMap[key].candidateTokens += tCand;
                             modelMap[key].cachedTokens += tCache;
                             modelMap[key].cost += (entry.cost || 0);
+                            if (entry.costBreakdown || (day.models && day.models[prov] && day.models[prov][m] && day.models[prov][m].costBreakdown)) {
+                                const bd = entry.costBreakdown || day.models[prov][m].costBreakdown;
+                                if (!modelMap[key].costBreakdown) modelMap[key].costBreakdown = { inputCost: 0, outputCost: 0, cacheReadCost: 0, cacheWriteCost: 0 };
+                                modelMap[key].costBreakdown.inputCost += (bd.inputCost || 0);
+                                modelMap[key].costBreakdown.outputCost += (bd.outputCost || 0);
+                                modelMap[key].costBreakdown.cacheReadCost += (bd.cacheReadCost || 0);
+                                modelMap[key].costBreakdown.cacheWriteCost += (bd.cacheWriteCost || 0);
+                            }
                             modelMap[key].ttftSum += (entry.ttftSum || 0);
                             modelMap[key].ttftCalls += (entry.ttftCalls || 0);
                             aggregateTokens += tTok;
@@ -2111,6 +2135,7 @@ function generateDashboardHtml() {
                 tbody.innerHTML = modelList.map(m => {
                     const ttftVal = m.avgTtft > 0 ? (m.avgTtft >= 1000 ? (m.avgTtft / 1000).toFixed(2) + 's' : m.avgTtft + 'ms') : '-';
                     const costDisplay = formatCost(m.cost);
+                    const costTitle = buildCostTitle(m.costBreakdown || (rawData && rawData.modelBreakdowns && rawData.modelBreakdowns[m.provider + '___' + m.model]?.breakdown), m.cost);
                     return \`
                         <tr>
                             <td class="mono" style="font-weight: 600; color: var(--text-main);">
@@ -2131,7 +2156,7 @@ function generateDashboardHtml() {
                             <td class="mono" style="color: var(--accent-violet);">\${formatNumber(m.candidateTokens)}</td>
                             \${showTtft ? \`<td class="mono" style="color: var(--accent-amber); font-size: 0.8rem;">\${ttftVal}</td>\` : ''}
                             <td class="mono" style="font-weight: 700; color: var(--text-main);">\${formatNumber(m.tokens)}</td>
-                            <td class="mono" style="color: #fbbf24; font-weight: 600;">\${costDisplay}</td>
+                            <td class="mono" style="color: #fbbf24; font-weight: 600; cursor: default;" title="\${costTitle}">\${costDisplay}</td>
                         </tr>
                     \`;
                 }).join('');
@@ -2172,6 +2197,13 @@ function generateDashboardHtml() {
                             provMap[prov].cachedTokens += (entry.cachedTokens || 0);
                             provMap[prov].promptTokens += Math.max(0, tTok - tCand);
                             provMap[prov].cost += (entry.cost || 0);
+                            if (entry.costBreakdown) {
+                                if (!provMap[prov].costBreakdown) provMap[prov].costBreakdown = { inputCost: 0, outputCost: 0, cacheReadCost: 0, cacheWriteCost: 0 };
+                                provMap[prov].costBreakdown.inputCost += (entry.costBreakdown.inputCost || 0);
+                                provMap[prov].costBreakdown.outputCost += (entry.costBreakdown.outputCost || 0);
+                                provMap[prov].costBreakdown.cacheReadCost += (entry.costBreakdown.cacheReadCost || 0);
+                                provMap[prov].costBreakdown.cacheWriteCost += (entry.costBreakdown.cacheWriteCost || 0);
+                            }
                             grandTokens += tTok;
                         }
                     });
@@ -2211,13 +2243,14 @@ function generateDashboardHtml() {
                     var sharePct = grandTokens > 0 ? ((p.tokens / grandTokens) * 100).toFixed(1) : '0.0';
                     var cachedTxt = p.cachedTokens > 0 ? ' <span style=color:#059669;font-size:0.85em;>(' + formatNumber(p.cachedTokens) + ' cached)</span>' : '';
                     var costTxt = formatCost(p.cost);
+                    var costTitleProv = buildCostTitle(p.costBreakdown || (rawData && rawData.provBreakdowns && rawData.provBreakdowns[p.provider]?.breakdown), p.cost);
                     return '<tr><td><span class=badge-info style=font-size:0.75rem;display:inline-flex;align-items:center;gap:6px;>' + getProviderBrandIcon(p.provider, 16) + ' ' + formatProviderName(p.provider) + '</span></td>' +
                         '<td class=mono style=font-weight:700;color:var(--accent-amber);>' + p.requests.toLocaleString() + '</td>' +
                         '<td class=mono style=color:var(--accent-emerald);>' + formatNumber(p.promptTokens) + cachedTxt + '</td>' +
                         '<td><span class=badge-positive style=font-size:0.75rem;>' + p.cachePct + '%</span></td>' +
                         '<td class=mono style=color:var(--accent-violet);>' + formatNumber(p.candidateTokens) + '</td>' +
                         '<td class=mono style=font-weight:700;color:var(--text-main);>' + formatNumber(p.tokens) + ' <span style=color:var(--text-muted);font-size:0.75em;font-weight:500;>(' + sharePct + '%)</span></td>' +
-                        '<td class=mono style="color:#fbbf24;font-weight:600;">' + costTxt + '</td></tr>';
+                        '<td class=mono style="color:#fbbf24;font-weight:600;cursor:default;" title="' + costTitleProv + '">' + costTxt + '</td></tr>';
                 }).join('');
             } else if (tableMode === 'timed') {
                 titleEl.textContent = 'Per-Request Timed Log';
@@ -2248,6 +2281,7 @@ function generateDashboardHtml() {
                     output: Number(e.output) || 0,
                     reasoning: Number(e.reasoning) || 0,
                     cost: Number(e.cost) || 0,
+                    costBreakdown: e.costBreakdown || null,
                     ttft: Number(e.ttft) || 0
                 }));
 
@@ -2306,6 +2340,7 @@ function generateDashboardHtml() {
                 tbody.innerHTML = pageRows.map(r => {
                     const ttftVal = r.ttft > 0 ? (r.ttft >= 1000 ? (r.ttft / 1000).toFixed(2) + 's' : r.ttft + 'ms') : '-';
                     const costDisplay = formatCost(r.cost);
+                    const costTitle = buildCostTitle(r.costBreakdown, r.cost);
                     return \`
                         <tr>
                             <td class="mono" style="font-size: 0.75rem; color: var(--text-muted);">\${r.timeDisplay}</td>
@@ -2321,7 +2356,7 @@ function generateDashboardHtml() {
                             <td class="mono" style="color: var(--accent-violet);">\${formatNumber(r.output)}\${r.reasoning > 0 ? ' <span style="color: #8b5cf6; font-size: 0.75rem;">(' + formatNumber(r.reasoning) + ' thinking)</span>' : ''}</td>
                             \${showTtft ? \`<td class="mono" style="color: var(--accent-amber); font-size: 0.8rem;">\${ttftVal}</td>\` : ''}
                             <td class="mono" style="font-weight: 700;">\${formatNumber(r.total)}</td>
-                            <td class="mono" style="color: #fbbf24; font-weight: 600;">\${costDisplay}</td>
+                            <td class="mono" style="color: #fbbf24; font-weight: 600; cursor: default;" title="\${costTitle}">\${costDisplay}</td>
                         </tr>
                     \`;
                 }).join('');
@@ -2555,16 +2590,58 @@ export async function startUsageServer(preferredPort = 52140) {
                 const data = await getAllUsageData();
                 data.timed = await getTimedUsage(30);
 
-                if (data.timeline) {
+                if (Array.isArray(data.timed)) {
+                    // Map of date -> breakdown aggregator
+                    const dayBreakdowns = {};
+                    // Map of "prov___model" -> breakdown aggregator
+                    const modelBreakdowns = {};
+                    // Map of prov -> breakdown aggregator
+                    const provBreakdowns = {};
+
+                    const addBD = (target, bd, cost) => {
+                        if (!target.breakdown) target.breakdown = { inputCost: 0, outputCost: 0, cacheReadCost: 0, cacheWriteCost: 0 };
+                        if (bd) {
+                            target.breakdown.inputCost += Number(bd.inputCost) || 0;
+                            target.breakdown.outputCost += Number(bd.outputCost) || 0;
+                            target.breakdown.cacheReadCost += Number(bd.cacheReadCost) || 0;
+                            target.breakdown.cacheWriteCost += Number(bd.cacheWriteCost) || 0;
+                        }
+                        target.cost = (target.cost || 0) + (Number(cost) || 0);
+                    };
+
+                    data.timed.forEach(entry => {
+                        entry.cost = Number((entry.cost || 0).toFixed(6));
+                        const dStr = entry.time ? entry.time.slice(0, 10) : '';
+                        const p = entry.provider || 'unknown';
+                        const m = entry.model || 'unknown';
+                        const pmKey = p + '___' + m;
+
+                        if (dStr) {
+                            if (!dayBreakdowns[dStr]) dayBreakdowns[dStr] = { breakdown: null, cost: 0 };
+                            addBD(dayBreakdowns[dStr], entry.costBreakdown, entry.cost);
+                        }
+                        if (!modelBreakdowns[pmKey]) modelBreakdowns[pmKey] = { breakdown: null, cost: 0 };
+                        addBD(modelBreakdowns[pmKey], entry.costBreakdown, entry.cost);
+
+                        if (!provBreakdowns[p]) provBreakdowns[p] = { breakdown: null, cost: 0 };
+                        addBD(provBreakdowns[p], entry.costBreakdown, entry.cost);
+                    });
+
+                    if (data.timeline) {
+                        for (const day of data.timeline) {
+                            day.cost = Number((day.cost || 0).toFixed(6));
+                            if (dayBreakdowns[day.date] && dayBreakdowns[day.date].breakdown) {
+                                day.costBreakdown = dayBreakdowns[day.date].breakdown;
+                            }
+                        }
+                    }
+
+                    data.modelBreakdowns = modelBreakdowns;
+                    data.provBreakdowns = provBreakdowns;
+                } else if (data.timeline) {
                     for (const day of data.timeline) {
                         day.cost = Number((day.cost || 0).toFixed(6));
                     }
-                }
-
-                if (Array.isArray(data.timed)) {
-                    data.timed.forEach(entry => {
-                        entry.cost = Number((entry.cost || 0).toFixed(6));
-                    });
                 }
 
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });

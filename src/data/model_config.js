@@ -192,13 +192,20 @@ export const updateModelInfoInProvider = (provider, modelId, info = {}) => {
         const cmd = typeof m === 'string' ? m : m?.cmd;
         return cmd && cmd.trim().toLowerCase() === lowerId;
     });
-    if (!existingItem) {
-        p.models.Free.push({ cmd: id, multimodal: false, desc: id, info });
-    } else if (typeof existingItem === 'string') {
-        const idx = p.models.Free.indexOf(existingItem);
-        p.models.Free[idx] = { cmd: existingItem, multimodal: false, desc: existingItem, info };
+
+    if (info === null) {
+        if (existingItem && typeof existingItem === 'object') {
+            delete existingItem.info;
+        }
     } else {
-        existingItem.info = { ...(existingItem.info || {}), ...info };
+        if (!existingItem) {
+            p.models.Free.push({ cmd: id, multimodal: false, desc: id, info });
+        } else if (typeof existingItem === 'string') {
+            const idx = p.models.Free.indexOf(existingItem);
+            p.models.Free[idx] = { cmd: existingItem, multimodal: false, desc: existingItem, info };
+        } else {
+            existingItem.info = { ...(existingItem.info || {}), ...info };
+        }
     }
 
     saveModelConfigToDisk();
