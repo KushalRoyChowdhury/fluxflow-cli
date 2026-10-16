@@ -233,7 +233,7 @@ const tokenizeLine = (line, lang) => {
     return tokens;
 };
 
-const renderHighlightedLine = (line, lang, defaultColor = undefined, defaultBgColor = undefined) => {
+export const renderHighlightedLine = (line, lang, defaultColor = undefined, defaultBgColor = undefined) => {
     if (!line) return <Text backgroundColor={defaultBgColor}>{' '}</Text>;
     const tokens = tokenizeLine(line, lang);
     return (
@@ -601,7 +601,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
 
         // Case B: Truly unchanged boilerplate context lines get full soft tint
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
-            const textColor = isRemoval ? colors.diffRemovalText : (isAddition ? colors.diffAdditionText : colors.textMuted);
+            const textColor = undefined;
             const textBgColor = undefined;
             return (
                 <Box flexDirection="column">
@@ -642,23 +642,23 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
                             if (part.isHighlight) {
                                 return (
                                     <React.Fragment key={idx}>
-                                        {renderHighlightedLine(part.text, extension, colors.diffRemovalText, colors.diffRemovalHighlightBg)}
+                                        {renderHighlightedLine(part.text, extension, undefined, colors.diffRemovalHighlightBg)}
                                     </React.Fragment>
                                 );
                             }
-                            return <React.Fragment key={idx}>{renderHighlightedLine(part.text, extension, colors.diffRemovalText)}</React.Fragment>;
+                            return <React.Fragment key={idx}>{renderHighlightedLine(part.text, extension, undefined)}</React.Fragment>;
                         }
                         if (isAddition) {
                             if (part.isHighlight) {
                                 return (
                                     <React.Fragment key={idx}>
-                                        {renderHighlightedLine(part.text, extension, colors.diffAdditionText, colors.diffAdditionHighlightBg)}
+                                        {renderHighlightedLine(part.text, extension, undefined, colors.diffAdditionHighlightBg)}
                                     </React.Fragment>
                                 );
                             }
-                            return <React.Fragment key={idx}>{renderHighlightedLine(part.text, extension, colors.diffAdditionText)}</React.Fragment>;
+                            return <React.Fragment key={idx}>{renderHighlightedLine(part.text, extension, undefined)}</React.Fragment>;
                         }
-                        return <React.Fragment key={idx}>{renderHighlightedLine(part.text, extension, colors.textMuted)}</React.Fragment>;
+                        return <React.Fragment key={idx}>{renderHighlightedLine(part.text, extension, undefined)}</React.Fragment>;
                     })}
                 </Text>
             );
@@ -758,23 +758,23 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
                                     if (part.isHighlight) {
                                         return (
                                             <React.Fragment key={sIdx}>
-                                                {renderHighlightedLine(part.text, extension, colors.diffRemovalText, colors.diffRemovalHighlightBg)}
+                                                {renderHighlightedLine(part.text, extension, undefined, colors.diffRemovalHighlightBg)}
                                             </React.Fragment>
                                         );
                                     }
-                                    return <React.Fragment key={sIdx}>{renderHighlightedLine(part.text, extension, colors.diffRemovalText)}</React.Fragment>;
+                                    return <React.Fragment key={sIdx}>{renderHighlightedLine(part.text, extension, undefined)}</React.Fragment>;
                                 }
                                 if (isAddition) {
                                     if (part.isHighlight) {
                                         return (
                                             <React.Fragment key={sIdx}>
-                                                {renderHighlightedLine(part.text, extension, colors.diffAdditionText, colors.diffAdditionHighlightBg)}
+                                                {renderHighlightedLine(part.text, extension, undefined, colors.diffAdditionHighlightBg)}
                                             </React.Fragment>
                                         );
                                     }
-                                    return <React.Fragment key={sIdx}>{renderHighlightedLine(part.text, extension, colors.diffAdditionText)}</React.Fragment>;
+                                    return <React.Fragment key={sIdx}>{renderHighlightedLine(part.text, extension, undefined)}</React.Fragment>;
                                 }
-                                return <React.Fragment key={sIdx}>{renderHighlightedLine(part.text, extension, colors.textMuted)}</React.Fragment>;
+                                return <React.Fragment key={sIdx}>{renderHighlightedLine(part.text, extension, undefined)}</React.Fragment>;
                             })}
                         </Text>
                     </Box>

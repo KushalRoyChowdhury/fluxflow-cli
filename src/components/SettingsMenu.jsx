@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { getThemeColors, THEMES } from '../utils/theme.js';
-import { setPreserveThinkingCache } from './ChatLayout.jsx';
+import { setPreserveThinkingCache, renderHighlightedLine } from './ChatLayout.jsx';
 import { getModels } from '../data/model_config.js';
 import { getProviderAPIKey } from '../utils/secrets.js';
 import v8 from 'v8';
@@ -855,36 +855,36 @@ export default function SettingsMenu({
                         <Box flexDirection="column" marginLeft={2} marginBottom={1}>
                             <Text>
                                 <Text color={previewColors.textDim}>3 </Text>
-                                <Text color={previewColors.textDim}>  import "fmt"</Text>
+                                {renderHighlightedLine('  import "fmt"', '.go', undefined)}
                             </Text>
                             <Text color={previewColors.textDim}>4</Text>
                             <Box backgroundColor={previewColors.diffRemovalBg}>
                                 <Text>
                                     <Text color={previewColors.diffRemovalNum || previewColors.diffRemovalText}>5 </Text>
                                     <Text color={previewColors.diffRemovalPrefix || previewColors.diffRemovalText}>- </Text>
-                                    <Text color={previewColors.diffRemovalText}>func </Text>
-                                    <Text color={previewColors.diffRemovalHighlightColor || previewColors.diffRemovalText} backgroundColor={previewColors.diffRemovalHighlightBg} bold>main()</Text>
-                                    <Text color={previewColors.diffRemovalText}> &#123;</Text>
+                                    {renderHighlightedLine('func ', '.go', undefined)}
+                                    {renderHighlightedLine('main()', '.go', undefined, previewColors.diffRemovalHighlightBg)}
+                                    {renderHighlightedLine(' {', '.go', undefined)}
                                 </Text>
                             </Box>
                             <Box backgroundColor={previewColors.diffAdditionBg}>
                                 <Text>
                                     <Text color={previewColors.diffAdditionNum || previewColors.diffAdditionText}>5 </Text>
                                     <Text color={previewColors.diffAdditionPrefix || previewColors.diffAdditionText}>+ </Text>
-                                    <Text color={previewColors.diffAdditionText}>func </Text>
-                                    <Text color={previewColors.diffAdditionHighlightColor || previewColors.diffAdditionText} backgroundColor={previewColors.diffAdditionHighlightBg} bold>greet(name string)</Text>
-                                    <Text color={previewColors.diffAdditionText}> &#123;</Text>
+                                    {renderHighlightedLine('func ', '.go', undefined)}
+                                    {renderHighlightedLine('greet(name string)', '.go', undefined, previewColors.diffAdditionHighlightBg)}
+                                    {renderHighlightedLine(' {', '.go', undefined)}
                                 </Text>
                             </Box>
                             <Box backgroundColor={previewColors.diffAdditionBg}>
                                 <Text>
                                     <Text color={previewColors.diffAdditionNum || previewColors.diffAdditionText}>6 </Text>
                                     <Text color={previewColors.diffAdditionPrefix || previewColors.diffAdditionText}>+ </Text>
-                                    <Text color={previewColors.diffAdditionText}>    </Text>
-                                    <Text color={previewColors.diffAdditionHighlightColor || previewColors.diffAdditionText} backgroundColor={previewColors.diffAdditionHighlightBg}>fmt.Printf("Hello, %s!\n", name)</Text>
+                                    <Text>    </Text>
+                                    {renderHighlightedLine('fmt.Printf("Hello, %s!\\n", name)', '.go', undefined, previewColors.diffAdditionHighlightBg)}
                                 </Text>
                             </Box>
-                            <Text color={previewColors.textDim}>7   &#125;</Text>
+                            <Text>7   &#125;</Text>
                         </Box>
 
                         {/* Thought Process */}

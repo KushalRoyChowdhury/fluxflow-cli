@@ -2174,11 +2174,7 @@ export default function App({ args = [] }) {
                 const nextIdx = (modes.indexOf(mode) + 1) % modes.length;
                 const newMode = modes[nextIdx >= 0 ? nextIdx : 0];
                 setMode(newMode);
-                if (newMode === 'Flow') {
-                    setThinkingLevel('Fast');
-                } else if (newMode === 'Flux' || newMode === 'ICU' || newMode === 'FluxCU') {
-                    setThinkingLevel('High');
-                }
+
                 setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${getModeDisplayName(newMode)}\n⠀`, isMeta: true }]);
                 return;
             }
@@ -3210,9 +3206,7 @@ export default function App({ args = [] }) {
                         else if (targetParam === 'flux') newMode = 'Flux';
 
                         setMode(newMode);
-                        if (newMode === 'Flow') {
-                            setThinkingLevel('Fast');
-                        }
+
                         const s = emojiSpace(2);
                         setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${getModeDisplayName(newMode)}.\n⠀`, isMeta: true }]; });
                     } else {
@@ -7485,11 +7479,7 @@ export default function App({ args = [] }) {
                             }
                             const newMode = item.value;
                             setMode(newMode);
-                            if (newMode === 'Flow') {
-                                setThinkingLevel('Fast');
-                            } else {
-                                setThinkingLevel('High');
-                            }
+
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
                                 return [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${getModeDisplayName(newMode)}\n⠀`, isMeta: true }];
