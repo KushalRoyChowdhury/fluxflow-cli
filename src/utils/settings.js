@@ -62,7 +62,8 @@ const DEFAULT_SETTINGS = {
         contextLength: '256k',
         keepReasoningContext: false,
         autoExcludeMetadata: false,
-        disableTodo: false
+        disableTodo: false,
+        alwaysAskFiles: '.env, .env.*, *.env'
     },
     profileData: {
         name: null,

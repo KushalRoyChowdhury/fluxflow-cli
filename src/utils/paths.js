@@ -2,6 +2,7 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { minimatch } from 'minimatch';
 
 /**
  * Flux Flow - Global Path Configuration
@@ -136,5 +137,63 @@ export const getGitignoreExcludes = (dir = process.cwd()) => {
         // ignore errors
     }
     return [];
+};
+
+/**
+ * Checks if a given file path matches any pattern in a comma-separated list of names/globs.
+ * Uses minimatch for complete glob support (e.g. ".env, .env.*, *.env, *.pem, secrets/**, id_rsa*").
+ */
+export const matchesPathPattern = (filePath, patternCsv) => {
+    if (!filePath || !patternCsv) return false;
+    const cleanPath = filePath.replace(/\\/g, '/');
+    const fileName = path.basename(filePath);
+
+    const patterns = patternCsv
+        .split(',')
+        .map(p => p.trim())
+        .filter(Boolean);
+
+    let minimatchFn = null;
+    try {
+        // dynamic require / import fallback or standard import
+        const mm = (typeof minimatch !== 'undefined') ? minimatch : null;
+        if (mm) minimatchFn = mm;
+    } catch (e) {}
+
+    for (const pat of patterns) {
+        const cleanPat = pat.replace(/\\/g, '/');
+        // Direct exact match
+        if (fileName.toLowerCase() === cleanPat.toLowerCase() ||
+            cleanPath.toLowerCase() === cleanPat.toLowerCase() ||
+            cleanPath.toLowerCase().endsWith('/' + cleanPat.toLowerCase())) {
+            return true;
+        }
+
+        // Minimatch check (on both whole path and filename)
+        try {
+            if (minimatchFn) {
+                if (minimatchFn(cleanPath, cleanPat, { dot: true, nocase: true, matchBase: true }) ||
+                    minimatchFn(fileName, cleanPat, { dot: true, nocase: true })) {
+                    return true;
+                }
+            }
+        } catch (e) {}
+
+        // Fast regex glob fallback if minimatch is not in scope
+        if (cleanPat.includes('*') || cleanPat.includes('?')) {
+            const regexStr = '^' + cleanPat
+                .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+                .replace(/\*\*/g, '.*')
+                .replace(/\*/g, '[^/]*')
+                .replace(/\?/g, '.') + '$';
+            try {
+                const re = new RegExp(regexStr, 'i');
+                if (re.test(fileName) || re.test(cleanPath)) {
+                    return true;
+                }
+            } catch (e) { }
+        }
+    }
+    return false;
 };
 

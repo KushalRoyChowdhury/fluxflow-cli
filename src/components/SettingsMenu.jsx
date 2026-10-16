@@ -315,6 +315,7 @@ export default function SettingsMenu({
                     { label: 'External Workspace Access', value: 'externalAccess', status: systemSettings.allowExternalAccess ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'Network Access (Terminal)', value: 'networkAccess', status: systemSettings.networkAccess !== false ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'Always Ask Commands', value: 'alwaysAsk', status: truncateCSV(systemSettings.alwaysAskCommands), section: 'Sandbox' },
+                    { label: 'Always Ask Files/Paths', value: 'alwaysAskFiles', status: truncateCSV(systemSettings.alwaysAskFiles || '.env, .env.*, *.env'), section: 'Sandbox' },
                     { label: 'Auto Approve Commands', value: 'autoApprove', status: truncateCSV(systemSettings.autoApproveCommands), section: 'Sandbox' },
                     { label: 'Auto Disapprove Commands', value: 'autoDisallow', status: truncateCSV(systemSettings.autoDisallowCommands), section: 'Sandbox' },
                     { label: 'Auto Approve Git Commits', value: 'autoApproveGit', status: systemSettings.autoApproveGit ? 'ON' : 'OFF', section: 'Sandbox' },
@@ -541,6 +542,9 @@ export default function SettingsMenu({
         } else if (item.value === 'alwaysAsk') {
             setEditingItem('alwaysAskCommands');
             setEditValue(systemSettings.alwaysAskCommands || '');
+        } else if (item.value === 'alwaysAskFiles') {
+            setEditingItem('alwaysAskFiles');
+            setEditValue(systemSettings.alwaysAskFiles || '.env, .env.*, *.env');
         } else if (item.value === 'autoApprove') {
             setEditingItem('autoApproveCommands');
             setEditValue(systemSettings.autoApproveCommands || '');
@@ -1004,11 +1008,12 @@ export default function SettingsMenu({
 
                                 const isEditingThis = isSelected && editingItem &&
                                     ((editingItem === 'alwaysAskCommands' && item.value === 'alwaysAsk') ||
+                                        (editingItem === 'alwaysAskFiles' && item.value === 'alwaysAskFiles') ||
                                         (editingItem === 'autoApproveCommands' && item.value === 'autoApprove') ||
                                         (editingItem === 'autoDisallowCommands' && item.value === 'autoDisallow') ||
                                         (editingItem === 'customOpenAIBaseUrl' && item.value === 'customOpenAIBaseUrl') ||
                                         (editingItem === 'customOpenAIKey' && item.value === 'customOpenAIKey'));
-                                const isCommandListItem = item.value === 'alwaysAsk' || item.value === 'autoApprove' || item.value === 'autoDisallow';
+                                const isCommandListItem = item.value === 'alwaysAsk' || item.value === 'alwaysAskFiles' || item.value === 'autoApprove' || item.value === 'autoDisallow';
                                 const isParserDownload = item.value === 'parserDownload';
 
                                 elements.push(

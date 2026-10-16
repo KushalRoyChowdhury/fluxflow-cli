@@ -20,6 +20,7 @@ import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPI
 import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary } from './utils/ai.js';
 import { subagentProgress } from './utils/subagent_state.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
+import { matchesPathPattern } from './utils/paths.js';
 import { getThemeColors } from './utils/theme.js';
 import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, saveChatContext, loadChatContext } from './utils/history.js';
 import ResumeModal from './components/ResumeModal.jsx';
@@ -4692,10 +4693,15 @@ export default function App({ args = [] }) {
                             },
                             onIDEApproval: resetPendingApproval,
                             onToolApproval: async (tool, args) => {
-                                const isAuto = autoAcceptWrites || systemSettings.autoExec;
+                                const parsed = parseArgs(args || '{}');
+                                const filePath = parsed.path || parsed.targetPath || parsed.file || '';
+                                const patternList = systemSettings?.alwaysAskFiles || '.env, .env.*, *.env';
+                                const isSensitiveFile = (tool === 'view_file' || tool === 'write_file' || tool === 'update_file') && matchesPathPattern(filePath, patternList);
+
+                                const isAuto = !isSensitiveFile && (autoAcceptWrites || systemSettings.autoExec);
 
                                 if (tool === 'exec_command') {
-                                    const { command } = parseArgs(args || '{}');
+                                    const { command } = parsed;
                                     const safeRegex = /^(echo|ls|dir|pwd|cd|git status|git log|git diff|type|cat|help)\b/i;
 
                                     if (isAuto || (command && safeRegex.test(command.trim()))) return 'allow';
@@ -7376,10 +7382,10 @@ export default function App({ args = [] }) {
             case 'approval':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1} width="100%">
-                        <Text color="white" bold underline>FILE WRITE PERMISSION</Text>
-                        <Text marginTop={1}>The agent is attempting to modify: <Text color="cyan">{parseArgs(pendingApproval?.args || '{}').path || 'Unknown File'}</Text></Text>
+                        <Text color="white" bold underline>{pendingApproval?.tool === 'view_file' ? 'FILE READ PERMISSION' : 'FILE WRITE PERMISSION'}</Text>
+                        <Text marginTop={1}>The agent is attempting to {pendingApproval?.tool === 'view_file' ? 'read' : 'modify'}: <Text color="cyan">{parseArgs(pendingApproval?.args || '{}').path || 'Unknown File'}</Text></Text>
 
-                        {!isBridgeConnected() ? (
+                        {pendingApproval?.tool === 'view_file' ? null : (!isBridgeConnected() ? (
                             <Box marginTop={1} borderStyle="single" borderColor="#333" paddingX={1} flexDirection="column">
                                 <Text color="gray">--- PROPOSED CONTENT ---</Text>
                                 {(() => {
@@ -7437,14 +7443,14 @@ export default function App({ args = [] }) {
                             <Box marginTop={1} paddingX={1}>
                                 <Text color="cyan" italic>FluxFlow Companion is active. Review the changes in your editor.</Text>
                             </Box>
-                        )}
+                        ))}
 
                         <Box marginTop={1}>
                             <CommandMenu
                                 title="Action Required"
                                 items={[
                                     { label: 'Accept this time', value: 'allow' },
-                                    { label: 'Accept for this session', value: 'always' },
+                                    ...(pendingApproval?.tool === 'view_file' ? [] : [{ label: 'Accept for this session', value: 'always' }]),
                                     { label: 'Don\'t accept', value: 'deny' }
                                 ]}
                                 onSelect={(item) => {

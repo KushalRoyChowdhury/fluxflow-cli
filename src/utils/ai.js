@@ -1,4 +1,4 @@
-import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes, SETTINGS_FILE } from './paths.js';
+import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes, SETTINGS_FILE, matchesPathPattern } from './paths.js';
 
 // NOTE: dotenv is already fully initialised by src/cli.jsx (all 14 env paths, in
 // the same order) before this module is ever reached, so the duplicate block was
@@ -190,7 +190,7 @@ const colorMainWords = (label) => {
     const themeColors = getThemeColors(currentTheme || 'Dark');
     const highlightAnsi = themeColors.toolFeedbackAnsi || '\x1b[95m';
 
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked|Located|Dragged|Scrolled|Typed|Pressed Key|Recaptured Screen|Created|Read Skill|Read Documentation|Executed|Searched Documentation|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Model produced malformed tool call|Loop Detected|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked Screen|Clicked|Located|Dragged|Scrolled|Typed|Entered|Pressed Key|Recaptured Screen|Created|Read Skill|Read Documentation|Executed|Searched Documentation|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Model produced malformed tool call|Loop Detected|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} ${highlightAnsi}${word}\x1b[0m`;
     });
 };
@@ -4044,7 +4044,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let label = '';
                                 if (normToolName === 'click') {
                                     const p = parseArgs(toolCall.args);
-                                    label = `✔  Clicked: ${p.intendedClickText ? `${p.intendedClickText}` : ''}`;
+                                    label = `✔  Clicked ${p.intendedClickText ? `: ${p.intendedClickText}` : 'Screen'}`;
                                 } else if (normToolName === 'drag') {
                                     const p = parseArgs(toolCall.args);
                                     label = `✔  Dragged: Cell ${p.fromGridId || ''} → Cell ${p.toGridId || ''}`;
@@ -4053,7 +4053,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     label = `✔  Scrolled: ${p.direction || 'down'} (${p.amount || 1})`;
                                 } else if (normToolName === 'keyboard_typing') {
                                     const p = parseArgs(toolCall.args);
-                                    label = `✔  Typed: ${p.text ? `"${p.text.length > 20 ? p.text.substring(0, 20) + '...' : p.text}"` : ''}`;
+                                    label = `✔  ${p.autoPressEnter ? 'Entered' : 'Typed'}: ${p.text ? `"${p.text.length > 20 ? p.text.substring(0, 20) + '...' : p.text}"` : ''}`;
                                 } else if (normToolName === 'key_press') {
                                     const p = parseArgs(toolCall.args);
                                     label = `✔  Pressed Key: ${p.key || ''}`;
@@ -4401,17 +4401,34 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 if (settings.onToolApproval) {
-                                    let shouldPrompt = (normToolName === 'write_file' || normToolName === 'update_file' || normToolName === 'exec_command');
-                                    if (shouldPrompt) {
-                                        const systemSettings = settings.systemSettings || {};
-                                        const autoExec = systemSettings.autoExec;
+                                    const systemSettings = settings.systemSettings || {};
+                                    const autoExec = systemSettings.autoExec;
 
+                                    let isAlwaysAskFile = false;
+                                    let askFilePath = '';
+                                    if (normToolName === 'view_file') {
+                                        const parsedArgs = parseArgs(toolCall.args);
+                                        askFilePath = parsedArgs.path || parsedArgs.targetPath || parsedArgs.file || '';
+                                        if (askFilePath) {
+                                            const patternList = systemSettings.alwaysAskFiles || '.env, .env.*, *.env';
+                                            if (matchesPathPattern(askFilePath, patternList)) {
+                                                isAlwaysAskFile = true;
+                                            }
+                                        }
+                                    }
+
+                                    let shouldPrompt = (normToolName === 'write_file' || normToolName === 'update_file' || normToolName === 'exec_command' || isAlwaysAskFile);
+                                    if (shouldPrompt) {
                                         let decision = null; // 'allow', 'deny', or null (prompt)
                                         let forcePrompt = false;
                                         let disallowMatch = false;
                                         let isNetworkDeny = false;
 
-                                        if (normToolName === 'exec_command') {
+                                        if (isAlwaysAskFile) {
+                                            // Always prompt user permission for reading sensitive/alwaysAskFiles regardless of autoExec
+                                            forcePrompt = true;
+                                            decision = null;
+                                        } else if (normToolName === 'exec_command') {
                                             const { command } = parseArgs(toolCall.args);
                                             const cmdTrimmed = (command || '').trim();
 
@@ -4516,7 +4533,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             if (!forcePrompt && !decision && autoExec) {
                                                 decision = 'allow';
                                             }
-                                        } else {
+                                        } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                             // For file writes/updates (write_file, update_file)
                                             // File tools should not get affected by sandbox auto approve or disallow, only fallback to autoExec
                                             if (autoExec) {
@@ -4854,7 +4871,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                         if (approval === 'deny') {
                                             let denyMsg = `Permission Denied: Prohibited ${normToolName === 'exec_command' ? 'Command' : 'file edit'}.`;
-                                            if (denyReason === 'user') {
+                                            if (isAlwaysAskFile) {
+                                                const targetName = path.basename(askFilePath || '.env');
+                                                denyMsg = `User denied reading ${targetName}`;
+                                            } else if (denyReason === 'user') {
                                                 denyMsg = 'Permission Denied by User';
                                             } else if (denyReason === 'settings') {
                                                 denyMsg = 'Permission Denied by User Policy';
@@ -4864,7 +4884,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 denyMsg = 'Permission Denied: Prohibited Command in User Policy';
                                             }
 
-                                            if (normToolName === 'write_file' || normToolName === 'update_file') {
+                                            if (normToolName === 'view_file') {
+                                                const deniedLabel = `✘ Read Denied: ${parseArgs(toolCall.args).path?.replaceAll('\\', '/') || '.env'}`;
+                                                let terminalWidth = 115;
+                                                if (process.stdout.isTTY) {
+                                                    terminalWidth = process.stdout.columns - 5 || 120;
+                                                }
+                                                const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
+                                                const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
+                                                yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
+                                                thisIsFirstToolFeedback = false;
+                                            } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
                                                 const deniedLabel = `✘ ${action}: ${parseArgs(toolCall.args).path.replaceAll('\\', '/') || '...'}`;
                                                 // Get terminal physical width

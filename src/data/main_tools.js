@@ -81,19 +81,19 @@ Invocations:
     // =====================================================================================================
 
     const computerTools = `**Computer Use (Desktop Automation)**
-- Click(gridId=int, type="single/double", button="left/middle/right", intendedClickText=string, ocrCorrection?=bool:true). Click target grid number, intendedClickText: literal text/symbol on screen (OCR scannable, upto 3 words). Double click desktop icons, nonOCR element/icon/toggle? ocrCorrection=false
-- Drag(fromGridId=int, toGridId=int). Drag mouse from start grid number to target grid number
-- Scroll(direction="up/down", gridId=int). Scroll viewport vertically
+- Click(gridId=int, type="single/double", button="left/middle/right", intendedClickText?=string, ocrCorrection=bool). Click target grid number, intendedClickText: literal text on screen (OCR scannable, upto 3 words). Double click desktop icons, clicking text? set ocrCorrection=true
+- Scroll(direction="up/down", gridId=int). Scrolls viewport, gridId to hover over window
 - KeyboardTyping(text=string, autoPressEnter?=bool). Type text string into currently active input. JSON escape literal escape sequences
 - KeyPress(key="key or ;-separated combination, eg: enter, back, backspace, clearInput, ctrl;c, alt;tab, f5, f11, alt;f4"). Press key, shortcut, function key (f1-f12), or clear active input field
 - RecaptureScreen(). Request fresh gridded screenshot
 - Wait(seconds?=int[..120]). Wait for process to finish`;
 
+    // - Drag(fromGridId=int, toGridId=int). Drag mouse from start grid number to target grid number
     // =====================================================================================================
 
     return `
 -- ACTIONS --
-In chat output the format \`[action:ActionName(arg1="value1")]\` in NEW line
+In chat output the format [action:ActionName(arg1="value1")] in NEW line
 Rules:
 - Max 5 actions/turn
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}

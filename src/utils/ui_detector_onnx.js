@@ -25,8 +25,8 @@ const MODEL_DOWNLOAD_URL = 'https://github.com/KushalRoyChowdhury/fluxflow-cli/r
 const INPUT_SIZE = 640;
 const CONF_THRESHOLD = 0.02; // Balanced threshold for UI buttons & icons
 const IOU_THRESHOLD = 0.30;  // Tight NMS deduplication to prevent double-badges on same icon
-const MIN_BOX_WIDTH = 32;    // Discard tiny micro-dots / specks
-const MIN_BOX_HEIGHT = 32;
+const MIN_BOX_WIDTH = 28;    // Discard tiny micro-dots / specks
+const MIN_BOX_HEIGHT = 28;
 
 /**
  * Downloads a file with full redirect follow support and proper request headers.

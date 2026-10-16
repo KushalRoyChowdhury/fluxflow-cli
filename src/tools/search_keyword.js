@@ -3,7 +3,8 @@ import path from 'path';
 import fg from 'fast-glob';
 import { Minimatch } from 'minimatch';
 import { parseArgs } from '../utils/arg_parser.js';
-import { FLUXFLOW_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes } from '../utils/paths.js';
+import { FLUXFLOW_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes, matchesPathPattern } from '../utils/paths.js';
+import { loadSettings } from '../utils/settings.js';
 import fsSync from 'fs';
 
 /**
@@ -442,12 +443,27 @@ export const search_keyword = async (args) => {
         const dirPrefix = pathArgType === 'dir' ? '[DIR]' : (pathArgType === 'glob' ? '[GLOB]' : '');
         let output = `${dirPrefix}${dirPrefix ? ' ' : ''}${outputHeader}\n\n`;
 
-        for (const group of fileGroups) {
-            output += `${group.path}\n`;
-            for (const m of group.matches) {
-                output += `  ${m.line}: ${m.content}\n`;
+        let alwaysAskFilesPattern = '';
+        try {
+            const currentSettings = await loadSettings();
+            if (currentSettings?.systemSettings?.alwaysAskFiles) {
+                alwaysAskFilesPattern = currentSettings.systemSettings.alwaysAskFiles;
             }
-            output += '\n';
+        } catch (e) { }
+
+        for (const group of fileGroups) {
+            output += `${group.path}:\n`;
+            const isRestricted = matchesPathPattern(group.path, alwaysAskFilesPattern);
+
+            if (isRestricted) {
+                const lineNumbers = group.matches.map(m => `Line ${m.line}`).join(', ');
+                output += `  ${lineNumbers}. Line snapshot not available due to file restriction policy. ReadFile if needed\n\n`;
+            } else {
+                for (const m of group.matches) {
+                    output += `  Line ${m.line}: ${m.content}\n`;
+                }
+                output += '\n';
+            }
         }
 
         return output.trimEnd();

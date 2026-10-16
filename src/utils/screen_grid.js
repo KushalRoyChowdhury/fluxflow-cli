@@ -860,3 +860,46 @@ export async function gridToNativeCoordinates(target, actualScreenWidth, actualS
         offsetY
     };
 }
+
+/**
+ * Converts 1280x720 canvas coordinates back to the closest UI grid/badge ID.
+ */
+export function coordinates720pToGridId(point720) {
+    if (!point720 || typeof point720.x !== 'number' || typeof point720.y !== 'number') return null;
+
+    if (detectedUIElements && detectedUIElements.length > 0) {
+        // Find if it lands directly inside any detected UI element bounding box
+        const insideBox = detectedUIElements.find(box =>
+            point720.x >= box.startX && point720.x <= (box.startX + box.cellW) &&
+            point720.y >= box.startY && point720.y <= (box.startY + box.cellH)
+        );
+        if (insideBox) {
+            return insideBox.badgeId !== undefined ? insideBox.badgeId : insideBox.cellNum;
+        }
+
+        // Otherwise find closest UI element center
+        let closest = null;
+        let minDistSq = Infinity;
+        for (const box of detectedUIElements) {
+            const dx = point720.x - box.cx;
+            const dy = point720.y - box.cy;
+            const distSq = dx * dx + dy * dy;
+            if (distSq < minDistSq) {
+                minDistSq = distSq;
+                closest = box;
+            }
+        }
+        if (closest && minDistSq <= (45 * 45)) {
+            return closest.badgeId !== undefined ? closest.badgeId : closest.cellNum;
+        }
+    }
+
+    // Mathematical grid calculation fallback
+    const cellWidth = GRID_CONFIG.TARGET_WIDTH / GRID_CONFIG.COLS;
+    const cellHeight = GRID_CONFIG.TARGET_HEIGHT / GRID_CONFIG.ROWS;
+
+    const colIdx = Math.max(0, Math.min(GRID_CONFIG.COLS - 1, Math.floor(point720.x / cellWidth)));
+    const rowIdx = Math.max(0, Math.min(GRID_CONFIG.ROWS - 1, Math.floor(point720.y / cellHeight)));
+
+    return (rowIdx * GRID_CONFIG.COLS) + colIdx + 1;
+}

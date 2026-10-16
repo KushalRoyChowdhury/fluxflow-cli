@@ -33,6 +33,7 @@ Open in chat via /settings
   * Always Ask Commands → Commands requiring explicit confirmation
   * Auto Approve Commands → Safe commands allowed to execute automatically
   * Auto Disapprove Commands → Blacklisted commands automatically rejected
+  * Always Ask File/Paths → System auto prompts user before resolving the read req to user specified files/paths in
 
 * Auto Approve Git Commits → Auto-confirm git commit operations
 * Advanced Recovery [EXPERIMENTAL] → Enhanced rollback if agent corrupt codebase

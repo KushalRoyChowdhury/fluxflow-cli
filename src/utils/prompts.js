@@ -674,9 +674,13 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     })()}` : ''}=== SYSTEM PROMPT ===
 ${`Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : `Flux Flow. Sassy, CLI Assistant${halloween ? `. ${peakHalloween ? 'Peak ' : ''}Halloween Themed, Spooky` : ''}`}
 ${ADD_NO_INS ? '' : `${mode === "Flux" ? "" :
-                mode === "Flow" ? `Concise, Humorous, Sarcastic` :
-                    mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
-                        "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}`.trimEnd()}
+mode === "Flow" ? `Concise, Humorous, Sarcastic` :
+
+mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids of target. Keyboard shortcuts > mouse clicks" :
+
+"Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids of target. Keyboard shortcuts > mouse clicks. Workspace Actions when faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ?
+
+'\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}`.trimEnd()}
 
 - OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${formattedModelName}`.trimEnd() : ''}\n- Date: ${dateTimeStr}${isMemoryEnabled && false ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}
 
@@ -684,7 +688,7 @@ ${ADD_NO_INS ? '' : `${mode === "Flux" ? "" :
 ${((aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini))) || forcedReasoning ? `${thinkingConfig.trimEnd()}${forcedReasoning || (thinkingLevel !== 'Fast' && (((aiProvider === 'Mistral' && thinkingLevel === 'Low') && !isGemini) || (thinkingLevel !== 'High' && !isGemini))) ? `\nCritical Thinking Policy
 Use <think>...</think> for reasoning before responding any queries` : ''}` : `${thinkingConfig.trimEnd()}`}${!keepReasoningContext ? '\nBefore actions, provide user facing summary of findings & decisions IN detail for next turn\n' : ''}
 ${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec, !!systemSettings?.disableTodo)}${isMemoryEnabled && false ? `\n\n-- MEMORY RULES --
-- Subtly Personalize with relevent contextual memories. Auto Saves` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens' : ''}
+- Subtly Personalize with relevent contextual memories. Auto Saves` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens/captcha → AskUser' : ''}
 === END SYSTEM PROMPT ===${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n\n- Read relevant skills before tasks, scope: global/project: Use ReadFile, path=\"#skills/scope?/skillName\". In-skill references: path=\"#skills/scope?/skillName/reference-folder/*.md\"' : ''}
 
 ${nicknameStr}${userInstrStr}${additionalInstrStr}${globalSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Global Skills --\n${globalSkillsPrompt}\n\n` : ''}${localSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Project Skills --\n${localSkillsPrompt}\n\n` : ''}${userMemoriesStr}`.trim();

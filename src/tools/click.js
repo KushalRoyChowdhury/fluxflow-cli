@@ -1,6 +1,6 @@
 import { parseArgs } from '../utils/arg_parser.js';
 import { executeMouseAction } from '../utils/computer_use.js';
-import { gridToNativeCoordinates, parseGridCodeTo720p } from '../utils/screen_grid.js';
+import { gridToNativeCoordinates, parseGridCodeTo720p, coordinates720pToGridId } from '../utils/screen_grid.js';
 import screenshotDesktop from 'screenshot-desktop';
 import sharp from 'sharp';
 import fs from 'fs-extra';
@@ -281,39 +281,6 @@ function pickBestMatch(matches, targetCoords) {
     return bestMatch;
 }
 
-/**
- * Generate 8 tile definitions (4 cols × 2 rows) for a screen of (screenW, screenH).
- * Returns tiles sorted by distance of their center from (targetX, targetY),
- * with the tile that contains the target always first.
- */
-function getSortedTiles(screenW, screenH, targetX, targetY) {
-    const COLS = 4, ROWS = 2;
-    const tileW = Math.ceil(screenW / COLS);
-    const tileH = Math.ceil(screenH / ROWS);
-    const tiles = [];
-
-    for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-            const x0 = c * tileW;
-            const y0 = r * tileH;
-            const w = Math.min(tileW, screenW - x0);
-            const h = Math.min(tileH, screenH - y0);
-            const cx = x0 + w / 2;
-            const cy = y0 + h / 2;
-            const containsTarget = targetX >= x0 && targetX < x0 + w && targetY >= y0 && targetY < y0 + h;
-            tiles.push({ x0, y0, w, h, cx, cy, containsTarget });
-        }
-    }
-
-    return tiles.sort((a, b) => {
-        if (a.containsTarget) return -1;
-        if (b.containsTarget) return 1;
-        const da = Math.hypot(a.cx - targetX, a.cy - targetY);
-        const db = Math.hypot(b.cx - targetX, b.cy - targetY);
-        return da - db;
-    });
-}
-
 let _ocrWorkerPromise = null;
 
 async function getOcrWorker() {
@@ -363,9 +330,9 @@ export const click = async (args, context = {}) => {
     const type = (parsed.type || parsed.clickType || 'single').toLowerCase();
     const button = (parsed.button || 'left').toLowerCase();
     const intendedClickText = parsed.intendedClickText || parsed.text || '';
-    const ocrCorrection = parsed.ocrCorrection !== undefined 
-        ? (parsed.ocrCorrection === true || parsed.ocrCorrection === 'true') 
-        : (parsed.useOCR !== undefined ? (parsed.useOCR === true || parsed.useOCR === 'true') : true);
+    const ocrCorrection = parsed.ocrCorrection !== undefined
+        ? (parsed.ocrCorrection === true || parsed.ocrCorrection === 'true')
+        : (parsed.useOCR !== undefined ? (parsed.useOCR === true || parsed.useOCR === 'true') : false);
 
     if (!gridId && !intendedClickText) {
         return 'ERROR: Missing required "gridId" parameter for Click tool.';
@@ -452,36 +419,6 @@ export const click = async (args, context = {}) => {
                 }
             }
 
-            // ─── PASS 3: Tiled OCR (8 tiles at 3x upscale for microscopic text) ───
-            if (!bestMatch) {
-                const tiles = getSortedTiles(screenW, screenH, targetCoords.x, targetCoords.y);
-                const cleanTag = targetLower.replace(/[^a-z0-9]/g, '_');
-
-                await worker.setParameters({ tessedit_pageseg_mode: '11' });
-                for (let ti = 0; ti < tiles.length; ti++) {
-                    const tile = tiles[ti];
-                    const tileRaw = await sharp(rawBuffer)
-                        .extract({ left: tile.x0, top: tile.y0, width: tile.w, height: tile.h })
-                        .toBuffer();
-                    const tileBuffer = await preprocessForOcr(tileRaw, 3);
-                    await saveDebugImage('tiles', `tile_${ti + 1}_${Date.now()}_${cleanTag}.png`, tileBuffer);
-
-                    const { data: tileData } = await worker.recognize(tileBuffer, {}, { tsv: true, blocks: true });
-                    if (!tileData || !tileData.text) continue;
-
-                    const tileMatches = extractOcrMatches(tileData, targetLower, tile.x0, tile.y0, 3);
-
-                    if (tileMatches.length > 0) {
-                        const candidate = pickBestMatch(tileMatches, targetCoords);
-                        if (candidate) {
-                            bestMatch = candidate;
-                            matchSource = `tile ${ti + 1} OCR (${tile.containsTarget ? 'target tile' : `offset ${tile.x0},${tile.y0}`})`;
-                            break;
-                        }
-                    }
-                }
-            }
-
             if (bestMatch) {
                 const target720p = {
                     x: Math.round(bestMatch.x * (1280 / screenW)),
@@ -489,7 +426,18 @@ export const click = async (args, context = {}) => {
                 };
 
                 const mouseRes = await executeMouseAction('click', target720p, { button, clickType: type });
-                return `${mouseRes} (${matchSource} for "${intendedClickText}" at ${Math.round(bestMatch.dist)}px distance)`;
+                if (typeof mouseRes === 'string' && mouseRes.startsWith('ERROR:')) {
+                    return mouseRes;
+                }
+
+                const correctedGridId = coordinates720pToGridId(target720p);
+                const clickActionDesc = `${type === 'double' ? 'Double' : 'Single'} clicked ${button} button`;
+
+                if (gridId && correctedGridId && String(gridId) !== String(correctedGridId)) {
+                    return `${clickActionDesc}. Tried clicking grid ${gridId}, but OCR corrected to grid ${correctedGridId} (${matchSource} for "${intendedClickText}"). If the click landed unintended, try with ocr correction off.`;
+                }
+
+                return `${clickActionDesc} on grid ${correctedGridId || gridId} (${matchSource} for "${intendedClickText}").`;
             }
 
         } catch (ocrErr) {
@@ -502,5 +450,10 @@ export const click = async (args, context = {}) => {
         clickType: type
     });
 
-    return clickRes;
+    if (typeof clickRes === 'string' && clickRes.startsWith('ERROR:')) {
+        return clickRes;
+    }
+
+    const targetGridId = gridId || (typeof finalTarget === 'object' ? coordinates720pToGridId(finalTarget) : finalTarget);
+    return `${type === 'double' ? 'Double' : 'Single'} clicked ${button} button on grid ${targetGridId}.`;
 };
