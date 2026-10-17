@@ -4,7 +4,7 @@ export const MODES_MD = `# Fluxflow Modes
 ## Modes Overview (TAB to cycle)
 * [Flux] (Workspace / Dev) → Primary coding & workspace agent
 * [Flow] (Studio / Creative) → Web research & formatted document authoring (PDF / DOCX)
-* [ICU] (Computer Use) → Autonomous GUI & OS desktop automation
+* [ICU] (Interactive Computer Use) → Autonomous GUI & OS desktop automation
 * [FluxCU] (Omni) → Unified full-stack agent (Workspace Dev + Computer Use + Web)
 
 ## Tool Availability
@@ -16,5 +16,5 @@ export const MODES_MD = `# Fluxflow Modes
 * Web & Research: WebSearch, WebScrape → [Universal]
 * User Inquiry: AskUser → [Universal]
 * Document Creation: WritePDF, WriteDoc → [Flow]
-* GUI & Desktop Automation: Click, Drag, Scroll, KeyboardTyping, KeyPress, RecaptureScreen → [ICU] | [FluxCU]
+* GUI & Desktop Automation: Click, Scroll, KeyboardTyping, KeyPress, RecaptureScreen → [ICU] | [FluxCU]
 `;

@@ -100,9 +100,25 @@ export const getTokenHarborStream = async function* (apiKey, model, contents, sy
     let lastFlushTime = Date.now();
     let hasNewData = false;
 
+    // Buffer early content chunks briefly to catch any late-arriving reasoning_content packets from TokenHarbor
+    let bufferedContentParts = [];
+    let contentHoldChunks = 0;
+    const CONTENT_HOLD_THRESHOLD = 5;
+    let isHoldingContent = true;
+
+    const flushContentHold = () => {
+        if (bufferedContentParts.length > 0) {
+            pendingParts.push(...bufferedContentParts);
+            bufferedContentParts = [];
+            hasNewData = true;
+        }
+        isHoldingContent = false;
+    };
+
     while (true) {
         const { done, value } = await reader.read();
         if (done) {
+            flushContentHold();
             if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
                 yield {
                     candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
@@ -123,6 +139,7 @@ export const getTokenHarborStream = async function* (apiKey, model, contents, sy
             let isDone = false;
             if (cleanLine === 'data: [DONE]') {
                 isDone = true;
+                flushContentHold();
             } else {
                 try {
                     const json = JSON.parse(cleanLine.substring(6));
@@ -147,12 +164,21 @@ export const getTokenHarborStream = async function* (apiKey, model, contents, sy
                         }
 
                         if (thought) {
+                            // Reasoning always goes to pendingParts directly (before any held content)
                             pendingParts.push({ text: thought, thought: true });
                             hasNewData = true;
                         }
                         if (delta.content) {
-                            pendingParts.push({ text: delta.content });
-                            hasNewData = true;
+                            if (isHoldingContent) {
+                                bufferedContentParts.push({ text: delta.content });
+                                contentHoldChunks++;
+                                if (contentHoldChunks >= CONTENT_HOLD_THRESHOLD) {
+                                    flushContentHold();
+                                }
+                            } else {
+                                pendingParts.push({ text: delta.content });
+                                hasNewData = true;
+                            }
                         }
                     }
                 } catch (e) { }

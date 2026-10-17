@@ -5221,7 +5221,8 @@ export default function App({ args = [] }) {
                         // 2. Append to target role with Genuine Closing and Leak Protection
                         if (inThinkMode && activeStreamingMsgRef.current?.role === 'think') {
                             flushTypewriterNow();
-                            const newText = activeStreamingMsgRef.current.text + chunkText;
+                            const currentThinkText = activeStreamingMsgRef.current.text || '';
+                            const newText = currentThinkText + chunkText;
                             const closeRes = findGenuineThinkClose(newText);
                             if (closeRes.index !== -1) {
                                 const thinkPart = newText.substring(0, closeRes.index);
