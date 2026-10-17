@@ -55,7 +55,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
 - ReadFolder(path=string, recurse?=int[1..3])
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchor: ^LINE:...$ syntax, must for large blocks &  escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
-- CodeSearch(keyword=string, path?="dir/file/glob, inclusion/exclusion ;-separated", regex?=bool:auto). Find relevant code
+- CodeSearch(keyword=string, path?="file/glob, inclusion !exclusion ;-separated", regex?=bool:auto)
 - Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user${!disableTodo ? `\n- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. get + markDone marks complete` : ''}
 ${_cachedAdvanceRollback ? `
 **Emergency**

@@ -5787,7 +5787,7 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 - WebScrape(url=string). Proactive use for specific webpage/docs
 
 **Workspace**
-- CodeSearch(keyword=string, path?="dir/file/glob, inclusion/exclusion ;-separated", regex?=bool:auto). Find relevant code
+- CodeSearch(keyword=string, path?="file/glob, inclusion !exclusion ;-separated", regex?=bool:auto)
 - ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
 - FindFile(basename=string). Find file path. Extention optional
 - ReadFile(path=string, startLine?=int, endLine?=int)

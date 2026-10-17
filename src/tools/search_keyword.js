@@ -256,8 +256,11 @@ export const search_keyword = async (args) => {
         let pathArgType = null; // 'file' | 'dir' | 'glob' | null
 
         if (pathArg) {
-            // Support multiple patterns via semicolon separation, enabling negative globs (!pattern) without breaking brace expansion
-            const patterns = pathArg.split(';').map(p => p.trim()).filter(Boolean);
+            // Support multiple patterns via semicolon separation, enabling negative globs (!pattern) without breaking brace expansion.
+            // Exclusions may be prefixed with either '!' (glob negation) or '-' (simple CLI-style); normalize '-' to '!' internally
+            // so ALL downstream exclusion logic (negative-only walker, fast-glob array) works for both forms.
+            const normalizeExclusion = (p) => (p.startsWith('!') || !p.startsWith('-')) ? p : '!' + p.replace(/^-+/, '');
+            const patterns = pathArg.split(';').map(p => p.trim()).filter(Boolean).map(normalizeExclusion).filter(p => p !== '!');
             const hasNegation = patterns.some(p => p.startsWith('!'));
             const isGlob = patterns.some(p => fg.isDynamicPattern(p) || /[*?{}[\]()|+]/.test(p));
             if (isGlob) {
