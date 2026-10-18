@@ -20,16 +20,38 @@ try {
         if (fileContent.startsWith('{')) {
             settings = JSON.parse(fileContent);
         } else {
-            // Decrypt AES settings securely
+            // Decrypt AES settings securely (support both new machine key and legacy fallback)
             const parts = fileContent.split(':');
             if (parts.length === 2) {
                 const iv = Buffer.from(parts[0], 'hex');
                 const ciphertext = parts[1];
-                const key = crypto.createHash('sha256').update('fluxflow-cli-sanctuary-key').digest();
-                const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-                let decrypted = decipher.update(ciphertext, 'hex', 'utf8');
-                decrypted += decipher.final('utf8');
-                settings = JSON.parse(decrypted);
+                let decrypted = null;
+
+                // 1. Try machine key from .machine_token if present
+                try {
+                    const tokenPath = path.join(FLUXFLOW_DIR, '.token');
+                    if (fs.existsSync(tokenPath)) {
+                        const token = fs.readFileSync(tokenPath, 'utf8').trim();
+                        if (token) {
+                            const machineKey = crypto.createHash('sha256').update(token).digest();
+                            const decipher = crypto.createDecipheriv('aes-256-cbc', machineKey, iv);
+                            decrypted = decipher.update(ciphertext, 'hex', 'utf8') + decipher.final('utf8');
+                        }
+                    }
+                } catch {}
+
+                // 2. Fallback to legacy key
+                if (!decrypted) {
+                    try {
+                        const legacyKey = crypto.createHash('sha256').update('fluxflow-cli-sanctuary-key').digest();
+                        const decipher = crypto.createDecipheriv('aes-256-cbc', legacyKey, iv);
+                        decrypted = decipher.update(ciphertext, 'hex', 'utf8') + decipher.final('utf8');
+                    } catch {}
+                }
+
+                if (decrypted) {
+                    settings = JSON.parse(decrypted);
+                }
             }
         }
 
@@ -196,4 +218,3 @@ export const matchesPathPattern = (filePath, patternCsv) => {
     }
     return false;
 };
-

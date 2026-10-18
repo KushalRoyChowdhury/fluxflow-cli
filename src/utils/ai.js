@@ -17,6 +17,7 @@ import fs from 'fs';
 import { view_file } from '../tools/view_file.js';
 import { emojiSpace } from './terminal.js';
 import { applyPatches, generateHighFidelityDiff, parsePatchPairs, estimateTokenCount } from './text.js';
+import { structuredPatch } from 'diff';
 import { loadSettings } from './settings.js';
 import { subagentProgress } from './subagent_state.js';
 import { isModelMultimodal, getFallbackValue, hasModelReasoning } from '../data/model_config.js';
@@ -4770,32 +4771,69 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             if (normToolName === 'update_file') {
                                                 const diffReport = generateHighFidelityDiff(originalContentForReporting, finalContent, patchResults, 12, settings?.compressToolResults || globalSettings?.systemSettings?.compressToolResults);
 
-                                                // Verify which patches were actually retained in finalContent vs rejected/reverted by user in IDE
+                                                // 1. Evaluate each patch requested by the model
+                                                const { patchPairs: originalPatches } = parsePatchPairs(parseArgs(toolCall.args));
+                                                const totalBlocks = originalPatches?.length || requestedPatchCount || 1;
                                                 let appliedBlocks = 0;
+                                                let rejectedBlocks = 0;
                                                 const blockNotes = [];
-                                                const { patchPairs: originalPatches } = parsePatchPairs(toolCall.args);
 
                                                 if (originalPatches && originalPatches.length > 0) {
                                                     originalPatches.forEach((patch, idx) => {
-                                                        const searchClean = (patch.search || '').trim();
-                                                        const replaceClean = (patch.replace || '').trim();
+                                                        const searchRaw = patch.replace || '';
+                                                        const replaceRaw = patch.new || '';
+                                                        const searchClean = searchRaw.trim();
+                                                        const replaceClean = replaceRaw.trim();
 
-                                                        // If newContent is present in final file and searchContent is not (or search is different from final)
-                                                        const isNewPresent = replaceClean ? finalContent.includes(replaceClean) : true;
-                                                        const isOldGone = searchClean && searchClean !== replaceClean ? !finalContent.includes(searchClean) : true;
+                                                        // Did this block actually change?
+                                                        // If finalContent still contains the original search content (and search != replace)
+                                                        // OR if finalContent does NOT contain the replacement content,
+                                                        // then this block was not changed (i.e. rejected / reverted by user).
+                                                        const replacePresent = replaceClean ? finalContent.includes(replaceRaw) || finalContent.includes(replaceClean) : true;
+                                                        const searchPresent = searchClean ? finalContent.includes(searchRaw) || finalContent.includes(searchClean) : false;
 
-                                                        if (isNewPresent && (isOldGone || !searchClean)) {
+                                                        const blockChanged = replacePresent && (!searchClean || !searchPresent || searchClean === replaceClean);
+
+                                                        if (blockChanged) {
                                                             appliedBlocks++;
                                                         } else {
-                                                            blockNotes.push(`  • Block ${idx + 1}: No change detected OR user rejected change.`);
+                                                            rejectedBlocks++;
+                                                            blockNotes.push(`  • Block ${idx + 1}: Rejected by user in IDE (reverted to original).`);
                                                         }
                                                     });
                                                 } else {
-                                                    appliedBlocks = patchResults.length;
+                                                    appliedBlocks = requestedPatchCount || 0;
                                                 }
 
-                                                const failureSection = blockNotes.length > 0 ? `\n\nNotes:\n${blockNotes.join('\n')}` : '';
-                                                result = `File [${filePath}] updated via IDE Companion (May have user edits). [${appliedBlocks}/${requestedPatchCount}] blocks applied.${failureSection}\n\n${diffReport}`;
+                                                // 2. Detect actual manual additions made by user that were NOT in model's preparedContent
+                                                let manualAddsCount = 0;
+                                                if (preparedModifiedContent && finalContent !== preparedModifiedContent) {
+                                                    const userDiff = structuredPatch('', '', preparedModifiedContent || '', finalContent || '', '', '', { context: 0 });
+                                                    if (userDiff && userDiff.hunks) {
+                                                        for (const uHunk of userDiff.hunks) {
+                                                            const addedLines = uHunk.lines.filter(l => l.startsWith('+')).map(l => l.slice(1).trim()).filter(Boolean);
+                                                            // Only count lines that were not originally present in the file (i.e. truly newly written by user, not just reverted original lines)
+                                                            for (const line of addedLines) {
+                                                                if (!originalContentForReporting.includes(line)) {
+                                                                    manualAddsCount++;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // Build clear breakdown summary for model
+                                                const statusParts = [`[${appliedBlocks}/${totalBlocks}] applied`];
+                                                if (rejectedBlocks > 0) {
+                                                    statusParts.push(`${rejectedBlocks} rejected by user`);
+                                                }
+                                                if (manualAddsCount > 0) {
+                                                    statusParts.push(`${manualAddsCount} manual ${manualAddsCount === 1 ? 'modification' : 'modifications'} by user`);
+                                                }
+                                                const statusSummary = statusParts.join(', ');
+
+                                                const failureSection = blockNotes.length > 0 ? `\n\nUser Review Details:\n${blockNotes.join('\n')}` : '';
+                                                result = `File [${filePath}] updated via IDE Companion. ${statusSummary}.${failureSection}\n\n${diffReport}`;
                                             } else {
                                                 // write_file reporting style
                                                 const verifiedLines = finalContent.split(/\r?\n/);

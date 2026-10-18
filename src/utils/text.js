@@ -1,5 +1,5 @@
 import os from 'os';
-import { DATA_DIR } from './paths';
+import { DATA_DIR } from './paths.js';
 import fs from 'fs';
 import { structuredPatch } from 'diff';
 

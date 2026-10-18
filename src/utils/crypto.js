@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import os from 'os';
+import { FLUXFLOW_DIR } from './paths.js';
 
 const XOR_KEY = 0x42;
 const bypass = true; // Changed
@@ -14,20 +16,44 @@ const xorTransform = (data) => {
     return result;
 };
 
+export const getMachineIdentifier = () => {
+    try {
+        const idDir = FLUXFLOW_DIR;
+        const idFile = path.join(idDir, '.token');
+
+        if (fs.existsSync(idFile)) {
+            const token = fs.readFileSync(idFile, 'utf8').trim();
+            if (token) return token;
+        }
+
+        const token = crypto.randomUUID();
+
+        try {
+            if (!fs.existsSync(idDir)) fs.mkdirSync(idDir, { recursive: true });
+            fs.writeFileSync(idFile, token, { encoding: 'utf8', mode: 0o600 });
+        } catch {}
+
+        return token;
+    } catch {
+        return 'fluxflow-fallback-default-device-seed';
+    }
+};
+
 // AES-256-CBC secure encryption keys
 const AES_ALGORITHM = 'aes-256-cbc';
-const AES_KEY = crypto.createHash('sha256').update('fluxflow-cli-sanctuary-key').digest();
+const LEGACY_KEY = crypto.createHash('sha256').update('fluxflow-cli-sanctuary-key').digest();
+const AES_KEY = crypto.createHash('sha256').update(getMachineIdentifier()).digest();
 
-export const encryptAes = (text, shouldEncrypt = false) => {
+export const encryptAes = (text, shouldEncrypt = false, key = AES_KEY) => {
     if (bypass && !shouldEncrypt) return text;
     const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(AES_ALGORITHM, AES_KEY, iv);
+    const cipher = crypto.createCipheriv(AES_ALGORITHM, key, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     return iv.toString('hex') + ':' + encrypted;
 };
 
-export const decryptAes = (encryptedText, shouldDecrypt = false) => {
+export const decryptAes = (encryptedText, shouldDecrypt = false, key = AES_KEY) => {
     if (bypass && !shouldDecrypt) return encryptedText;
     const parts = encryptedText.split(':');
     if (parts.length !== 2) {
@@ -35,14 +61,57 @@ export const decryptAes = (encryptedText, shouldDecrypt = false) => {
     }
     const iv = Buffer.from(parts[0], 'hex');
     const ciphertext = parts[1];
-    const decipher = crypto.createDecipheriv(AES_ALGORITHM, AES_KEY, iv);
+    const decipher = crypto.createDecipheriv(AES_ALGORITHM, key, iv);
     let decrypted = decipher.update(ciphertext, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
 };
 
 /**
- * Reads an AES encrypted JSON file (with automatic fallback to XOR and raw JSON for seamless migration).
+ * Migrates ciphertext from the old hardcoded key to the new machine key.
+ * @param {string} encryptedText - Ciphertext encrypted with legacy key.
+ * @returns {string} Ciphertext re-encrypted with new machine key.
+ */
+export const migrateCiphertext = (encryptedText) => {
+    try {
+        const decrypted = decryptAes(encryptedText, true, LEGACY_KEY);
+        return encryptAes(decrypted, true, AES_KEY);
+    } catch {
+        // If it cannot be decrypted with the old key, return as is
+        return encryptedText;
+    }
+};
+
+/**
+ * Migrates a JSON file encrypted with the old key to the new machine key.
+ * @param {string} filePath - Absolute path to file.
+ * @returns {boolean} True if successfully migrated.
+ */
+export const migrateFile = (filePath) => {
+    try {
+        if (!fs.existsSync(filePath)) return false;
+        const rawContent = fs.readFileSync(filePath, 'utf8').trim();
+        if (!rawContent || rawContent.startsWith('{') || rawContent.startsWith('[')) return false;
+
+        // Try decrypting with old key
+        let decrypted;
+        try {
+            decrypted = decryptAes(rawContent, true, LEGACY_KEY);
+        } catch {
+            return false; // Already with new key or invalid
+        }
+
+        const data = JSON.parse(decrypted);
+        writeEncryptedJson(filePath, data, true);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+/**
+ * Reads an AES encrypted JSON file (with automatic fallback to old key, XOR, and raw JSON).
+ * If encrypted with the old key, automatically re-encrypts and migrates with the new key in place!
  * @param {string} filePath - Absolute path to the file.
  * @param {any} defaultValue - Value to return if file doesn't exist.
  * @returns {any} The decrypted JSON content.
@@ -58,15 +127,28 @@ export const readEncryptedJson = (filePath, defaultValue = {}) => {
             return JSON.parse(fileContent);
         }
 
-        // 2. Try AES decryption
+        // 2. Try AES decryption with current machine key
         try {
-            const decrypted = decryptAes(fileContent, true); // Forced: readable even if written with shouldEncrypt under bypass
+            const decrypted = decryptAes(fileContent, true, AES_KEY);
             return JSON.parse(decrypted);
         } catch (aesErr) {
-            // Not AES or AES failed, fallback to XOR.
+            // Not current key, proceed to check old legacy key
         }
 
-        // 3. Fallback to legacy XOR decryption
+        // 3. Fallback: try AES decryption with old legacy key and auto-migrate file
+        try {
+            const legacyDecrypted = decryptAes(fileContent, true, LEGACY_KEY);
+            const parsed = JSON.parse(legacyDecrypted);
+            // Seamless auto-migration to new machine key
+            try {
+                writeEncryptedJson(filePath, parsed, true);
+            } catch {}
+            return parsed;
+        } catch (legacyErr) {
+            // Not old AES either
+        }
+
+        // 4. Fallback to legacy XOR decryption
         const decryptedDataXor = xorTransform(rawContent).toString('utf8');
         if (decryptedDataXor.startsWith('{') || decryptedDataXor.startsWith('[')) {
             return JSON.parse(decryptedDataXor);
@@ -91,7 +173,7 @@ export const writeEncryptedJson = (filePath, data, shouldEncrypt = false) => {
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
         const jsonData = JSON.stringify(data, null, 2);
-        const encrypted = encryptAes(jsonData, shouldEncrypt);
+        const encrypted = encryptAes(jsonData, shouldEncrypt, AES_KEY);
         fs.writeFileSync(filePath, encrypted, 'utf8');
     } catch (err) {
         console.error(`Vault Write Error [${path.basename(filePath)}]:`, err.message);

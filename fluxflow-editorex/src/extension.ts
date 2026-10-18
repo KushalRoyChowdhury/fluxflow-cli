@@ -691,13 +691,13 @@ async function handleMessage(message: any, ws?: WebSocket) {
     try {
         if (command === 'open') {
             const doc = await vscode.workspace.openTextDocument(uri);
-            await vscode.window.showTextDocument(doc, { preview: false });
+            await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
             lastKnownStates.set(doc.fileName, doc.getText());
         }
         else if (command === 'diff') {
             lastDiffTimestamp = Date.now();
             const doc = await vscode.workspace.openTextDocument(uri);
-            await vscode.window.showTextDocument(doc, { preview: false });
+            await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
         }
         else if (command === 'showDiff') {
             // Handle new file creation placeholder
@@ -732,13 +732,19 @@ async function handleMessage(message: any, ws?: WebSocket) {
                 });
             }
 
-            // Open side-by-side diff with preserveFocus: true
+            // Open diff with preserveFocus: true
             await vscode.commands.executeCommand('vscode.diff',
                 virtualUri,
                 uri,
                 `${path.basename(filePath)} (Original) ↔ Modified (AI)`,
                 { preserveFocus: true }
             );
+
+            // Ensure inline diff mode without modifying user's persistent settings
+            const isSideBySide = vscode.workspace.getConfiguration('diffEditor').get<boolean>('renderSideBySide', true);
+            if (isSideBySide) {
+                await vscode.commands.executeCommand('toggle.diff.renderSideBySide');
+            }
         }
         else if (command === 'save') {
             const doc = await vscode.workspace.openTextDocument(uri);

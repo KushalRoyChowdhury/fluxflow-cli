@@ -1,14 +1,20 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.38.0": {
+        "note": "OCTOBER 19",
+        "added": [],
+        "changed": [],
+        "fixes": [
+            "Bug Fixes in IDE Companion."
+        ]
+    },
     "4.37.0": {
         "note": "OCTOBER 16",
         "added": [
             "Added file/path based read permissions, which will prompt user before reading sensitive/configured files. `/settings → Security → Always ask file/paths`."
         ],
-        "changed": [
-            ""
-        ],
+        "changed": [],
         "fixes": []
     },
     "4.36.0": {
