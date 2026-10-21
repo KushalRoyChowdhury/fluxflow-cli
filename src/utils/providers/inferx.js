@@ -147,7 +147,7 @@ export const getInferXStream = async function* (apiKey, model, contents, systemI
                         if (delta.content) {
                             let contentText = delta.content;
                             if (addThink && isFirstChunk && contentText.length > 0) {
-                                contentText = '<think>' + contentText;
+                                contentText = '<think_fluxflow>' + contentText;
                                 isFirstChunk = false;
                             }
                             pendingParts.push({ text: contentText });

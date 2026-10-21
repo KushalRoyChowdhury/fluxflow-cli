@@ -6,6 +6,7 @@ const BRIDGE_URL = 'ws://localhost:56832';
 const messageQueue = [];
 let contextResolver = null;
 let securityListener = null;
+let rejectionListener = null;
 
 let cliVersion = '2.0.0'; // Default fallback
 
@@ -18,6 +19,15 @@ export const registerSecurityListener = (callback) => {
     securityListener = callback;
 };
 
+/**
+ * Called when the extension refuses the connection (e.g. CWD mismatch with the
+ * open workspace). Lets the CLI show a tailored message instead of the generic
+ * "install the companion" promo — the companion IS installed, it just rejected us.
+ */
+export const registerBridgeRejectionListener = (callback) => {
+    rejectionListener = callback;
+};
+
 const connect = () => {
     if (ws || isConnecting) return;
     isConnecting = true;
@@ -26,12 +36,13 @@ const connect = () => {
         ws = socket;
         isConnecting = false;
 
-        // Handshake: Send current CLI version, PID, and PPID
+        // Handshake: Send current CLI version, PID, PPID, and working directory.
         ws.send(JSON.stringify({
             command: 'version',
             version: cliVersion,
             pid: process.pid,
-            ppid: process.ppid
+            ppid: process.ppid,
+            cwd: process.cwd()
         }));
 
         while (messageQueue.length > 0) {
@@ -46,6 +57,10 @@ const connect = () => {
                 contextResolver = null;
             } else if (msg.command === 'securityResponse' && securityListener) {
                 securityListener(msg.result);
+            } else if (msg.command === 'inlineComplete') {
+                handleInlineComplete(msg);
+            } else if (msg.command === 'connectionRejected') {
+                if (rejectionListener) rejectionListener(msg);
             }
         } catch (e) { }
     });
@@ -64,6 +79,33 @@ const send = (payload) => {
 
 export const isBridgeConnected = () => {
     return ws !== null && ws.readyState === WebSocket.OPEN;
+};
+
+/**
+ * Handle an inline-completion request coming from the extension.
+ * Generates completion via the CLI provider layer and replies over the bridge.
+ * Always replies (empty on failure) so the extension never hangs.
+ */
+const handleInlineComplete = async (msg) => {
+    let completion = '';
+    try {
+        const { generateAutoCompletion } = await import('./auto_completion.js');
+        completion = await generateAutoCompletion({
+            prefix: msg.prefix || '',
+            suffix: msg.suffix || '',
+            fileName: msg.fileName || '',
+            language: msg.language || '',
+            recentChanges: msg.recentChanges || '',
+            clipboard: msg.clipboard || ''
+        });
+    } catch (e) {
+        completion = '';
+    }
+    send({
+        command: 'inlineCompleteResponse',
+        requestId: msg.requestId,
+        completion: completion || ''
+    });
 };
 
 export const sendStatus = (status) => {

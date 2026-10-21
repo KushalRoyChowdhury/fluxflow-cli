@@ -14,6 +14,7 @@ import { parseArgs } from './arg_parser.js';
 import { fileURLToPath } from 'url';
 import path, { normalize } from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 import { view_file } from '../tools/view_file.js';
 import { emojiSpace } from './terminal.js';
 import { applyPatches, generateHighFidelityDiff, parsePatchPairs, estimateTokenCount } from './text.js';
@@ -80,10 +81,10 @@ const RE_CHANNEL_THINK_CLOSE = /<channel\|>/gi;
 
 export const convertChannelThinkTags = (str) => {
     if (typeof str !== 'string') return str;
-    return str.replace(RE_CHANNEL_THINK_OPEN, '<think>').replace(RE_CHANNEL_THINK_CLOSE, '</think>');
+    return str.replace(RE_CHANNEL_THINK_OPEN, '<think_fluxflow>').replace(RE_CHANNEL_THINK_CLOSE, '</think_fluxflow>');
 };
 
-export const RE_LEADING_THINK = /^\s*(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\]|$)/i;
+export const RE_LEADING_THINK = /^\s*(?:<think_fluxflow[^>]*>|<\|channel>thought|\[think_fluxflow\])[\s\S]*?(?:<\/think_fluxflow>|<channel\|>|\[\/think_fluxflow\]|$)/i;
 
 export const isInsideBacktick = (str, idx, matchLen = 1) => {
     // Check if the match is wrapped specifically in inline backtick: `...`
@@ -92,9 +93,9 @@ export const isInsideBacktick = (str, idx, matchLen = 1) => {
     return prevChar === '`' && nextChar === '`';
 };
 
-// Finds the genuine, outermost </think> closing tag outside backticks
+// Finds the genuine, outermost </think_fluxflow> closing tag outside backticks
 export const findGenuineThinkClose = (str) => {
-    const regex = /(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/gi;
+    const regex = /(?:<\/think_fluxflow>|<channel\|>|\[\/think_fluxflow\])/gi;
     let match;
     while ((match = regex.exec(str)) !== null) {
         if (isInsideBacktick(str, match.index, match[0].length)) continue;
@@ -105,7 +106,7 @@ export const findGenuineThinkClose = (str) => {
 
 export const getLeadingThinkBlock = (text) => {
     if (!text || typeof text !== 'string') return null;
-    const openMatch = text.match(/^\s*(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])/i);
+    const openMatch = text.match(/^\s*(?:<think_fluxflow[^>]*>|<\|channel>thought|\[think_fluxflow\])/i);
     if (!openMatch) return null;
     const afterOpenIndex = openMatch.index + openMatch[0].length;
     const afterOpenText = text.substring(afterOpenIndex);
@@ -133,10 +134,10 @@ export const stripLeadingThinking = (text) => {
     return leading.remainingText.trimStart();
 };
 
-const RE_STRIP_THINK_CLOSED = /(?:<(think|thought|thoughts)>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/gi;
-const RE_STRIP_THINK_OPEN = /(?:<(think|thought|thoughts)>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*$/gi;
-const RE_STRIP_THINK_SIMPLE = /(?:<think>|<\|channel>thought|\[think\])[\s\S]*?(?:<\/think>|<channel\|>|\[\/think\]|$)/gi;
-const RE_STRIP_THINK_FULL = /(?:<(think|thought|thoughts)>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\]|$)/gi;
+const RE_STRIP_THINK_CLOSED = /(?:<think_fluxflow>|<\|channel>thought|\[think_fluxflow\])[\s\S]*?(?:<\/think_fluxflow>|<channel\|>|\[\/think_fluxflow\])/gi;
+const RE_STRIP_THINK_OPEN = /(?:<think_fluxflow>|<\|channel>thought|\[think_fluxflow\])[\s\S]*$/gi;
+const RE_STRIP_THINK_SIMPLE = /(?:<think_fluxflow>|<\|channel>thought|\[think_fluxflow\])[\s\S]*?(?:<\/think_fluxflow>|<channel\|>|\[\/think_fluxflow\]|$)/gi;
+const RE_STRIP_THINK_FULL = /(?:<think_fluxflow>|<\|channel>thought|\[think_fluxflow\])[\s\S]*?(?:<\/think_fluxflow>|<channel\|>|\[\/think_fluxflow\]|$)/gi;
 const RE_BACKTICK_SPAN = /`[^`\r\n]*`/g;
 const RE_BACKTICK_OPEN = /`[^`\r\n]*$/;  // unclosed same-line span — handles streaming on the current line only
 const RE_KIMI_TOOL_CALL = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
@@ -2435,8 +2436,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const isForceReasoning = process.env.forcedReasoning || false;
 
         const thinkingPolicyBlock = (thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'High' && aiProvider === 'Google')))
-            ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma') || isForceReasoning) ? "[system] strictly follow thinking policy as high priority. do not start a response without <think>...</think> [/system]\n" : ""}`
+            ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma') || isForceReasoning) ? "[system] strictly follow thinking policy as high priority. do not start a response without <think_fluxflow>...</think_fluxflow> [/system]\n" : ""}`
             : '';
+
+        let clipboardContext = '';
+        if (systemSettings?.clipboardContext) {
+            try {
+                if (process.platform === 'win32') {
+                    clipboardContext = execSync('powershell.exe -NoProfile -Command Get-Clipboard', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 1500 }).replace(/\r?\n$/, '');
+                } else if (process.platform === 'darwin') {
+                    clipboardContext = execSync('pbpaste', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 1500 }).replace(/\r?\n$/, '');
+                } else {
+                    clipboardContext = execSync('xclip -selection clipboard -o || xsel --clipboard --output', { encoding: 'utf8', shell: true, stdio: ['pipe', 'pipe', 'ignore'], timeout: 1500 }).replace(/\r?\n$/, '');
+                }
+            } catch {
+                clipboardContext = '';
+            }
+        }
 
         let firstUserMsg = '';
         const shouldCheckExclude = !!systemSettings?.autoExcludeMetadata;
@@ -2454,7 +2470,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (shouldCheckExclude && !hasMovingParts) {
             firstUserMsg = cleanPromptForModel.trim();
         } else {
-            firstUserMsg = `[System Metadata] Time: ${dateTimeStrExclude}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${ideBlock}\nAction format: [action:ActionName(...)]\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+            firstUserMsg = `[System Metadata] Time: ${dateTimeStrExclude}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${ideBlock}\nAction format: [action:ActionName(...)]\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${wildcardToolingPrompt}${clipboardContext.trim().length > 0 ? `[Clipboard Context:\n- ${clipboardContext.trim()}\n` : ''}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
         }
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
@@ -2490,6 +2506,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let wasToolCalledInLastLoop = false;
         let hasTurnCompleted = false;
 
+        let toolsThisUserTurn = [];
+
         // 1 extra loop for grace period
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
             // Check if agent reached 95% of current MAX_LOOPS and prompt user on every limit threshold reached
@@ -2508,6 +2526,55 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                 } catch (e) {
                     // silently proceed on ask user errors
+                }
+            }
+
+            // Check if agent is stuck in repetitive tool loop (> 10 identical tool calls)
+            if (toolsThisUserTurn.length >= 10 && typeof settings?.onAskUser === 'function') {
+                const counts = {};
+                let stuckToolStr = null;
+                for (const str of toolsThisUserTurn) {
+                    counts[str] = (counts[str] || 0) + 1;
+                    if (counts[str] >= 10) {
+                        stuckToolStr = str;
+                        break;
+                    }
+                }
+                if (stuckToolStr) {
+                    try {
+                        const question = `Agent seems stuck in a tool loop. You can prompt it to steer or break the loop:`;
+                        const options = [
+                            { id: 'continue', label: 'Continue Anyway', description: 'Ignore warning and let it proceed' },
+                            { id: 'stop', label: 'Stop Loop', description: 'Force agent to summarize progress and stop repeating' }
+                        ];
+                        const choice = await settings.onAskUser(question, options);
+                        if (choice) {
+                            let steeringHint = '';
+                            if (typeof choice === 'string' && (choice.toLowerCase() === 'stop' || choice.includes('Stop Loop'))) {
+                                steeringHint = `STOP REPEATING THE SAME TOOL CALL. Acknowledge what failed or succeeded, summarize your current findings, and conclude.`;
+                            } else if (typeof choice === 'string' && (choice.toLowerCase() === 'continue' || choice.includes('Continue Anyway'))) {
+                                // Clear duplicate records to give it a fresh cycle before warning again
+                                toolsThisUserTurn = toolsThisUserTurn.filter(t => t !== stuckToolStr);
+                            } else {
+                                // User typed custom steering guidance or selected steer
+                                steeringHint = typeof choice === 'string' ? choice : (choice?.label || choice?.id || '');
+                            }
+
+                            if (steeringHint) {
+                                // Protocol Sync: If last message is 'user', append hint to it to avoid consecutive role errors
+                                if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
+                                    modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT from USER, High Priority] ${steeringHint.trim()} [/STEERING HINT]`;
+                                } else {
+                                    modifiedHistory.push({ role: 'user', text: `[STEERING HINT from USER, High Priority] ${steeringHint.trim()} [/STEERING HINT]` });
+                                }
+                                yield { type: 'status', content: 'Steering Hint Injected...' };
+                                // Reset the count for this stuck tool so it doesn't immediately re-trigger without giving the agent a chance
+                                toolsThisUserTurn = toolsThisUserTurn.filter(t => t !== stuckToolStr);
+                            }
+                        }
+                    } catch (e) {
+                        // silently proceed on ask user errors
+                    }
                 }
             }
 
@@ -2995,9 +3062,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         lastUserMsg.parts[0].text += `\n[system] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue. [/system]`;
                     }
 
-                    const isNoDev = process.env.NO_DEV === 'true' || process.env.NO_DEV === '1' || process.env.NO_DEV === true || false;
+                    const logChat = process.env.LOG_CHAT === 'true' || process.env.LOG_CHAT === '1' || process.env.LOG_CHAT === true || false;
 
-                    if (!isNoDev) {
+                    if (logChat) {
                         // Ensure the folders exist
                         const chatDir = path.join(LOGS_DIR, 'chats', String(chatId));
 
@@ -3006,7 +3073,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
 
                         fs.writeFileSync(path.join(chatDir, 'context.json'), JSON.stringify({ contents }, null, 2));
-                        fs.writeFileSync(path.join(chatDir, 'system.md'), `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n\n${currentSystemInstruction}`);
+                        fs.writeFileSync(path.join(chatDir, 'system.md'), `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n--------------------------------------------------------------------\n\n${currentSystemInstruction}`);
                     }
 
                     // fs.writeFileSync(`contents_context. json`, `${JSON.stringify({ contents }, null, 2)}`);
@@ -3352,7 +3419,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     const updateThinkingState = (text) => {
                         if (!text) return;
-                        const tagRegex = /(?:<(\/?)(?:think|thought|thoughts)[^>]*>|\[(\/?)(?:think|thought|thoughts)\]|<\/?channel\|?>|<\|channel>thought)/gi;
+                        const tagRegex = /(?:<(\/?)think_fluxflow[^>]*>|\[(\/?)think_fluxflow\]|<\/?channel\|?>|<\|channel>thought)/gi;
                         let match;
                         while ((match = tagRegex.exec(text)) !== null) {
                             const full = match[0].toLowerCase();
@@ -3384,7 +3451,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 updateThinkingState(chunkToEmit);
                                 return;
                             }
-                            const tagRegex = /(?:<(\/?)(?:think|thought|thoughts)[^>]*>|\[(\/?)(?:think|thought|thoughts)\]|<\/?channel\|?>|<\|channel>thought)/gi;
+                            const tagRegex = /(?:<(\/?)think_fluxflow[^>]*>|\[(\/?)think_fluxflow\]|<\/?channel\|?>|<\|channel>thought)/gi;
                             let lastIndex = 0;
                             let match;
                             while ((match = tagRegex.exec(chunkToEmit)) !== null) {
@@ -3586,6 +3653,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     updateThinkingState(fullMatch);
                                     if ((activeBufferType === 'tool' || activeBufferType === 'action' || activeBufferType?.startsWith('kimi')) && !isToolCallInBacktick && !isToolCallInThink) {
                                         emittedToolCallInTurn = true;
+                                        toolsThisUserTurn.push(fullMatch.trim());
                                     }
                                     isToolCallInBacktick = false; // reset for next tool call
                                     isToolCallInThink = false;
@@ -3627,14 +3695,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (part.thought) {
                                     if (pText) {
                                         if (!inThinkingState) {
-                                            chunkText += '<think>';
+                                            chunkText += '<think_fluxflow>';
                                             inThinkingState = true;
                                         }
                                         chunkText += pText;
                                     }
                                 } else if (pText) {
                                     if (inThinkingState) {
-                                        chunkText += '</think>';
+                                        chunkText += '</think_fluxflow>';
                                         inThinkingState = false;
                                     }
                                     chunkText += pText;
@@ -3643,7 +3711,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         } else {
                             const t = chunk.text || '';
                             if (t && inThinkingState) {
-                                chunkText += '</think>';
+                                chunkText += '</think_fluxflow>';
                                 inThinkingState = false;
                             }
                         }
@@ -3689,11 +3757,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                     const cleanText = dedupeBuffer.substring(overlapLen);
                                     if (cleanText) {
-                                        // [SEAMLESS PICKUP] Strip redundant <think> tags if model restarts them during dedupe
-                                        const hasOpenThink = /(?:<(think|thought)>|\[(think|thought)\])(?:(?!(?:<\/(?:think|thought)>|\[\/(?:think|thought)\]))[\s\S])*$/i.test(accumulatedContext);
+                                        // [SEAMLESS PICKUP] Strip redundant <think_fluxflow> tags if model restarts them during dedupe
+                                        const hasOpenThink = /(?:<think_fluxflow>|\[think_fluxflow\])(?:(?!(?:<\/think_fluxflow>|\[\/think_fluxflow\]))[\s\S])*$/i.test(accumulatedContext);
                                         const dedupeClean = hasOpenThink
-                                            ? cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '')
-                                            : cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])\s*/gi, '').replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '');
+                                            ? cleanText.replace(/^\s*(?:<think_fluxflow>|\[think_fluxflow\])\s*/gi, '')
+                                            : cleanText.replace(/^\s*(?:<think_fluxflow>|\[think_fluxflow\])[\s\S]*?(?:<\/think_fluxflow>|\[\/think_fluxflow\])\s*/gi, '').replace(/^\s*(?:<think_fluxflow>|\[think_fluxflow\])\s*/gi, '');
                                         if (dedupeClean) {
                                             turnText += dedupeClean;
                                             if (aiProvider === 'Google') {
@@ -4786,19 +4854,41 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                         const replaceClean = replaceRaw.trim();
 
                                                         // Did this block actually change?
-                                                        // If finalContent still contains the original search content (and search != replace)
-                                                        // OR if finalContent does NOT contain the replacement content,
-                                                        // then this block was not changed (i.e. rejected / reverted by user).
-                                                        const replacePresent = replaceClean ? finalContent.includes(replaceRaw) || finalContent.includes(replaceClean) : true;
-                                                        const searchPresent = searchClean ? finalContent.includes(searchRaw) || finalContent.includes(searchClean) : false;
+                                                        // NOTE: We must NOT require the search text to vanish — pure
+                                                        // insertion patches (add a line above/below, append a trailing
+                                                        // comment, wrap a block) keep the matched text inside their
+                                                        // replacement, so a "search still present" test false-flags them
+                                                        // as rejected even though they applied fine.
+                                                        //
+                                                        // Fast path: if the file ended up exactly as the full applied
+                                                        // proposal, every block was accepted.
+                                                        const acceptedAll = !!preparedModifiedContent && finalContent === preparedModifiedContent;
 
-                                                        const blockChanged = replacePresent && (!searchClean || !searchPresent || searchClean === replaceClean);
+                                                        const replacePresent = replaceClean
+                                                            ? finalContent.includes(replaceRaw) || finalContent.includes(replaceClean)
+                                                            : true;
+                                                        // Was the replacement already in the ORIGINAL file? If so its
+                                                        // presence proves nothing about this block.
+                                                        const replaceWasPresent = replaceRaw
+                                                            ? originalContentForReporting.includes(replaceRaw) ||
+                                                              (!!replaceClean && originalContentForReporting.includes(replaceClean))
+                                                            : false;
+                                                        const searchPresent = searchClean
+                                                            ? finalContent.includes(searchRaw) || finalContent.includes(searchClean)
+                                                            : false;
+
+                                                        // Changed if: full proposal matched, OR the replacement is now
+                                                        // present and it is a genuinely new change (replacement absent
+                                                        // before, or a real modify where search no longer survives).
+                                                        const blockChanged = acceptedAll ||
+                                                            (!!replaceRaw && replacePresent &&
+                                                                (!replaceWasPresent || !searchPresent || searchClean === replaceClean));
 
                                                         if (blockChanged) {
                                                             appliedBlocks++;
                                                         } else {
                                                             rejectedBlocks++;
-                                                            blockNotes.push(`  • Block ${idx + 1}: Rejected by user in IDE (reverted to original).`);
+                                                            blockNotes.push(`  • Block ${idx + 1}: not applied (reverted or rejected in IDE).`);
                                                         }
                                                     });
                                                 } else {
@@ -5256,13 +5346,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (inThinkingState) {
                         inThinkingState = false;
                         if (isDedupeActive) {
-                            dedupeBuffer += '</think>';
+                            dedupeBuffer += '</think_fluxflow>';
                         } else {
-                            turnText += '</think>';
+                            turnText += '</think_fluxflow>';
                             if (aiProvider === 'Google') {
-                                pendingGoogleText += '</think>';
+                                pendingGoogleText += '</think_fluxflow>';
                             } else {
-                                yield { type: 'text', content: '</think>' };
+                                yield { type: 'text', content: '</think_fluxflow>' };
                             }
                         }
                     }
@@ -5279,10 +5369,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                         const cleanText = dedupeBuffer.substring(overlapLen);
                         if (cleanText) {
-                            const hasOpenThink = /(?:<(think|thought)>|\[(think|thought)\])(?:(?!(?:<\/(?:think|thought)>|\[\/(?:think|thought)\]))[\s\S])*$/i.test(accumulatedContext);
+                            const hasOpenThink = /(?:<think_fluxflow>|\[think_fluxflow\])(?:(?!(?:<\/think_fluxflow>|\[\/think_fluxflow\]))[\s\S])*$/i.test(accumulatedContext);
                             const dedupeClean = hasOpenThink
-                                ? cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '')
-                                : cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])\s*/gi, '').replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '');
+                                ? cleanText.replace(/^\s*(?:<think_fluxflow>|\[think_fluxflow\])\s*/gi, '')
+                                : cleanText.replace(/^\s*(?:<think_fluxflow>|\[think_fluxflow\])[\s\S]*?(?:<\/think_fluxflow>|\[\/think_fluxflow\])\s*/gi, '').replace(/^\s*(?:<think_fluxflow>|\[think_fluxflow\])\s*/gi, '');
                             if (dedupeClean) {
                                 turnText += dedupeClean;
                                 if (aiProvider === 'Google') {
@@ -5300,15 +5390,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     if (toolCallBuffer) {
                         const leftover = toolCallBuffer;
+                        const isLikelyTool = (activeBufferType === 'tool' || activeBufferType === 'action') && (leftover.startsWith('[tool:') || leftover.startsWith('[action:'));
                         toolCallBuffer = '';
                         isBufferingToolCall = false;
                         activeBufferType = null;
                         isToolCallInBacktick = false;
                         isToolCallInThink = false;
-                        if (aiProvider === 'Google') {
-                            pendingGoogleText += leftover;
-                        } else {
-                            yield { type: 'text', content: leftover };
+                        // Never leak incomplete tool calls as raw prose text!
+                        if (!isLikelyTool) {
+                            if (aiProvider === 'Google') {
+                                pendingGoogleText += leftover;
+                            } else {
+                                yield { type: 'text', content: leftover };
+                            }
                         }
                     }
 
@@ -5354,10 +5448,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (inThinkingState) {
                             inThinkingState = false;
                             if (isDedupeActive) {
-                                dedupeBuffer += '</think>';
+                                dedupeBuffer += '</think_fluxflow>';
                             } else {
-                                turnText += '</think>';
-                                yield { type: 'text', content: '</think>' };
+                                turnText += '</think_fluxflow>';
+                                yield { type: 'text', content: '</think_fluxflow>' };
                             }
                         }
                         // Swallow/suppress SDK stream-end JSON chunk parsing bug
@@ -5369,9 +5463,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (inThinkingState) {
                         inThinkingState = false;
                         if (isDedupeActive) {
-                            dedupeBuffer += '</think>';
+                            dedupeBuffer += '</think_fluxflow>';
                         } else {
-                            turnText += '</think>';
+                            turnText += '</think_fluxflow>';
                         }
                     }
 
@@ -5387,10 +5481,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                         const cleanText = dedupeBuffer.substring(overlapLen);
                         if (cleanText) {
-                            const hasOpenThink = /(?:<(think|thought)>|\[(think|thought)\])(?:(?!(?:<\/(?:think|thought)>|\[\/(?:think|thought)\]))[\s\S])*$/i.test(accumulatedContext);
+                            const hasOpenThink = /(?:<think_fluxflow>|\[think_fluxflow\])(?:(?!(?:<\/think_fluxflow>|\[\/think_fluxflow\]))[\s\S])*$/i.test(accumulatedContext);
                             const dedupeClean = hasOpenThink
-                                ? cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '')
-                                : cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])\s*/gi, '').replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '');
+                                ? cleanText.replace(/^\s*(?:<think_fluxflow>|\[think_fluxflow\])\s*/gi, '')
+                                : cleanText.replace(/^\s*(?:<think_fluxflow>|\[think_fluxflow\])[\s\S]*?(?:<\/think_fluxflow>|\[\/think_fluxflow\])\s*/gi, '').replace(/^\s*(?:<think_fluxflow>|\[think_fluxflow\])\s*/gi, '');
                             if (dedupeClean) {
                                 turnText += dedupeClean;
                             }
@@ -5436,7 +5530,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (turnText.trim().length > 0) {
                                 modifiedHistory.push({ role: 'agent', text: turnText });
 
-                                const recoveryText = "[system]\n- seamless continuation: resume immediately. pick up from last words with zero gap/disruption\n- no repetition: do not repeat any text already written\n- no re-think: do not restart or open <think> if reasoning already started. continue the thinking and close thinking block </think> before chat output\n- mid-tool safety: if cutoff was mid-tool call, restart that tool call from start\n- stealth: do not mention/apologize for cutoff [/system]";
+                                const recoveryText = "[system]\n- seamless continuation: resume immediately. pick up from last words with zero gap/disruption\n- no repetition: do not repeat any text already written\n- no re-think: do not restart or open <think_fluxflow> if reasoning already started. continue the thinking and close thinking block </think_fluxflow> before chat output\n- mid-tool safety: if cutoff was mid-tool call, restart that tool call from start\n- stealth: do not mention/apologize for cutoff [/system]";
 
                                 if (toolResults.length > 0) {
                                     // Merge recovery prompt into the last tool result to avoid consecutive user roles
@@ -5578,8 +5672,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         // Clean up JIT question injection markers
                         msg.text = msg.text
                             .replaceAll(`\n\n[system] user question. resolve this specific query within '[ANSWER] ... [/ANSWER]' concisely, naturally [/system]\n`, '')
-                            .replaceAll(`[system] user question. resolve this specific query within '[ANSWER] ... [/ANSWER]' concisely, naturally\n**strictly follow thinking policy as high priority. do not start a response without <think>...</think>** [/system]\n`, '')
-                            .replaceAll(`[system] **strictly follow thinking policy as high priority. do not start a response without <think>...</think>** [/system]\n`, '')
+                            .replaceAll(`[system] user question. resolve this specific query within '[ANSWER] ... [/ANSWER]' concisely, naturally\n**strictly follow thinking policy as high priority. do not start a response without <think_fluxflow>...</think_fluxflow>** [/system]\n`, '')
+                            .replaceAll(`[system] **strictly follow thinking policy as high priority. do not start a response without <think_fluxflow>...</think_fluxflow>** [/system]\n`, '')
                             .replaceAll(
                                 /\n\[system\] WARNING, Turn Limit Impending: Step \d+\/\d+\. Wrap up quickly\/prompt user to continue & use \[\[END\]\] quickly\. \[\/system\]/g,
                                 ''
@@ -5591,7 +5685,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const isGemmaOrMistral = aiProvider === 'Mistral' || (aiProvider === 'Google' && modelName?.toLowerCase().startsWith('gemma'));
                         if (isGemmaOrMistral && (msg.text.startsWith('[ACTION RESULT]') || msg.text.startsWith('[TOOL RESULT]'))) {
                             const jitInstructionFast = `\n[system] Action result received. Analyze output and proceed with your turn [/system]`;
-                            const jitInstructionThinking = `\n[system] Action result received. Analyze output and proceed with your turn. **strictly follow thinking policy. do not start a response without <think>...</think>** [/system]`;
+                            const jitInstructionThinking = `\n[system] Action result received. Analyze output and proceed with your turn. **strictly follow thinking policy. do not start a response without <think_fluxflow>...</think_fluxflow>** [/system]`;
                             msg.text = msg.text.replaceAll(jitInstructionThinking, '').replaceAll(jitInstructionFast, '').trim();
                         }
                     }
@@ -5628,7 +5722,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
             } else {
                 if (!TERMINATION_SIGNAL) {
-                    const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/i, '');
+                    const toolActionableText = turnText.replace(/(?:<think_fluxflow>|\[think_fluxflow\])[\s\S]*?(?:<\/think_fluxflow>|\[\/think_fluxflow\]|$)/i, '');
                     const attemptedToolsCount = (toolActionableText.match(/\[(?:tool|action):/gi) || []).length;
                     if (wasToolCalledInLastLoop || detectedAnyToolCalls || attemptedToolsCount > 0) {
                         const diag = diagnoseUnexecutedTools(toolActionableText);
@@ -5810,7 +5904,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
 In chat output the format \`[action:ActionName(arg1="value1")]\` in NEW line
 Rules:
 - JSON escape literal sequences, backslash: \\\\, newLine: \\ n
-- Same file, multiple edits? ONE PatchFile (≤15 blocks)
+- Same file, multiple edits? ONE PatchFile ≤15 blocks
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
 - Stuck on syntax error? Tell user > waste time
@@ -5821,13 +5915,13 @@ Rules:
 ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web**
-- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: exclude limit
+- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). Proactive use for unknown/latest info
 - WebScrape(url=string). Proactive use for specific webpage/docs
 
 **Workspace**
 - CodeSearch(keyword=string, path?="file/glob, inclusion !exclusion ;-separated", regex?=bool:auto)
-- ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
-- FindFile(basename=string). Find file path. Extention optional
+- ReadFolder(path=string, recurse?=int[1..3])
+- FindFile(basename=string)
 - ReadFile(path=string, startLine?=int, endLine?=int)
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchors: ^LINE:...$ syntax, must for large blocks & escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
@@ -5835,7 +5929,7 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 
     const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
 Identity: FluxFlow subagent helping the main Agent
-Your task is: "${task}"
+Your task: "${task}"
 CWD: ${process.cwd()}
 
 ${providedToolsSection.trimEnd()}

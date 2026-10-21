@@ -63,6 +63,7 @@ const DEFAULT_SETTINGS = {
         keepReasoningContext: false,
         autoExcludeMetadata: false,
         disableTodo: false,
+        clipboardContext: false,
         alwaysAskFiles: '.env, .env.*, *.env'
     },
     profileData: {
@@ -74,8 +75,43 @@ const DEFAULT_SETTINGS = {
         keyType: 'Default',
         quality: 'Low-High',
         apiKey: ''
+    },
+    autoCompletion: {
+        enabled: false,
+        model: 'Default',
+        provider: '',
+        baseUrl: ''
     }
 };
+
+/**
+ * Provider → base URL map for auto-completion requests.
+ * Keys are provider names (matching a model's `provider` field); values are
+ * OpenAI-compatible base URLs (ending in /v1, or full /chat/completions path).
+ * Keys must match a model's `provider` field exactly (as stored on save).
+ */
+export const PROVIDER_BASE_URLS = {
+    'Mistral': 'https://api.mistral.ai/v1/chat/completions',
+    'DeepSeek': 'https://api.deepseek.com/chat/completions',
+    'OpenRouter': 'https://openrouter.ai/api/v1/chat/completions',
+    'NVIDIA': 'https://integrate.api.nvidia.com/v1',
+    // Ollama: static entry is a fallback only. The direct-fetch path resolves
+    // localhost vs cloud at runtime based on whether the key is LOCAL.
+    'Ollama': 'https://ollama.com/v1',
+    'InferX': 'https://model.inferx.net/endpoints/v1/chat/completions',
+    'SenseNova': 'https://token.sensenova.ai/v1/chat/completions',
+    'Poolside': 'https://inference.poolside.ai/v1/chat/completions',
+    'ExpLabs': 'https://api.experientiallabs.ai/v1/chat/completions',
+    'TokenHarbor': 'https://tokenharbor.ai/v1/chat/completions',
+    'Infron': 'https://llm.onerouter.pro/v1/chat/completions',
+    'APInex': 'https://api.apinex.bond/v1/chat/completions',
+    'AIHubMix': 'https://aihubmix.com/v1/chat/completions',
+    // Google: CLI path uses the SDK directly; this endpoint is only used by the
+    // extension's direct OpenAI-compatible fetch path.
+    'Google': 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    // '9router' and 'c_openai' are user-supplied URLs - resolved at runtime.
+};
+
 
 /**
  * Loads settings from the JSON file
@@ -113,7 +149,8 @@ export const loadSettings = async () => {
                 },
                 systemSettings: { ...DEFAULT_SETTINGS.systemSettings, ...saved.systemSettings },
                 profileData: { ...DEFAULT_SETTINGS.profileData, ...saved.profileData },
-                imageSettings: { ...DEFAULT_SETTINGS.imageSettings, ...saved.imageSettings }
+                imageSettings: { ...DEFAULT_SETTINGS.imageSettings, ...saved.imageSettings },
+                autoCompletion: { ...DEFAULT_SETTINGS.autoCompletion, ...saved.autoCompletion }
             };
         }
     } catch (err) {

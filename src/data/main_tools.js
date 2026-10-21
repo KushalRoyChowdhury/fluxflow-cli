@@ -41,7 +41,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     }
 
     const fluxInstructions = `- JSON escape literal sequences, backslash: \\\\, newLine: \\ n
-- Same file, multiple edits? One PatchFile (≤15 blocks)${autoExec ? '' : '\n- Action denied? Ask for guidance'}
+- Same file, multiple edits? One PatchFile ≤15 blocks${autoExec ? '' : '\n- Action denied? Ask for guidance'}
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
 - Stuck on syntax error? Tell user > waste time
@@ -50,8 +50,8 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     // =====================================================================================================
 
     const fluxTools = `**Workspace (path = relative; first argument; separator: '/')**
-- ReadFile(path=string, startLine?=int, endLine?=int)${aiProvider === 'Google' || isMultiModal ? `. Supports images` : ''}
-- FindFile(basename=string). Find file path. Extention optional
+- ReadFile(path=string, startLine?=int, endLine?=int)
+- FindFile(basename=string)
 - ReadFolder(path=string, recurse?=int[1..3])
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchor: ^LINE:...$ syntax, must for large blocks &  escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
@@ -64,13 +64,13 @@ Info: initial = current task prompt. Revert id = turn before disaster (eg. disas
 **Sub Agent**
 Default to using subagents whenever helpful, no user nudge needed
 Invocations:
-• Invoke (async/background, ≤7 parallel). Parallelize tasks
-• InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens
-- InvokeSync/Invoke(title=string, task=string). Detailed task, file paths, dependencies
-- Await(id=string, timeout?=int[..180]). Event driven wait
-- GetProgress(id=string). Poll sparingly; NO initial poll. Work or await
+• Invoke, async/background, ≤7 parallel. Parallelize tasks
+• InvokeSync, sync/blocking. Sequential, repetitive or delegated tasks
+- InvokeSync/Invoke(title=string, task=string). Detailed task & file paths
+- Await(id=string, timeout?=int[..180])
+- GetProgress(id=string). Poll sparingly; Work or await
 - Steer(id=string, message=string). Inject additional instruction into active async subagent
-- Cancel(id=string). Cancel async task ONLY if stalled (2m+) or incorrect` : ''}`;
+- Cancel(id=string). Cancel async task ONLY if stalled for 2m+ or incorrect` : ''}`;
 
     // =====================================================================================================
 
@@ -101,7 +101,7 @@ ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : "
 - AskUser(question=string, optionA?="title::description", ...MAX4). Any Ambiguity
 
 **Web**
-- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: exclude limit
+- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). Proactive use for unknown/latest info
 - WebScrape(url=string). Proactive use for specific webpage/docs
 
 ${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();

@@ -4,7 +4,7 @@
     "publisher": "fluxflow-cli",
     "icon": "fluxflow-cli-companion.png",
     "description": "Enable FluxFlow CLI with direct access to your IDE workspace.",
-    "version": "1.5.4",
+    "version": "1.6.0",
     "engines": {
         "vscode": "^1.90.0"
     },
@@ -16,6 +16,18 @@
     ],
     "main": "./dist/extension.js",
     "contributes": {
+        "keybindings": [
+            {
+                "command": "editor.action.inlineSuggest.commit",
+                "key": "tab",
+                "when": "inlineSuggestionVisible && !editorTabMovesFocus && !hasSnippetCompletions && !inlineSuggestionTabMovesFocus"
+            },
+            {
+                "command": "editor.action.inlineSuggest.commitNextWord",
+                "key": "alt+right",
+                "when": "inlineSuggestionVisible"
+            }
+        ],
         "commands": [
             {
                 "command": "fluxflow-editorx.run",

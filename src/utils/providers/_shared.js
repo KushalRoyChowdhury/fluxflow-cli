@@ -62,6 +62,6 @@ export async function hash(input) {
 export const convertChannelThinkTags = (str) => {
     if (typeof str !== 'string') return str;
     return str
-        .replace(/<\|channel>thought/gi, '<think>')
-        .replace(/<channel\|>/gi, '</think>');
+        .replace(/<\|channel>thought/gi, '<think_fluxflow>')
+        .replace(/<channel\|>/gi, '</think_fluxflow>');
 };

@@ -1229,13 +1229,13 @@ export const cleanSignals = (text, role = 'agent') => {
     const isAgentRole = role === false || role === 'agent';
 
     let normalizedText = text
-        .replace(/<\|channel>thought/gi, '<think>')
-        .replace(/<channel\|>/gi, '</think>');
+        .replace(/<\|channel>thought/gi, '<think_fluxflow>')
+        .replace(/<channel\|>/gi, '</think_fluxflow>');
 
     if (isThinkRole) {
         return normalizedText
-            .replace(/^<(think|thought|thoughts|thinking)>/gi, '')
-            .replace(/<\/(think|thought|thoughts|thinking)>$/gi, '')
+            .replace(/^<think_fluxflow>/gi, '')
+            .replace(/<\/think_fluxflow>$/gi, '')
             .replace(/^\r?\n+/, '')
             .replace(/\r?\n+$/, '');
     }
@@ -1243,8 +1243,8 @@ export const cleanSignals = (text, role = 'agent') => {
     let result = normalizedText;
 
     if (isAgentRole) {
-        // Strip only the <think> and </think> tags from agent responses if not wrapped in code backticks
-        result = result.replace(/<\/?(?:think|thought|thoughts|thinking)>/gi, (match, offset, str) =>
+        // Strip only the <think_fluxflow> and </think_fluxflow> tags from agent responses if not wrapped in code backticks
+        result = result.replace(/<\/?think_fluxflow>/gi, (match, offset, str) =>
             isInsideBacktick(str, offset) ? match : '');
 
         result = result.replace(REGEX_INITIAL_TOOL, (match, _nl, offset, str) =>
@@ -1264,6 +1264,7 @@ export const cleanSignals = (text, role = 'agent') => {
             }
         }
     }
+
 
     const trigger = 'tool:';
     const actionTrigger = 'action:';
@@ -1350,13 +1351,27 @@ export const cleanSignals = (text, role = 'agent') => {
                 }
                 j++;
                 if (j === result.length) {
-                    if (foundStart && balance > 0) {
-                        result = result.substring(0, startIdx);
-                    }
-                    return result;
+                    // If tool call is in progress/unclosed at end of text (streaming or truncated), strip from startIdx to end
+                    result = result.substring(0, startIdx);
+                    break;
                 }
             }
         }
+    }
+
+    // Secondary cleanup: strip any stray or orphaned tool invocation / argument fragments that leaked (guarded by backtick check)
+    if (isAgentRole) {
+        // Strip any remaining complete/balanced tool patterns [action:Name(...)] or [tool:Name(...)]
+        result = result.replace(/\[\s*(?:tool|action):[a-zA-Z0-9_.]*\s*\([\s\S]*?\)\s*\]/gi, (match, offset, str) =>
+            (!bypassBacktick && isInsideBacktick(str, offset)) ? match : '');
+        // Strip unclosed streaming tool calls at the end: [action:Name(... or [tool:Name(...
+        result = result.replace(/\[\s*(?:tool|action):[a-zA-Z0-9_.]*[\s\S]*$/gi, (match, offset, str) =>
+            (!bypassBacktick && isInsideBacktick(str, offset)) ? match : '');
+        // Strip orphaned parameter fragments that leaked when the tool prefix was cut (e.g. ="path/file.ext", arg2="val")] or path="...", startLine=...)]
+        result = result.replace(/^(?:\s*=\s*["'][^"'\n]*["']|\s*[a-zA-Z0-9_]+\s*=\s*(?:["'][^"'\n]*["']|\d+|true|false))(?:\s*,\s*[a-zA-Z0-9_]+\s*=\s*(?:["'][^"'\n]*["']|\d+|true|false))*\s*\)?\]\s*/gm, (match, offset, str) =>
+            (!bypassBacktick && isInsideBacktick(str, offset)) ? match : '');
+        result = result.replace(/(?:\r?\n|^)\s*=\s*["'][^"'\n]*["'][\s\S]*?\s*\)?\]\s*/g, (match, offset, str) =>
+            (!bypassBacktick && isInsideBacktick(str, offset)) ? match : '\n');
     }
 
     // Consolidated regex pass eliminates string allocations scaling linearly with replace rules

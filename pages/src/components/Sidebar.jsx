@@ -25,9 +25,9 @@ export default function Sidebar() {
                     {navItems.map((section, sIdx) => (
                         <motion.div
                             key={section.title}
-                            initial={{ opacity: 0, y: 10 }}
+                            initial={{ opacity: 0, y: 12 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: sIdx * 0.1 + 0.2 }}
+                            transition={{ delay: sIdx * 0.08 + 0.15, duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
                         >
                             <p className="text-xs font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest mb-4 ml-3">
                                 {section.title}

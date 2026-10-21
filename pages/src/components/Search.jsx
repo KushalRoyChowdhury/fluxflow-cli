@@ -100,9 +100,15 @@ export default function Search() {
                     />
 
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -20 }}
+                        initial={{ opacity: 0, scale: 0.96, y: -12 }}
+                        animate={{
+                            opacity: 1, scale: 1, y: 0,
+                            transition: { duration: 0.3, ease: [0.32, 0.72, 0, 1] }
+                        }}
+                        exit={{
+                            opacity: 0, scale: 0.97, y: -8,
+                            transition: { duration: 0.18, ease: [0.4, 0, 0.2, 1] }
+                        }}
                         className="relative w-full max-w-xl bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl overflow-hidden border dark:border-white/10"
                     >
                         <div className="flex items-center px-4 py-4 border-b dark:border-white/5">
@@ -123,11 +129,20 @@ export default function Search() {
                             {results.length > 0 ? (
                                 <div className="space-y-1">
                                     {results.map((item, idx) => (
-                                        <button
+                                        <motion.button
                                             key={`${item.path}-${item.section}`}
                                             onClick={() => handleSelect(item)}
                                             onMouseEnter={() => setSelectedIndex(idx)}
-                                            className={`w-full flex flex-col items-start px-4 py-3 rounded-xl transition-all duration-200 ${idx === selectedIndex
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{
+                                                opacity: 1, y: 0,
+                                                transition: {
+                                                    duration: 0.32,
+                                                    ease: [0.32, 0.72, 0, 1],
+                                                    delay: Math.min(idx * 0.035, 0.25)
+                                                }
+                                            }}
+                                            className={`w-full flex flex-col items-start px-4 py-3 rounded-xl transition-colors duration-200 ${idx === selectedIndex
                                                 ? 'bg-blue-600 text-white'
                                                 : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
                                                 }`}
@@ -140,7 +155,7 @@ export default function Search() {
                                             <div className="text-sm font-medium leading-relaxed">
                                                 {item.snippet}
                                             </div>
-                                        </button>
+                                        </motion.button>
                                     ))}
                                 </div>
                             ) : query ? (

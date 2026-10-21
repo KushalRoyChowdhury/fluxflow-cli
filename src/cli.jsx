@@ -575,12 +575,12 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
         const oneShotInstruction = `Identity: FluxFlow. Sassy, CLI Assistant
 Use NO markdown, only plain text
-Additional Context:
+Context:
 - OS: ${osDetected}
 - Model: ${formattedModelName}
 - Approx time: ${dateTimeStr}
 - Non interactive CLI, support piped inputs
-- 'fluxflow' TUI has full agentic tools & capabilities${nickname.trim().length > 0 ? `\nUser Nickname: ${nickname.trim()}` : ''}${instructions.trim().length > 0 ? `\nUser Preferences: ${instructions.trim()}` : ''}`.trim();
+- 'fluxflow' TUI has full agentic tools${nickname.trim().length > 0 ? `\nUser Nickname: ${nickname.trim()}` : ''}${instructions.trim().length > 0 ? `\nUser Preferences: ${instructions.trim()}` : ''}`.trim();
 
         const { getPromptSessionHistory, savePromptSessionHistory, clearPromptSessionHistory } = await import('./utils/sessionDaemon.js');
 

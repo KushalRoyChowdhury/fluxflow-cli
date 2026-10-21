@@ -9,6 +9,7 @@ import { readEncryptedJson } from './crypto.js';
 import { MEMORIES_FILE, LOGS_DIR, FLUXFLOW_DIR } from './paths.js';
 import { loadSettings } from './settings.js';
 import { createAboutSkill } from './about_skill.js';
+import { isBridgeConnected } from './editor.js';
 
 export const getCaseInsensitiveFilePath = (dir, fileNames) => {
     try {
@@ -669,6 +670,11 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         .replace(/\b\w/g, char => char.toUpperCase().trim());
 
     const isNoDev = process.env.NO_DEV === 'true' || false;
+
+    // IDE companion (extension) connection flag — evaluated live each turn so it
+    // reflects the real-time bridge state (the bridge connects asynchronously).
+    let ideConnected = false;
+    try { ideConnected = isBridgeConnected(); } catch (e) { ideConnected = false; }
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT ===
@@ -686,9 +692,9 @@ mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze
 
 -- REASONING GUIDANCE --
 ${((aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini))) || forcedReasoning ? `${thinkingConfig.trimEnd()}${forcedReasoning || (thinkingLevel !== 'Fast' && (((aiProvider === 'Mistral' && thinkingLevel === 'Low') && !isGemini) || (thinkingLevel !== 'High' && !isGemini))) ? `\nCritical Thinking Policy
-Use <think>...</think> for reasoning before responding any queries` : ''}` : `${thinkingConfig.trimEnd()}`}${!keepReasoningContext ? '\nBefore actions, provide user facing summary of findings & decisions IN detail for next turn\n' : ''}
+Use <think_fluxflow>...</think_fluxflow> for reasoning before responding any queries` : ''}` : `${thinkingConfig.trimEnd()}`}${!keepReasoningContext ? '\nBefore actions, provide user facing summary of findings & decisions IN detail\n' : ''}
 ${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec, !!systemSettings?.disableTodo)}${isMemoryEnabled && false ? `\n\n-- MEMORY RULES --
-- Subtly Personalize with relevent contextual memories. Auto Saves` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens/captcha → AskUser' : ''}
+- Subtly Personalize with relevent contextual memories. Auto Saves` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens/captcha → AskUser' : ''}${ideConnected ? '\n\nReference files as ./file:start..end' : ''}
 === END SYSTEM PROMPT ===${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n\n- Read relevant skills before tasks, scope: global/project: Use ReadFile, path=\"#skills/scope?/skillName\". In-skill references: path=\"#skills/scope?/skillName/reference-folder/*.md\"' : ''}
 
 ${nicknameStr}${userInstrStr}${additionalInstrStr}${globalSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Global Skills --\n${globalSkillsPrompt}\n\n` : ''}${localSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Project Skills --\n${localSkillsPrompt}\n\n` : ''}${userMemoriesStr}`.trim();

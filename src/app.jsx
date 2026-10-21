@@ -47,7 +47,7 @@ import { emojiSpace, getFluxLogo } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, cleanTerminalOutput } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens, parseMessageToBlocks, clearBlocksCache, flattenString, splitTypewriterTokens } from './utils/text.js';
-import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
+import { isBridgeConnected, initBridge, sendStatus, registerBridgeRejectionListener } from './utils/editor.js';
 import GlintText from './components/GlintText.jsx';
 import { loadedFilesCount, getLoadedFilesSummary } from './utils/prompts.js';
 import { getProcessTree } from './utils/process.js';
@@ -267,6 +267,51 @@ const BridgePromo = ({ width, height, selectedIndex, aiProvider, theme = 'Dark' 
 
                 <Box marginTop={1} alignItems="center" justifyContent="center">
                     <Text dimColor italic>(Use arrows to navigate, Enter to select)</Text>
+                </Box>
+            </Box>
+        </Box>
+    );
+};
+
+const BridgeRejected = ({ width, height, aiProvider, theme = 'Dark', reason }) => {
+    const ideName = getIDEName();
+    const isVersion = reason === 'version_mismatch';
+
+    return (
+        <Box
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            width={width}
+            height={height}
+        >
+            <Box marginBottom={1} width={Math.min(80, width - 4)} justifyContent="flex-start">
+                <Text>{getFluxLogo(versionFluxflow, aiProvider, theme)}</Text>
+            </Box>
+            <Box flexDirection="column" borderStyle="double" paddingX={3} paddingY={1} width={Math.min(80, width - 4)}>
+                <Text bold color="yellow" textAlign="center">{isVersion ? '⚠  VERSION MISMATCH' : '⚠  CWD MISMATCH'}</Text>
+                <Box marginY={1} flexDirection="column" alignItems="left">
+                    <Text>
+                        {isVersion
+                            ? 'Your FluxFlow CLI version is not supported by the '
+                            : 'CWD mismatch from '}
+                        {!isVersion && <Text bold color="white">{ideName}</Text>}
+                        {!isVersion && ' workspace. '}
+                        IDE features aren&apos;t available right now.
+                    </Text>
+                    {!isVersion && (
+                        <Box marginTop={1}>
+                            <Text dimColor>Tip: Launch FluxFlow CLI from the same folder open in {ideName}.</Text>
+                        </Box>
+                    )}
+                </Box>
+
+                <Box marginTop={1}>
+                    <Text color="yellow" bold> ❯ Understood</Text>
+                </Box>
+
+                <Box marginTop={1} alignItems="center" justifyContent="center">
+                    <Text dimColor italic>(Press Enter to dismiss)</Text>
                 </Box>
             </Box>
         </Box>
@@ -645,7 +690,11 @@ export default function App({ args = [] }) {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isFilePickerDismissed, setIsFilePickerDismissed] = useState(false);
     const [showBridgePromo, setShowBridgePromo] = useState(false);
+    const [showBridgeRejection, setShowBridgeRejection] = useState(null);
     const [promoSelectedIndex, setPromoSelectedIndex] = useState(0);
+    // Persist rejection for the session so we never re-show the install promo
+    const bridgeRejectRef = useRef(null);
+    const rejectionDismissedRef = useRef(false);
     const suggestionOffsetRef = useRef(0);
     const maxScrollRef = useRef(0);
     const persistedModelRef = useRef(null);
@@ -759,7 +808,8 @@ export default function App({ args = [] }) {
 
         // Wait 500ms before showing promo to allow WebSocket to connect
         const graceTimer = setTimeout(() => {
-            if (isIDE && !isBridgeConnected()) {
+            // Never nag with the install promo if the IDE explicitly rejected us
+            if (isIDE && !isBridgeConnected() && !bridgeRejectRef.current) {
                 setShowBridgePromo(true);
             }
         }, 500);
@@ -768,6 +818,9 @@ export default function App({ args = [] }) {
         const interval = setInterval(() => {
             if (isBridgeConnected()) {
                 setShowBridgePromo(false);
+                setShowBridgeRejection(null);
+                bridgeRejectRef.current = null;
+                rejectionDismissedRef.current = false;
             }
         }, 1000);
 
@@ -1251,10 +1304,11 @@ export default function App({ args = [] }) {
     const [pbsSelected, setPbsSelected] = useState({}); // providerBudgetSelect checkbox state
     const [pbfFormState, setPbfFormState] = useState({}); // providerBudgetFlow form values
     const [pbfFieldIndex, setPbfFieldIndex] = useState(0); // providerBudgetFlow active field cursor
-    const [systemSettings, setSystemSettings] = useState({ memory: true, theme: 'Dark', compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '' });
+    const [systemSettings, setSystemSettings] = useState({ memory: true, theme: 'Dark', compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '', clipboardContext: false });
     const colors = useMemo(() => getThemeColors(systemSettings.theme), [systemSettings.theme]);
     const [profileData, setProfileData] = useState({ name: null, nickname: null, instructions: null });
     const [imageSettings, setImageSettings] = useState({ keyType: 'Default', quality: 'Low-High', apiKey: '' });
+    const [autoCompletion, setAutoCompletion] = useState({ enabled: false, model: 'Default', provider: '', baseUrl: '' });
     const [sessionStats, setSessionStats] = useState({ tokens: 0 });
     const [lastChunkTime, setLastChunkTime] = useState(0);
     const chunkWordCountRef = useRef(0);
@@ -1854,6 +1908,14 @@ export default function App({ args = [] }) {
             }
         }
 
+        if (showBridgeRejection) {
+            if (key.return || key.escape) {
+                rejectionDismissedRef.current = true;
+                setShowBridgeRejection(null);
+            }
+            return;
+        }
+
         if (showBridgePromo) {
             const ideName = getIDEName();
             const options = getPromoOptions(ideName);
@@ -2251,6 +2313,17 @@ export default function App({ args = [] }) {
 
     useEffect(() => {
         async function init() {
+            // Register the rejection handler before connecting so we never miss a handshake
+            registerBridgeRejectionListener((info) => {
+                const reason = info?.reason || 'cwd_mismatch';
+                bridgeRejectRef.current = reason;
+                setShowBridgePromo(false);
+                // Don't re-nag if the user already acknowledged it this session
+                if (!rejectionDismissedRef.current) {
+                    setShowBridgeRejection(reason);
+                }
+            });
+
             // 0. Initialize IDE Bridge with dynamic version
             try {
                 const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
@@ -2370,6 +2443,7 @@ export default function App({ args = [] }) {
             setSystemSettings(freshSettings);
             setProfileData(saved.profileData);
             setImageSettings(saved.imageSettings || { keyType: 'Default', quality: 'Low-High', apiKey: '' });
+            setAutoCompletion({ enabled: false, model: 'Default', provider: '', baseUrl: '', ...(saved.autoCompletion || {}) });
 
             // 2. Load API key
             let key = parsedArgs.key;
@@ -2557,10 +2631,11 @@ export default function App({ args = [] }) {
                 systemSettings: settingsToSave,
                 profileData,
                 imageSettings,
+                autoCompletion,
                 apiTier
             });
         }
-    }, [mode, thinkingLevel, aiProvider, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing, parsedArgs, apiTier]);
+    }, [mode, thinkingLevel, aiProvider, activeModel, showFullThinking, systemSettings, profileData, imageSettings, autoCompletion, isInitializing, parsedArgs, apiTier]);
 
     const handleSetup = async (val) => {
         const key = val.trim();
@@ -2659,6 +2734,7 @@ export default function App({ args = [] }) {
                 systemSettings: newSys,
                 profileData,
                 imageSettings,
+                autoCompletion,
                 apiTier
             });
 
@@ -5150,7 +5226,7 @@ export default function App({ args = [] }) {
                         }
 
                         // 1. Detect transition to THINK mode (Strictly at the START of response for this turn)
-                        const RE_STREAM_THINK_OPEN = /^\s*(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])/i;
+                        const RE_STREAM_THINK_OPEN = /^\s*(?:<think_fluxflow[^>]*>|<\|channel>thought|\[think_fluxflow\])/i;
 
                         const isInsideBacktick = (str, idx, matchLen = 1) => {
                             const prevChar = idx > 0 ? str[idx - 1] : '';
@@ -5159,7 +5235,7 @@ export default function App({ args = [] }) {
                         };
 
                         const findGenuineThinkClose = (str) => {
-                            const regex = /(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/gi;
+                            const regex = /(?:<\/think_fluxflow>|<channel\|>|\[\/think_fluxflow\])/gi;
                             let match;
                             while ((match = regex.exec(str)) !== null) {
                                 if (isInsideBacktick(str, match.index, match[0].length)) continue;
@@ -5600,6 +5676,8 @@ export default function App({ args = [] }) {
                         quotas={quotas}
                         setMessages={setMessages}
                         aiProvider={aiProvider}
+                        autoCompletion={autoCompletion}
+                        setAutoCompletion={setAutoCompletion}
                         setProviderReturnView={setProviderReturnView}
                     />
                 );
@@ -5616,6 +5694,8 @@ export default function App({ args = [] }) {
                         quotas={quotas}
                         setMessages={setMessages}
                         aiProvider={aiProvider}
+                        autoCompletion={autoCompletion}
+                        setAutoCompletion={setAutoCompletion}
                         initialSelectingTheme={true}
                         onCloseTheme={() => setActiveView('chat')}
                         setProviderReturnView={setProviderReturnView}
@@ -7813,7 +7893,9 @@ export default function App({ args = [] }) {
 
     return (
         <Box flexDirection="column" width="100%">
-            {isInitializing ? null : showBridgePromo ? (
+            {isInitializing ? null : showBridgeRejection ? (
+                <BridgeRejected width={stdout?.columns || 80} height={stdout?.rows || 24} aiProvider={aiProvider} theme={systemSettings.theme} reason={showBridgeRejection} />
+            ) : showBridgePromo ? (
                 <BridgePromo width={stdout?.columns || 80} height={stdout?.rows || 24} selectedIndex={promoSelectedIndex} aiProvider={aiProvider} theme={systemSettings.theme} />
             ) : (
                 <>

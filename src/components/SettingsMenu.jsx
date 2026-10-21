@@ -8,12 +8,14 @@ import { getProviderAPIKey } from '../utils/secrets.js';
 import v8 from 'v8';
 import { DATA_DIR, FLUXFLOW_DIR } from '../utils/paths.js';
 import os from 'os';
+import { PROVIDER_BASE_URLS } from '../utils/settings.js';
 
 const themeOptions = [...Object.keys(THEMES), 'Mystery'];
 
 const CATEGORIES = [
     { id: 'appearance', label: 'Appearance', desc: 'Customize UI theme & rendering options' },
     { id: 'memory', label: 'Memory', desc: 'Manage system context & agent\'s memory' },
+    { id: 'secondaryModels', label: 'Secondary Models', desc: 'Sub-agents & auto-completion models' },
     { id: 'other', label: 'Miscellaneous', desc: 'Miscellaneous preferences' },
     { id: 'providers', label: 'Providers', desc: 'Configure AI models' },
     { id: 'security', label: 'Security', desc: 'Configure permissions & data safety' },
@@ -75,6 +77,8 @@ export default function SettingsMenu({
     quotas,
     setMessages,
     aiProvider,
+    autoCompletion,
+    setAutoCompletion,
     initialSelectingTheme = false,
     onCloseTheme = null,
     setProviderReturnView = null
@@ -92,6 +96,7 @@ export default function SettingsMenu({
     const [initialTheme, setInitialTheme] = useState(systemSettings.theme || 'Dark');
 
     const [isSelectingSubAgentModel, setIsSelectingSubAgentModel] = useState(false);
+    const [modelPickerTarget, setModelPickerTarget] = useState('subAgent');
     const [subAgentModelIndex, setSubAgentModelIndex] = useState(0);
     const [subAgentScrollOffset, setSubAgentScrollOffset] = useState(0);
     const [subAgentSearchQuery, setSubAgentSearchQuery] = useState('');
@@ -321,17 +326,23 @@ export default function SettingsMenu({
                     { label: 'Auto Approve Git Commits', value: 'autoApproveGit', status: systemSettings.autoApproveGit ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'Advanced Recovery [EXPERIMENTAL]', value: 'advanceRollback', status: systemSettings.advanceRollback ? 'ON' : 'OFF', section: 'Other' },
                     { label: 'Auto-Delete History', value: 'autoDelete', status: systemSettings.autoDeleteHistory || '30d', section: 'Other' },
-                    { label: 'Save AppData Externally', value: 'externalData', status: systemSettings.useExternalData ? 'ON' : 'OFF', section: 'Other' }
+                    { label: 'Save AppData Externally', value: 'externalData', status: systemSettings.useExternalData ? 'ON' : 'OFF', section: 'Other' },
+                    { label: 'Agent Clipboard Context', value: 'clipboardContext', status: systemSettings.clipboardContext ? 'ON' : 'OFF', section: 'Other' }
                 ];
             case 'updater':
                 return [
                     { label: 'Auto-Update', value: 'autoUpdate', status: systemSettings.autoUpdate ? 'ON' : 'OFF' },
                     { label: 'Preferred Package Manager', value: 'updateManager', status: (systemSettings.updateManager || 'npm') === 'custom' ? 'Custom' : (systemSettings.updateManager || 'npm').toUpperCase() }
                 ];
-            case 'other':
+            case 'secondaryModels':
                 return [
                     { label: 'Sub-Agents', value: 'subAgents', status: systemSettings.subAgents !== false ? 'ON' : 'OFF' },
                     { label: 'Sub-Agent Model', value: 'subAgentModel', status: (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default' },
+                    { label: 'Enable Auto-Completion', value: 'autoCompletionEnabled', status: autoCompletion?.enabled ? 'ON' : 'OFF' },
+                    { label: 'Auto-Completion Model', value: 'autoCompletionModel', status: (autoCompletion?.model && autoCompletion.model !== 'Default') ? autoCompletion.model : 'Default' }
+                ];
+            case 'other':
+                return [
                     { label: 'Directory Tree Design', value: 'indentationTree', status: systemSettings.indentationTree !== false ? 'Modern' : 'Legacy' },
                     { label: 'Compact Large Tool Results', value: 'compressToolResults', status: systemSettings.compressToolResults ? 'ON' : 'OFF' },
                     { label: 'Auto Truncate Results', value: 'autoTruncateResults', status: systemSettings.autoTruncateResults ? 'ON' : 'OFF' },
@@ -395,17 +406,31 @@ export default function SettingsMenu({
             } else if (key.return) {
                 const selectedOpt = availableModels[subAgentModelIndex];
                 if (selectedOpt && !selectedOpt.isHeader) {
-                    setSystemSettings(s => {
-                        const isDefault = selectedOpt.value === 'Default';
-                        const newSysSettings = {
-                            ...s,
-                            CustomSubAgent: !isDefault,
-                            SubAgentModel: selectedOpt.value,
-                            SubAgentProvider: isDefault ? '' : (selectedOpt.provider || '')
-                        };
-                        saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
-                        return newSysSettings;
-                    });
+                    const isDefault = selectedOpt.value === 'Default';
+                    if (modelPickerTarget === 'autoCompletion') {
+                        setAutoCompletion(ac => {
+                            const provider = isDefault ? '' : (selectedOpt.provider || '');
+                            const next = {
+                                ...ac,
+                                model: selectedOpt.value,
+                                provider,
+                                baseUrl: isDefault ? '' : (PROVIDER_BASE_URLS[provider] || '')
+                            };
+                            saveSettings({ autoCompletion: next, apiTier, quotas });
+                            return next;
+                        });
+                    } else {
+                        setSystemSettings(s => {
+                            const newSysSettings = {
+                                ...s,
+                                CustomSubAgent: !isDefault,
+                                SubAgentModel: selectedOpt.value,
+                                SubAgentProvider: isDefault ? '' : (selectedOpt.provider || '')
+                            };
+                            saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                            return newSysSettings;
+                        });
+                    }
                     setIsSelectingSubAgentModel(false);
                 }
             } else if (key.escape) {
@@ -669,6 +694,25 @@ export default function SettingsMenu({
             const currentSubAgentModel = (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default';
             const curIdx = availableModels.findIndex(m => m.value === currentSubAgentModel);
             setSubAgentModelIndex(curIdx >= 0 ? curIdx : 0);
+            setModelPickerTarget('subAgent');
+            setIsSelectingSubAgentModel(true);
+        } else if (item.value === 'autoCompletionEnabled') {
+            setAutoCompletion(ac => {
+                const next = { ...ac, enabled: !ac.enabled };
+                saveSettings({ autoCompletion: next, apiTier, quotas });
+                return next;
+            });
+        } else if (item.value === 'clipboardContext') {
+            setSystemSettings(s => {
+                const next = { ...s, clipboardContext: !s.clipboardContext };
+                saveSettings({ systemSettings: next, apiTier, quotas });
+                return next;
+            });
+        } else if (item.value === 'autoCompletionModel') {
+            const currentModel = autoCompletion?.model || 'Default';
+            const curIdx = availableModels.findIndex(m => m.value === currentModel);
+            setSubAgentModelIndex(curIdx >= 0 ? curIdx : 0);
+            setModelPickerTarget('autoCompletion');
             setIsSelectingSubAgentModel(true);
         } else if (item.value === 'preserveThinking') {
             setSystemSettings(s => {
@@ -707,7 +751,9 @@ export default function SettingsMenu({
     const colors = getThemeColors(systemSettings.theme);
 
     if (isSelectingSubAgentModel) {
-        const currentSavedModel = (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default';
+        const currentSavedModel = modelPickerTarget === 'autoCompletion'
+            ? (autoCompletion?.model || 'Default')
+            : ((systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default');
 
         // Proper Viewport Scroll Logic:
         // Keep window fixed while cursor moves inside [offset, offset + VISIBLE_COUNT - 1]
@@ -731,7 +777,7 @@ export default function SettingsMenu({
                 {/* Title */}
                 <Box marginBottom={1} flexDirection="row" justifyContent="space-between">
                     <Text color={colors.text} bold underline>
-                        Select Sub-Agent Model:
+                        {modelPickerTarget === 'autoCompletion' ? 'Select Auto-Completion Model:' : 'Select Sub-Agent Model:'}
                     </Text>
                     {availableModels.length > 0 && (
                         <Text color="gray">

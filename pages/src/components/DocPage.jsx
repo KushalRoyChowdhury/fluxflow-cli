@@ -11,16 +11,16 @@ const pageVariants = {
         opacity: 1,
         y: 0,
         transition: {
-            duration: 0.4,
-            ease: [0.25, 1, 0.5, 1]
+            duration: 0.45,
+            ease: [0.32, 0.72, 0, 1]
         }
     },
     exit: {
         opacity: 0,
-        y: -20,
+        y: -12,
         transition: {
-            duration: 0.3,
-            ease: [0.25, 1, 0.5, 1]
+            duration: 0.2,
+            ease: [0.4, 0, 0.2, 1]
         }
     }
 }
@@ -48,14 +48,14 @@ export default function DocPage({ headings, children }) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="mt-24 pt-8 border-t border-slate-100 dark:border-slate-800"
+                className="mt-24 pt-8 border-t relative border-slate-100 dark:border-slate-800"
             >
                 <p className="text-sm text-slate-500 dark:text-slate-500">
                     Caught a mistake or want to contribute to the documentation?
                     <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli" className="ml-1 text-blue-600 dark:text-blue-400 font-medium hover:underline select-none">Edit this page on GitHub</a>
                 </p>
-                <div className='text-sm text-slate-500 dark:text-slate-500'>Updated: 2026SEP18 (v4.16.10)</div>
-                <div className='absolute text-transparent select-none h-0 w-0'>HUGE THANKS TO GEMINI CLI. (つ╥﹏╥)つ</div>
+                <div className='text-sm text-slate-500 dark:text-slate-500'>Updated: 2026OCT22 (v4.39.0)</div>
+                {/* <div className='text-transparent select-none h-1 w-1'>HUGE THANKS TO GEMINI CLI. (つ╥﹏╥)つ</div> */}
             </motion.footer>
         </motion.div>
     )

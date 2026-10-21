@@ -1,6 +1,19 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.39.0": {
+        "note": "OCTOBER 21",
+        "added": [
+            "Added smart inline code completions (Requrire FluxFlow Companion v1.6+)."
+        ],
+        "changed": [
+            "Improved FluxFlow Companion connection startup to check CWD match with CLI.",
+            "Increased FluxFlow Companion version to v1.6 adding code completions."
+        ],
+        "fixes": [
+            "Fixed bugs causing tool results to trigger false positives when diff accepted via IDE in non-YOLO mode."
+        ]
+    },
     "4.38.0": {
         "note": "OCTOBER 19",
         "added": [],
@@ -972,7 +985,7 @@ export const changelogData = {
         ]
     },
     "3.0.10": {
-        "note": "JULY 3 - Stability Patch for API Health Indicator & FluxFixer.",
+        "note": "JULY 3. Stability Patch for API Health Indicator & FluxFixer.",
         "added": [],
         "changed": [
             "Improved API Health Indicator to include SubAgents."
@@ -1000,7 +1013,7 @@ export const changelogData = {
         "fixes": []
     },
     "3.0.0": {
-        "note": "JULY 3 - MultiAgent Architecture.",
+        "note": "JULY 3. MultiAgent Architecture.",
         "added": [
             "Added SubAgent & Multi-Agent Architecture. With 2 invocation methods when main agent decides, `invokeSync` & `invoke` based on task complexity and parallelism benefits. May consume additional tokens."
         ],
@@ -1022,7 +1035,7 @@ export const changelogData = {
         "fixes": []
     },
     "2.16.7": {
-        "note": "JULY 2 - Bug Fixes.",
+        "note": "JULY 2. Bug Fixes.",
         "added": [
             "Added support for PowerShell 7.6 in Windows with fallback to PowerShell 5.1.",
             "Added support for `QWEN 3.5 397B` in NVIDIA API."
@@ -1046,7 +1059,7 @@ export const changelogData = {
         ]
     },
     "2.15.0": {
-        "note": "JUNE 30 - Budgeting Overhaul.",
+        "note": "JUNE 30. Budgeting Overhaul.",
         "added": [
             "New command `/budgets reset` to reset existing budgets."
         ],
@@ -1089,7 +1102,7 @@ export const changelogData = {
         ]
     },
     "2.13.0": {
-        "note": "JUNE 26 - Performance Improvements.",
+        "note": "JUNE 26. Performance Improvements.",
         "added": [
             "New rendering engine with massive performance improvement and all time low rendering overhead giving upto 99% more smoothness and lower resource usage than prior versions."
         ],
@@ -1101,7 +1114,7 @@ export const changelogData = {
         ]
     },
     "2.12.3": {
-        "note": "JUNE 25 - Upgrades to Playground.",
+        "note": "JUNE 25. Upgrades to Playground.",
         "added": [
             "Added new command `/move` to copy playground codebase to original working directory under `playground-export/` (`/move` is only valid in playground mode)."
         ],
@@ -1112,7 +1125,7 @@ export const changelogData = {
         ]
     },
     "2.12.0": {
-        "note": "JUNE 24 - Playground Mode.",
+        "note": "JUNE 24. Playground Mode.",
         "added": [
             "**Playground Mode:** Launch FluxFlow with `fluxflow --playground` to enter a persistent, isolated session. Chat ID is fixed to `flow-playground`, CWD is pinned to `FluxFlow/playground`, and history is automatically restored on every launch.",
             "Playground session is silently wiped on session end & Memory features are not available.",
@@ -1122,7 +1135,7 @@ export const changelogData = {
         "fixes": []
     },
     "2.11.5": {
-        "note": "JUNE 23 - Bug Fixes!",
+        "note": "JUNE 23. Bug Fixes!",
         "added": [],
         "changed": [
             "Tuned parameters for more stable tool calling."
@@ -1134,7 +1147,7 @@ export const changelogData = {
         ]
     },
     "2.11.1": {
-        "note": "JUNE 22 - Happy Coding!",
+        "note": "JUNE 22. Happy Coding!",
         "added": [
             "Added \"Budgets\" on Non-Billing API Keys, cuz numbers goo BRRR",
             "Added new command `/budgets` to set and view limits easily than checking from settings."
@@ -1165,7 +1178,7 @@ export const changelogData = {
         ]
     },
     "2.10.0": {
-        "note": "JUNE 20 - Inquiry support /btw command.",
+        "note": "JUNE 20. Inquiry support /btw command.",
         "added": [
             "Added /btw command to ask agent questions while working without interrupting."
         ],
@@ -1177,7 +1190,7 @@ export const changelogData = {
         ]
     },
     "2.9.0": {
-        "note": "JUNE 19 -  Flux Flow CLI.",
+        "note": "JUNE 19.  Flux Flow CLI.",
         "added": [
             "Auto file read when tagged with `@file` to save re-read input tokens & extra reasoning tokens about tagged file reads."
         ],
@@ -1185,7 +1198,7 @@ export const changelogData = {
         "fixes": []
     },
     "2.8.9": {
-        "note": "JUNE 19 -  Flux Flow CLI.",
+        "note": "JUNE 19.  Flux Flow CLI.",
         "added": [
             "Added auto set keybinds for IDEs if SHIFT+ENTER is not binded for new line."
         ],
@@ -1193,7 +1206,7 @@ export const changelogData = {
         "fixes": []
     },
     "2.8.6": {
-        "note": "JUNE 18 - Improved Reasoning.",
+        "note": "JUNE 18. Improved Reasoning.",
         "added": [
             "Added Realtime error auto-steering if Agent write broken syntax (IDE Companion REQUIRED)."
         ],
@@ -1205,7 +1218,7 @@ export const changelogData = {
         ]
     },
     "2.8.0": {
-        "note": "JUNE 18 - Improved Telemetry & Stability.",
+        "note": "JUNE 18. Improved Telemetry & Stability.",
         "added": [
             "Updated Telemetry to add monthly (last 30d) usage.",
             "Added a new Model Breakdown telemetry to track each model usage."
@@ -1217,7 +1230,7 @@ export const changelogData = {
         ]
     },
     "2.7.2": {
-        "note": "JUNE 17 - Critical Stability Patches.",
+        "note": "JUNE 17. Critical Stability Patches.",
         "added": [],
         "changed": [
             "Improved Documentation Page."
@@ -2050,7 +2063,7 @@ export const changelogData = {
         "fixes": []
     },
     "1.0.0": {
-        "note": "2026 APRIL 24 - Initial Release.",
+        "note": "2026 APRIL 24. Initial Release.",
         "added": [
             "Initial release of **Flux Flow CLI**",
             "Agentic CLI with *Gemini* integration",

@@ -46,7 +46,7 @@ export default function DocLayout() {
                                 {outlet && React.cloneElement(outlet, { key: location.pathname })}
                             </AnimatePresence>
                         </main>
-                        <div className="hidden xl:block w-64 shrink-0">
+                        <div className="hidden xl:block w-64 shrink-0 self-start sticky top-0">
                             <RightNav />
                         </div>
                     </div>

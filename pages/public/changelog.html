@@ -42,7 +42,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 50px 20px;
         }
@@ -67,39 +67,163 @@
             margin-top: 10px;
         }
 
+        /* Responsive Grid: row x col, up to 3 cols */
+        .changelog-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 24px;
+        }
+
+        @media (max-width: 992px) {
+            .changelog-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .changelog-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .version-card {
-            background: transparent;
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
+            background: rgba(26, 26, 26, 0.2);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-            transition: transform 0.2s ease, border-color 0.2s ease;
+            border-radius: 14px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
         }
 
         .version-card:hover {
-            transform: translateY(-2px);
-            border-color: #3d3d3d;
+            /* transform: translateY(-4px); */
+            border-color: var(--cyan);
+            background: rgba(32, 32, 32, 0.35);
+            box-shadow: 0 8px 30px rgba(0, 255, 255, 0.15);
         }
 
-        .version-header {
+        /* Source card grows into the modal + fades, so the card itself feels like it opens */
+        .version-card.card-morphing {
+            transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1),
+                        opacity 0.45s ease 0.05s;
+            transform-origin: center center;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Reverse: card returns as the modal collapses back into it (synced, snappier) */
+        .version-card.card-morphing.card-morph-back {
+            transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.2s ease;
+        }
+
+        .version-card-top {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .version-card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 15px;
-            margin-bottom: 20px;
         }
 
-        .version-number {
-            font-size: 1.8em;
-            font-weight: bold;
-            color: white;
+        .version-card-number {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #ffffff;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .version-date {
+            color: var(--gray);
+            font-size: 0.85em;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* Small viby caption after the date (only when a '.' is present) */
+        .version-caption {
+            display: inline-block;
+            margin-top: 2px;
+            font-size: 0.92em;
+            font-weight: 400;
+            letter-spacing: 0;
+            text-transform: none;
+            opacity: 0.6;
+        }
+
+        .card-stats {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .stat-pill {
+            font-size: 0.75em;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stat-improvements {
+            background: rgba(77, 255, 136, 0.1);
+            color: var(--green);
+            border: 1px solid rgba(77, 255, 136, 0.25);
+        }
+
+        .stat-patches {
+            background: rgba(255, 255, 0, 0.1);
+            color: var(--yellow);
+            border: 1px solid rgba(255, 255, 0, 0.25);
+        }
+
+        .stat-fixes {
+            background: rgba(255, 77, 77, 0.1);
+            color: var(--red);
+            border: 1px solid rgba(255, 77, 77, 0.25);
+        }
+
+        .card-footer {
+            margin-top: 20px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85em;
+            color: var(--gray);
+        }
+
+        .view-details-link {
+            color: var(--cyan);
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: gap 0.2s ease, color 0.2s ease;
+        }
+
+        .version-card:hover .view-details-link {
+            color: var(--magenta);
+            gap: 8px;
         }
 
         .badge {
@@ -114,6 +238,187 @@
             vertical-align: middle;
         }
 
+        .badge-stable {
+            background: rgba(77, 255, 136, 0.1);
+            color: var(--green);
+            border: 1px solid rgba(77, 255, 136, 0.3);
+        }
+
+        /* Modal / Popup Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0);
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            pointer-events: none;
+            visibility: hidden;
+            transition: background 0.38s ease, backdrop-filter 0.38s ease, visibility 0s linear 0.4s;
+        }
+
+        .modal-overlay.active {
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            pointer-events: auto;
+            visibility: visible;
+            transition: background 0.38s ease, backdrop-filter 0.38s ease, visibility 0s linear 0s;
+        }
+
+        .modal-card {
+            background: rgba(18, 18, 18, 0.55);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 760px;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 255, 255, 0.08);
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            /* morph transition — grow from the icon's center like iOS */
+            transform-origin: center center;
+            will-change: transform, opacity, border-radius;
+        }
+
+        .modal-card.morph-enter {
+            transition: none;
+        }
+
+        .modal-card.morph-active {
+            transition:
+                transform 0.6s cubic-bezier(0.32, 0.72, 0, 1),
+                opacity 0.28s ease,
+                border-radius 0.6s cubic-bezier(0.32, 0.72, 0, 1),
+                box-shadow 0.6s ease;
+        }
+
+        .modal-card.morph-exit {
+            /* stays opaque while it shrinks back into the card, then fades at the very end */
+            transition:
+                transform 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.12s ease 0.14s,
+                border-radius 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.24s ease;
+        }
+
+        /* App content emerges from inside the icon */
+        .modal-card.morph-enter .modal-header,
+        .modal-card.morph-enter .modal-body {
+            opacity: 0;
+            transform: scale(0.85);
+        }
+
+        .modal-card.morph-active .modal-header,
+        .modal-card.morph-active .modal-body {
+            transition:
+                opacity 0.45s ease 0.12s,
+                transform 0.65s cubic-bezier(0.32, 0.72, 0, 1) 0.06s;
+        }
+
+        .modal-card.morph-exit .modal-header,
+        .modal-card.morph-exit .modal-body {
+            opacity: 0;
+            transform: scale(0.9);
+            transition: opacity 0.1s ease, transform 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 28px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(26, 26, 26, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        .modal-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .modal-version {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        /* Date sits beside the version, deliberately quieter */
+        .modal-date {
+            font-size: 0.95em;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--gray);
+            align-self: flex-end;
+            margin-left: -4px;
+            padding-bottom: 4px;
+        }
+
+        .modal-close-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            font-size: 1.3em;
+            line-height: 1;
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close-btn:hover {
+            background: rgba(255, 77, 77, 0.25);
+            border-color: var(--red);
+            color: var(--red);
+            transform: rotate(90deg);
+        }
+
+        .modal-body {
+            padding: 28px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 255, 0.4);
+        }
+
         .section-title {
             font-size: 1.1em;
             font-weight: 600;
@@ -121,6 +426,10 @@
             margin-bottom: 12px;
             display: flex;
             align-items: center;
+        }
+
+        .section-title:first-child {
+            margin-top: 0;
         }
 
         .added-title {
@@ -138,7 +447,7 @@
         ul {
             list-style-type: none;
             padding: 0;
-            margin: 0;
+            margin: 0 0 15px 0;
         }
 
         .version-note {
@@ -146,7 +455,7 @@
             border-left: 3px solid var(--cyan);
             padding: 15px 18px;
             border-radius: 0 8px 8px 0;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
             font-size: 0.95em;
             color: #d4d4d4;
             line-height: 1.5;
@@ -156,7 +465,7 @@
         }
 
         .version-note::before {
-            content: '📑';
+            content: '📝';
             font-style: normal;
             font-size: 1.1em;
         }
@@ -183,7 +492,7 @@
             border-radius: 4px;
             font-family: monospace;
             color: var(--cyan);
-            font-size: 0.9em;
+            font-size: 1.05em;
         }
 
         a {
@@ -206,7 +515,22 @@
             <h1>Flux Flow CLI</h1>
             <div class="subtitle">Changelog & Release Notes</div>
         </header>
-        <div id="changelog-container"></div>
+        <div id="changelog-container" class="changelog-grid"></div>
+    </div>
+
+    <!-- Popup / Modal -->
+    <div id="changelog-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title-group" id="modal-title-group">
+                    <!-- Populated dynamically -->
+                </div>
+                <button type="button" class="modal-close-btn" id="modal-close-btn" aria-label="Close details">✕</button>
+            </div>
+            <div class="modal-body" id="modal-body-content">
+                <!-- Populated dynamically -->
+            </div>
+        </div>
     </div>
 
     <script type="module">
@@ -220,6 +544,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
              renderChangelog();
+             setupModalEvents();
         });
 
         function parseMarkdown(text) {
@@ -229,14 +554,212 @@
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
                 .replace(/`(.*?)`/g, '<code>$1</code>')
                 .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-                .replaceAll('\n', '<br>')
+                .replaceAll('\n', '<br>');
         }
 
-        function renderChangelog() {
-            const container = document.getElementById('changelog-container');
+        // Split "MONTH DATE. caption" on the FIRST dot only → { date, caption }
+        function splitNote(text) {
+            if (!text) return { date: '', caption: '' };
+            const dot = text.indexOf('.');
+            if (dot === -1) return { date: text.trim(), caption: '' };
+            return { date: text.slice(0, dot).trim(), caption: text.slice(dot + 1).trim() };
+        }
 
-            // Sort versions descending (semver logic)
-            const versions = Object.keys(changelogData).sort((a, b) => {
+        // Card note: "MONTH DATE" or "MONTH DATE. caption". Split on the FIRST dot only.
+        function formatCardNote(text) {
+            if (!text) return '';
+            const dot = text.indexOf('.');
+            if (dot === -1) return parseMarkdown(text);
+            const date = text.slice(0, dot).trim();
+            const caption = text.slice(dot + 1).trim();
+            if (!caption) return parseMarkdown(date);
+            return `${parseMarkdown(date)}<br><span class="version-caption">${parseMarkdown(caption)}</span>`;
+        }
+
+        function setupModalEvents() {
+            const modal = document.getElementById('changelog-modal');
+            const closeBtn = document.getElementById('modal-close-btn');
+
+            closeBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal();
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.classList.contains('active')) {
+                    closeModal();
+                }
+            });
+        }
+
+        let _lastSourceCard = null;
+
+        let _lastSourceRect = null;
+
+        function openModal(version, sourceCardEl) {
+            const data = changelogData[version];
+            if (!data) return;
+
+            const modal = document.getElementById('changelog-modal');
+            const modalCardEl = modal.querySelector('.modal-card');
+            const titleGroup = document.getElementById('modal-title-group');
+            const modalBody = document.getElementById('modal-body-content');
+
+            _lastSourceCard = sourceCardEl || null;
+            _lastSourceRect = null;
+
+            // --- Populate content ---
+            const versions = getSortedVersions();
+            const isLatest = versions[0] === version;
+            const isStable = stableVersions.includes(version);
+            const note = splitNote(data.note);
+
+            titleGroup.innerHTML = `
+                <div class="modal-version">v${version}</div>
+                ${note.date ? `<span class="modal-date">${parseMarkdown(note.date)}</span>` : ''}
+                ${isLatest ? '<span class="badge">Latest</span>' : ''}
+                ${isStable ? '<span class="badge badge-stable">Stable</span>' : ''}
+            `;
+
+            let bodyHtml = '';
+            // Note body only carries the caption now — the date lives in the header.
+            if (note.caption) bodyHtml += `<div class="version-note"><div>${parseMarkdown(note.caption)}</div></div>`;
+            if (data.added && data.added.length > 0) {
+                bodyHtml += `<div class="section-title added-title">✨ Improvements (${data.added.length})</div>
+                    <ul>${data.added.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>`;
+            }
+            if (data.changed && data.changed.length > 0) {
+                bodyHtml += `<div class="section-title changed-title">🔄 Patches (${data.changed.length})</div>
+                    <ul>${data.changed.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>`;
+            }
+            if (data.fixes && data.fixes.length > 0) {
+                bodyHtml += `<div class="section-title fixes-title">🐛 Fixes (${data.fixes.length})</div>
+                    <ul>${data.fixes.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>`;
+            }
+            if (!data.note && (!data.added || !data.added.length) && (!data.changed || !data.changed.length) && (!data.fixes || !data.fixes.length)) {
+                bodyHtml = `<p style="color: var(--gray); text-align: center; padding: 20px 0;">No additional release details recorded for this version.</p>`;
+            }
+            modalBody.innerHTML = bodyHtml;
+
+            // --- FLIP morph animation ---
+            // 1. Reset modal card to natural flow size (no transform) to measure its final rect
+            modalCardEl.classList.remove('morph-enter', 'morph-active', 'morph-exit');
+            modalCardEl.style.transform = '';
+            modalCardEl.style.opacity = '';
+            modalCardEl.style.borderRadius = '';
+
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+
+            // 2. Measure final (destination) rect of modal card
+            const finalRect = modalCardEl.getBoundingClientRect();
+
+            // 3. Measure source card rect (BEFORE any morph transform is applied)
+            const sourceRect = sourceCardEl
+                ? sourceCardEl.getBoundingClientRect()
+                : { left: finalRect.left, top: finalRect.top, width: finalRect.width, height: finalRect.height };
+            _lastSourceRect = sourceCardEl ? sourceRect : null;
+
+            // 4. Per-axis scale from the card's centre, so the modal's edges land EXACTLY
+            //    on the card's edges. Uniform scale left top/bottom gaps that "blur out".
+            const startScaleX = sourceRect.width / finalRect.width;
+            const startScaleY = sourceRect.height / finalRect.height;
+            const translateX = (sourceRect.left + sourceRect.width / 2) - (finalRect.left + finalRect.width / 2);
+            const translateY = (sourceRect.top + sourceRect.height / 2) - (finalRect.top + finalRect.height / 2);
+
+            // 4b. Grow the source card itself toward the modal and fade it out —
+            //     this is what makes it feel like the card *is* opening the modal.
+            if (sourceCardEl) {
+                const cardScaleX = finalRect.width / sourceRect.width;
+                const cardScaleY = finalRect.height / sourceRect.height;
+                const cardTx = (finalRect.left + finalRect.width / 2) - (sourceRect.left + sourceRect.width / 2);
+                const cardTy = (finalRect.top + finalRect.height / 2) - (sourceRect.top + sourceRect.height / 2);
+                sourceCardEl.classList.add('card-morphing');
+                sourceCardEl.getBoundingClientRect(); // reflow so the transition actually fires
+                sourceCardEl.style.transform = `translate(${cardTx}px, ${cardTy}px) scale(${cardScaleX}, ${cardScaleY})`;
+                sourceCardEl.style.opacity = '0';
+            }
+
+            // 5. Apply "First" state (card position/size/radius — looks exactly like the icon)
+            modalCardEl.classList.add('morph-enter');
+            modalCardEl.style.transform = `translate(${translateX}px, ${translateY}px) scale(${startScaleX}, ${startScaleY})`;
+            modalCardEl.style.opacity = '0.6';
+            modalCardEl.style.borderRadius = '14px';
+
+            // 6. Force reflow then animate to final state
+            modalCardEl.getBoundingClientRect();
+            modalCardEl.classList.remove('morph-enter');
+            modalCardEl.classList.add('morph-active');
+            modalCardEl.style.transform = '';
+            modalCardEl.style.opacity = '1';
+            modalCardEl.style.borderRadius = '';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('changelog-modal');
+            const modalCardEl = modal.querySelector('.modal-card');
+
+            // Get current modal rect
+            const currentRect = modalCardEl.getBoundingClientRect();
+
+            // Use the ORIGINAL (untransformed) card rect captured at open time —
+            // getBoundingClientRect() here would return the scaled-up morph rect.
+            let targetRect = currentRect;
+            if (_lastSourceRect) {
+                targetRect = _lastSourceRect;
+            }
+
+            // Calculate exit transform back toward the source card (per-axis, so edges land exactly)
+            const endScaleX = targetRect.width / currentRect.width;
+            const endScaleY = targetRect.height / currentRect.height;
+            const translateX = (targetRect.left + targetRect.width / 2) - (currentRect.left + currentRect.width / 2);
+            const translateY = (targetRect.top + targetRect.height / 2) - (currentRect.top + currentRect.height / 2);
+
+            modalCardEl.classList.remove('morph-active');
+            modalCardEl.classList.add('morph-exit');
+            modalCardEl.style.transform = `translate(${translateX}px, ${translateY}px) scale(${endScaleX}, ${endScaleY})`;
+            modalCardEl.style.opacity = '0';
+            modalCardEl.style.borderRadius = '14px';
+
+            // Send the source card back so it reappears as the modal collapses into it
+            if (_lastSourceCard) {
+                _lastSourceCard.classList.add('card-morph-back');
+                _lastSourceCard.style.transform = '';
+                _lastSourceCard.style.opacity = '';
+            }
+
+            // Fade out overlay simultaneously
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+
+            // Clean up after transition.
+            // NOTE: transitionend fires once PER property (transform, opacity, box-shadow...).
+            // Only run on the transform (the longest/primary one) or the card snaps back mid-close.
+            const onEnd = (e) => {
+                if (e && e.target !== modalCardEl) return;
+                if (e && e.propertyName !== 'transform') return;
+                modalCardEl.removeEventListener('transitionend', onEnd);
+                clearTimeout(fallbackTimer);
+                modalCardEl.classList.remove('morph-exit');
+                modalCardEl.style.transform = '';
+                modalCardEl.style.opacity = '0';
+                modalCardEl.style.borderRadius = '';
+                if (_lastSourceCard) {
+                    _lastSourceCard.classList.remove('card-morphing', 'card-morph-back');
+                    _lastSourceCard.style.transform = '';
+                    _lastSourceCard.style.opacity = '';
+                }
+                _lastSourceCard = null;
+            };
+            modalCardEl.addEventListener('transitionend', onEnd);
+            // Safety net in case transformend is missed entirely
+            const fallbackTimer = setTimeout(onEnd, 450);
+        }
+
+        function getSortedVersions() {
+            return Object.keys(changelogData).sort((a, b) => {
                 const partsA = a.split('.').map(Number);
                 const partsB = b.split('.').map(Number);
                 for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
@@ -247,55 +770,61 @@
                 }
                 return 0;
             });
+        }
+
+        function renderChangelog() {
+            const container = document.getElementById('changelog-container');
+            const versions = getSortedVersions();
 
             let html = '';
 
             versions.forEach((version, index) => {
                 const data = changelogData[version];
                 const isLatest = index === 0;
+                const isStable = stableVersions.includes(version);
 
-                let cardHtml = `
-                    <div class="version-card">
-                        <div class="version-header">
-                            <div class="version-number">
-                                v${version}${stableVersions.includes(version) ? ' - stable' : ''}
-                                ${isLatest ? '<span class="badge">Latest</span>' : ''}
+                const addedCount = data.added ? data.added.length : 0;
+                const changedCount = data.changed ? data.changed.length : 0;
+                const fixesCount = data.fixes ? data.fixes.length : 0;
+
+                html += `
+                    <div class="version-card" data-version="${version}" tabindex="0" role="button" aria-label="Version ${version} details">
+                        <div class="version-card-top">
+                            <div class="version-card-header">
+                                <div class="version-card-number">
+                                    v${version}
+                                    ${isLatest ? '<span class="badge">Latest</span>' : ''}
+                                    ${isStable ? '<span class="badge badge-stable">Stable</span>' : ''}
+                                </div>
+                            </div>
+                            ${data.note ? `<div class="version-date">${formatCardNote(data.note)}</div>` : ''}
+                            <div class="card-stats">
+                                ${addedCount > 0 ? `<span class="stat-pill stat-improvements">✨ ${addedCount}</span>` : ''}
+                                ${changedCount > 0 ? `<span class="stat-pill stat-patches">🔄 ${changedCount}</span>` : ''}
+                                ${fixesCount > 0 ? `<span class="stat-pill stat-fixes">🐛 ${fixesCount}</span>` : ''}
+                                ${addedCount === 0 && changedCount === 0 && fixesCount === 0 ? `<span class="stat-pill" style="color:var(--gray); background:rgba(255,255,255,0.05);">Maintenance</span>` : ''}
                             </div>
                         </div>
+                        <div class="card-footer">
+                            <span>Release Notes</span>
+                            <span class="view-details-link">View details ➔</span>
+                        </div>
+                    </div>
                 `;
-
-                if (data.note) {
-                    cardHtml += `
-                        <div class="version-note"><div>${parseMarkdown(data.note)}</div></div>
-                    `;
-                }
-
-                if (data.added && data.added.length > 0) {
-                    cardHtml += `
-                        <div class="section-title added-title">✨ Improvements</div>
-                        <ul>${data.added.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>
-                    `;
-                }
-
-                if (data.changed && data.changed.length > 0) {
-                    cardHtml += `
-                        <div class="section-title changed-title">🔄 Patches</div>
-                        <ul>${data.changed.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>
-                    `;
-                }
-
-                if (data.fixes && data.fixes.length > 0) {
-                    cardHtml += `
-                        <div class="section-title fixes-title">🐛 Fixes</div>
-                        <ul>${data.fixes.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>
-                    `;
-                }
-
-                cardHtml += `</div>`;
-                html += cardHtml;
             });
 
             container.innerHTML = html;
+
+            container.querySelectorAll('.version-card').forEach(card => {
+                const ver = card.getAttribute('data-version');
+                card.addEventListener('click', () => openModal(ver, card));
+                card.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openModal(ver, card);
+                    }
+                });
+            });
         }
 
         // ==========================================
