@@ -1318,6 +1318,8 @@ export default function App({ args = [] }) {
     const [chatTokens, setChatTokens] = useState(0);
     const chatTokenStartRef = useRef(0);
     const [chatCachedTokens, setChatCachedTokens] = useState(0);
+    const [chatCacheTokenLatest, setChatCacheTokenLatest] = useState(0);
+    const recentTurnsCacheRef = useRef([]);
     const chatCachedTokenStartRef = useRef(0);
     const [chatPromptTokens, setChatPromptTokens] = useState(0);
     const chatSessionPromptStartRef = useRef(0);
@@ -2489,8 +2491,10 @@ export default function App({ args = [] }) {
                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
                     chatCachedTokenStartRef.current = sessionTotalCachedTokens;
                     chatSessionPromptStartRef.current = sessionTotalPromptTokens;
+                    recentTurnsCacheRef.current = [];
                     setChatTokens(savedData.total);
                     setChatCachedTokens(0);
+                    setChatCacheTokenLatest(0);
                     setChatPromptTokens(0);
                     setSessionStats({ tokens: savedData.context });
                     chatLoadingRef.current = false;
@@ -2525,8 +2529,10 @@ export default function App({ args = [] }) {
                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
                     chatCachedTokenStartRef.current = sessionTotalCachedTokens;
                     chatSessionPromptStartRef.current = sessionTotalPromptTokens;
+                    recentTurnsCacheRef.current = [];
                     setChatTokens(savedData.total);
                     setChatCachedTokens(0);
+                    setChatCacheTokenLatest(0);
                     setChatPromptTokens(0);
                     setSessionStats({ tokens: savedData.context });
                     chatLoadingRef.current = false;
@@ -3077,8 +3083,10 @@ export default function App({ args = [] }) {
                                 chatTokenStartRef.current = sessionTotalTokens - savedData.total;
                                 chatCachedTokenStartRef.current = sessionTotalCachedTokens;
                                 chatSessionPromptStartRef.current = sessionTotalPromptTokens;
+                                recentTurnsCacheRef.current = [];
                                 setChatTokens(savedData.total);
                                 setChatCachedTokens(0);
+                                setChatCacheTokenLatest(0);
                                 setChatPromptTokens(0);
                                 setSessionStats({ tokens: savedData.context });
                                 chatLoadingRef.current = false;
@@ -3225,7 +3233,9 @@ export default function App({ args = [] }) {
                     setIsExpanded(false);
                     setChatTokens(0);
                     setChatCachedTokens(0);
+                    setChatCacheTokenLatest(0);
                     setChatPromptTokens(0);
+                    recentTurnsCacheRef.current = [];
                     chatTokenStartRef.current = sessionTotalTokens;
                     chatCachedTokenStartRef.current = sessionTotalCachedTokens;
                     chatSessionPromptStartRef.current = sessionTotalPromptTokens;
@@ -4832,6 +4842,16 @@ export default function App({ args = [] }) {
                                 if (candidates > 0) {
                                     setSessionTotalCandidateTokens(prev => prev + candidates);
                                 }
+                                if (input > 0 || cached > 0) {
+                                    recentTurnsCacheRef.current.push({ input, cached });
+                                    if (recentTurnsCacheRef.current.length > 3) {
+                                        recentTurnsCacheRef.current.shift();
+                                    }
+                                    const sumInput = recentTurnsCacheRef.current.reduce((acc, curr) => acc + curr.input, 0);
+                                    const sumCached = recentTurnsCacheRef.current.reduce((acc, curr) => acc + curr.cached, 0);
+                                    const latestPct = sumInput > 0 ? (sumCached / sumInput) * 100 : 0;
+                                    setChatCacheTokenLatest(latestPct);
+                                }
                                 setSessionAgentCalls(prev => prev + 1);
                             }
                         },
@@ -5087,6 +5107,16 @@ export default function App({ args = [] }) {
                             }
                             if (candidates > 0) {
                                 setSessionTotalCandidateTokens(prev => prev + candidates);
+                            }
+                            if (input > 0 || cached > 0) {
+                                recentTurnsCacheRef.current.push({ input, cached });
+                                if (recentTurnsCacheRef.current.length > 3) {
+                                    recentTurnsCacheRef.current.shift();
+                                }
+                                const sumInput = recentTurnsCacheRef.current.reduce((acc, curr) => acc + curr.input, 0);
+                                const sumCached = recentTurnsCacheRef.current.reduce((acc, curr) => acc + curr.cached, 0);
+                                const latestPct = sumInput > 0 ? (sumCached / sumInput) * 100 : 0;
+                                setChatCacheTokenLatest(latestPct);
                             }
                             setSessionAgentCalls(prev => prev + 1);
                             continue;
@@ -7346,8 +7376,10 @@ export default function App({ args = [] }) {
                                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
                                     chatCachedTokenStartRef.current = sessionTotalCachedTokens;
                                     chatSessionPromptStartRef.current = sessionTotalPromptTokens;
+                                    recentTurnsCacheRef.current = [];
                                     setChatTokens(savedData.total);
                                     setChatCachedTokens(0);
+                                    setChatCacheTokenLatest(0);
                                     setChatPromptTokens(0);
                                     setSessionStats({ tokens: savedData.context });
                                     chatLoadingRef.current = false;
@@ -8214,6 +8246,8 @@ export default function App({ args = [] }) {
                                 tokensTotal={chatTokens}
                                 cachedTokens={chatCachedTokens}
                                 promptTokens={chatPromptTokens}
+                                chatCacheTokenLatest={chatCacheTokenLatest}
+                                cacheCalculateMode={systemSettings.cacheCalculateMode || 'Session'}
                                 chatId={chatId}
                                 isMemoryEnabled={systemSettings.memory}
                                 apiTier={apiTier}

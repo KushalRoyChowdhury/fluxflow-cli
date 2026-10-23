@@ -64,6 +64,7 @@ const DEFAULT_SETTINGS = {
         autoExcludeMetadata: false,
         disableTodo: false,
         clipboardContext: false,
+        cacheCalculateMode: 'Session',
         alwaysAskFiles: '.env, .env.*, *.env'
     },
     profileData: {

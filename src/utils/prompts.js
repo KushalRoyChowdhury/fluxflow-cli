@@ -593,7 +593,8 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         'Sassy': 'Sassy',
         'Friendly': 'Warm & Chatty',
         'Playful': 'Playful',
-        'Efficient': 'Quick, Concise & Efficient'
+        'Efficient': 'Quick, Concise & Efficient',
+        'Professional': 'Professional'
     };
     const injectedPersonality = presetPrompt[preset] || null;
 

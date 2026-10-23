@@ -359,6 +359,7 @@ export default function SettingsMenu({
                     { label: 'Keep Reasoning Context', value: 'keepReasoningContext', status: systemSettings.keepReasoningContext ? 'ON' : 'OFF' },
                     { label: 'Auto Exclude Metadata', value: 'autoExcludeMetadata', status: systemSettings.autoExcludeMetadata ? 'ON' : 'OFF' },
                     { label: 'Disable Todo', value: 'disableTodo', status: systemSettings.disableTodo ? 'ON' : 'OFF' },
+                    { label: 'Cache Calculate Mode', value: 'cacheCalculateMode', status: systemSettings.cacheCalculateMode || 'Session' },
                     // { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' } // Dont remove this comment
                 ];
             default:
@@ -528,7 +529,7 @@ export default function SettingsMenu({
 
     const handleSelect = (item) => {
         if (item.value === 'profilePreset') {
-            const presets = ['Default', 'Sassy', 'Friendly', 'Playful', 'Efficient'];
+            const presets = ['Default', 'Sassy', 'Friendly', 'Playful', 'Efficient', 'Professional'];
             const currentPreset = profileData?.preset || 'Default';
             const curIndex = presets.indexOf(currentPreset);
             const nextIndex = (curIndex + 1) % presets.length;
@@ -722,6 +723,15 @@ export default function SettingsMenu({
         } else if (item.value === 'disableTodo') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, disableTodo: !s.disableTodo };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'cacheCalculateMode') {
+            const options = ['Session', 'Current'];
+            const currentIndex = options.indexOf(systemSettings.cacheCalculateMode || 'Session');
+            const nextIndex = (currentIndex + 1) % options.length;
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, cacheCalculateMode: options[nextIndex] };
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });
