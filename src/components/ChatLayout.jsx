@@ -1271,7 +1271,6 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/settings', desc: 'Configure system prefs' },
             { cmd: '/theme', desc: 'Customize UI color theme' },
             { cmd: '/key', desc: 'Manage API keys' },
-            { cmd: '/profile', desc: 'Edit developer persona' },
             { cmd: '/memory', desc: 'Manage agent memory' },
             { cmd: '/stats', desc: 'Show session usage' },
             { cmd: '/usage', desc: 'Open graphical token usage & analytics in browser' },

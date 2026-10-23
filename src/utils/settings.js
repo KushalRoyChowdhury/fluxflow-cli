@@ -67,6 +67,7 @@ const DEFAULT_SETTINGS = {
         alwaysAskFiles: '.env, .env.*, *.env'
     },
     profileData: {
+        preset: 'Default',
         name: null,
         nickname: null,
         instructions: null

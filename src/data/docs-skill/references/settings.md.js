@@ -17,7 +17,10 @@ Open in chat via /settings
 * Show TPM Estimate → Real-time Tokens Throughput speed estimate
 * Verbose Thinking → Show reasoning blocks in the UI. Keeps UI clean when disabled. And reasoning transparent when enabled
 
-### 3. Memory
+### 3. Personalization
+* Base Personality → Pick base personality for agent
+* Nickname → What agent should call user
+* Custom Instruction → Custom user preferences
 * Toggle Memory → Persistent cross-session memory learning (Not available for some providers)
 
 ### 4. Security & Sandbox

@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.40.0": {
+        "note": "OCTOBER 23",
+        "added": [
+            "Added configurable base personality in `/settings`."
+        ],
+        "changed": [
+            "Removed `/profile` and moved the functionality to `/settings`."
+        ],
+        "fixes": []
+    },
     "4.39.0": {
         "note": "OCTOBER 21",
         "added": [

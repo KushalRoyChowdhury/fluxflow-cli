@@ -20,13 +20,13 @@ export const AUTOCOMPLETE_SYSTEM_PROMPT = [
     'Rules:',
     '- Return ONLY the raw code to insert at the cursor. No explanations, commentary or rambling',
     '- Do NOT wrap in markdown code fences',
-    '- NEVER repeat same code that exist around cursor, if nothing sensible possible to predict, return empty string',
+    '- NEVER repeat code that exist before & after cursor, if nothing sensible possible to predict, return empty string',
     '- Match surrounding indentation and code style',
     '- Complete the current line statement',
-    '- Never include placeholder comments  like // TODO or # your code here',
-    '',
-    'Output format:',
-    '- Wrap the code to insert in <completion>...</completion>',
+    '- Never include placeholder comments like // TODO or # your code here',
+    // '',
+    // 'Output format:',
+    // '- Wrap the code to insert in <completion>...</completion>',
     '- Do not put anything except the code to insert between the tags'
 ].join('\n');
 

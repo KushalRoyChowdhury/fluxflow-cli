@@ -588,6 +588,15 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const nameStr = profile.name && profile.name?.length > 0 ? `User Name: ${profile.name}\n${(nicknameStr.length || userInstrStr.length) ? '' : '\n'}` : '';
     const cwdStr = process.cwd();
 
+    const preset = profile.preset;
+    const presetPrompt = {
+        'Sassy': 'Sassy',
+        'Friendly': 'Warm & Chatty',
+        'Playful': 'Playful',
+        'Efficient': 'Quick, Concise & Efficient'
+    };
+    const injectedPersonality = presetPrompt[preset] || null;
+
     const userMemories = getCachedUserMemories(chatId, isMemoryEnabled);
     const userMemoriesStr = userMemories?.length > 0 ? `--- Saved Memories ---\n${userMemories}\n\n` : '';
 
@@ -678,7 +687,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT ===
-${`Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : `Flux Flow. Sassy, CLI Assistant${halloween ? `. ${peakHalloween ? 'Peak ' : ''}Halloween Themed, Spooky` : ''}`}
+${`Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : `Flux Flow.${injectedPersonality ? ` ${injectedPersonality}` : ''} CLI Assistant${halloween ? `. ${peakHalloween ? 'Peak ' : ''}Halloween Themed, Spooky` : ''}`}
 ${ADD_NO_INS ? '' : `${mode === "Flux" ? "" :
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
 

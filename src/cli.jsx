@@ -199,7 +199,6 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /settings                                Configure system preferences
   /theme                                   Customize UI color theme
   /key                                     Manage API keys
-  /profile                                 Edit developer persona
   /memory <view|migrate>                   Manage agent memory or migrate to AGENTS.md
   /stats                                   Show session usage
   /usage                                   Open graphical token analytics dashboard in browser

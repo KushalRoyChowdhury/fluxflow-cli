@@ -13,7 +13,6 @@ import ChatLayout, { MessageItem, CodeRenderer, BlockItem } from './components/C
 import StatusBar, { getMemoryInfo } from './components/StatusBar.jsx';
 import CommandMenu from './components/CommandMenu.jsx';
 import SettingsMenu from './components/SettingsMenu.jsx';
-import ProfileForm from './components/ProfileForm.jsx';
 import AskUserModal from './components/AskUserModal.jsx';
 import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPIKey } from './utils/secrets.js';
@@ -1306,7 +1305,7 @@ export default function App({ args = [] }) {
     const [pbfFieldIndex, setPbfFieldIndex] = useState(0); // providerBudgetFlow active field cursor
     const [systemSettings, setSystemSettings] = useState({ memory: true, theme: 'Dark', compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '', clipboardContext: false });
     const colors = useMemo(() => getThemeColors(systemSettings.theme), [systemSettings.theme]);
-    const [profileData, setProfileData] = useState({ name: null, nickname: null, instructions: null });
+    const [profileData, setProfileData] = useState({ preset: 'Default', name: null, nickname: null, instructions: null });
     const [imageSettings, setImageSettings] = useState({ keyType: 'Default', quality: 'Low-High', apiKey: '' });
     const [autoCompletion, setAutoCompletion] = useState({ enabled: false, model: 'Default', provider: '', baseUrl: '' });
     const [sessionStats, setSessionStats] = useState({ tokens: 0 });
@@ -2932,7 +2931,6 @@ export default function App({ args = [] }) {
         { cmd: '/theme', desc: 'Customize UI color theme' },
         { cmd: '/key', desc: 'Manage API keys' },
         { cmd: '/files', desc: 'List loaded instruction and skill files' },
-        { cmd: '/profile', desc: 'Edit developer persona' },
         {
             cmd: '/memory', desc: 'Manage agent memory', subs: [
                 { cmd: 'view', desc: 'View and manage agent persistent memory' },
@@ -3867,10 +3865,6 @@ export default function App({ args = [] }) {
                 }
                 case '/key': {
                     setActiveView('key');
-                    break;
-                }
-                case '/profile': {
-                    setActiveView('profile');
                     break;
                 }
                 case '/stats': {
@@ -5678,6 +5672,8 @@ export default function App({ args = [] }) {
                         aiProvider={aiProvider}
                         autoCompletion={autoCompletion}
                         setAutoCompletion={setAutoCompletion}
+                        profileData={profileData}
+                        setProfileData={setProfileData}
                         setProviderReturnView={setProviderReturnView}
                     />
                 );
@@ -5696,6 +5692,8 @@ export default function App({ args = [] }) {
                         aiProvider={aiProvider}
                         autoCompletion={autoCompletion}
                         setAutoCompletion={setAutoCompletion}
+                        profileData={profileData}
+                        setProfileData={setProfileData}
                         initialSelectingTheme={true}
                         onCloseTheme={() => setActiveView('chat')}
                         setProviderReturnView={setProviderReturnView}
@@ -7418,19 +7416,6 @@ export default function App({ args = [] }) {
                     <Box width="100%" alignItems="center" justifyContent="center">
                         <ParserDownloadModal onClose={() => setActiveView('settings')} />
                     </Box>
-                );
-            case 'profile':
-                return (
-                    <ProfileForm
-                        initialData={profileData}
-                        onSave={(profile) => {
-                            setProfileData(profile);
-                            setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `${profile.name.length > 0 || profile.nickname.length > 0 ? `✦ Profile Updated${profile.name.length > 0 ? `\n⠀⠀\x1b[2m└─\x1b[22m Name: ${profile.name} ` : ''}${profile.nickname.length > 0 ? `\n⠀⠀\x1b[2m└─\x1b[22m Nickname: ${profile.nickname}` : ''}` : '✦ Profile\n⠀⠀\x1b[2m└─\x1b[22m Nothing to Update'}\n\n✦ Custom Instructions\n${profile.instructions.length > 0 ? `⠀⠀\x1b[2m└─\x1b[22m ${profile.instructions.substring(0, 30)}${profile.instructions.length > 30 ? '...' : ''}` : '⠀⠀\x1b[2m└─\x1b[22m No Instructions Provided.'}\n⠀`, isMeta: true }]);
-                            setActiveView('chat');
-                        }}
-                        onCancel={() => setActiveView('chat')}
-                        theme={systemSettings.theme}
-                    />
                 );
             case 'resolution':
                 return (

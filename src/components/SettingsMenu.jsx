@@ -14,7 +14,7 @@ const themeOptions = [...Object.keys(THEMES), 'Mystery'];
 
 const CATEGORIES = [
     { id: 'appearance', label: 'Appearance', desc: 'Customize UI theme & rendering options' },
-    { id: 'memory', label: 'Memory', desc: 'Manage system context & agent\'s memory' },
+    { id: 'memory', label: 'Personalization', desc: 'Manage system context & agent\'s memory' },
     { id: 'secondaryModels', label: 'Secondary Models', desc: 'Sub-agents & auto-completion models' },
     { id: 'other', label: 'Miscellaneous', desc: 'Miscellaneous preferences' },
     { id: 'providers', label: 'Providers', desc: 'Configure AI models' },
@@ -79,6 +79,8 @@ export default function SettingsMenu({
     aiProvider,
     autoCompletion,
     setAutoCompletion,
+    profileData,
+    setProfileData,
     initialSelectingTheme = false,
     onCloseTheme = null,
     setProviderReturnView = null
@@ -89,6 +91,7 @@ export default function SettingsMenu({
     const [activeColumn, setActiveColumn] = useState('categories'); // 'categories' or 'items'
     const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
+    const [securityTab, setSecurityTab] = useState('Sandbox'); // 'Sandbox' or 'Other'
     const [editingItem, setEditingItem] = useState(null);
     const [editValue, setEditValue] = useState('');
     const [isSelectingTheme, setIsSelectingTheme] = useState(initialSelectingTheme);
@@ -310,11 +313,14 @@ export default function SettingsMenu({
                 ];
             case 'memory':
                 return [
+                    { label: 'Base Personality', value: 'profilePreset', status: profileData?.preset || 'Default' },
+                    { label: 'Nickname', value: 'profileNickname', status: profileData?.nickname || 'None' },
+                    { label: 'Custom Instructions', value: 'profileInstructions', status: truncateCSV(profileData?.instructions) },
                     { label: 'Toggle Memory [Legacy]', value: 'memory', status: systemSettings.memory ? 'ON' : 'OFF' }
                 ];
-            case 'security':
+            case 'security': {
                 const activePreset = getActivePreset(systemSettings);
-                return [
+                const allSecItems = [
                     { label: 'Sandbox Preset', value: 'sandboxPreset', status: activePreset, section: 'Sandbox' },
                     { label: 'YOLO Mode', value: 'autoExec', status: systemSettings.autoExec ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'External Workspace Access', value: 'externalAccess', status: systemSettings.allowExternalAccess ? 'ON' : 'OFF', section: 'Sandbox' },
@@ -329,6 +335,8 @@ export default function SettingsMenu({
                     { label: 'Save AppData Externally', value: 'externalData', status: systemSettings.useExternalData ? 'ON' : 'OFF', section: 'Other' },
                     { label: 'Agent Clipboard Context', value: 'clipboardContext', status: systemSettings.clipboardContext ? 'ON' : 'OFF', section: 'Other' }
                 ];
+                return allSecItems.filter(item => item.section.toLowerCase() === securityTab.toLowerCase());
+            }
             case 'updater':
                 return [
                     { label: 'Auto-Update', value: 'autoUpdate', status: systemSettings.autoUpdate ? 'ON' : 'OFF' },
@@ -490,11 +498,26 @@ export default function SettingsMenu({
                 setActiveView('chat');
             }
         } else if (activeColumn === 'items') {
+            if (currentCatId === 'security' && (key.tab || input === '\t')) {
+                setSecurityTab(prev => prev === 'Sandbox' ? 'Other' : 'Sandbox');
+                setSelectedItemIndex(0);
+                return;
+            }
             if (key.upArrow) {
                 setSelectedItemIndex(prev => (prev - 1 + currentItems.length) % currentItems.length);
             } else if (key.downArrow) {
                 setSelectedItemIndex(prev => (prev + 1) % currentItems.length);
-            } else if (key.leftArrow || key.escape) {
+            } else if (key.leftArrow) {
+                if (currentCatId === 'security' && securityTab === 'Other') {
+                    setSecurityTab('Sandbox');
+                    setSelectedItemIndex(0);
+                } else {
+                    setActiveColumn('categories');
+                }
+            } else if (key.rightArrow && currentCatId === 'security' && securityTab === 'Sandbox') {
+                setSecurityTab('Other');
+                setSelectedItemIndex(0);
+            } else if (key.escape) {
                 setActiveColumn('categories');
             } else if (key.return) {
                 const item = currentItems[selectedItemIndex];
@@ -504,7 +527,22 @@ export default function SettingsMenu({
     });
 
     const handleSelect = (item) => {
-        if (item.value === 'memory') {
+        if (item.value === 'profilePreset') {
+            const presets = ['Default', 'Sassy', 'Friendly', 'Playful', 'Efficient'];
+            const currentPreset = profileData?.preset || 'Default';
+            const curIndex = presets.indexOf(currentPreset);
+            const nextIndex = (curIndex + 1) % presets.length;
+            const nextPreset = presets[nextIndex >= 0 ? nextIndex : 0];
+            const newProfile = { ...(profileData || {}), preset: nextPreset };
+            if (setProfileData) setProfileData(newProfile);
+            saveSettings({ profileData: newProfile, systemSettings, apiTier, quotas });
+        } else if (item.value === 'profileNickname') {
+            setEditingItem('profileNickname');
+            setEditValue(profileData?.nickname || '');
+        } else if (item.value === 'profileInstructions') {
+            setEditingItem('profileInstructions');
+            setEditValue(profileData?.instructions || '');
+        } else if (item.value === 'memory') {
             setSystemSettings(s => ({ ...s, memory: !s.memory }));
         } else if (item.value === 'sandboxPreset') {
             const activePreset = getActivePreset(systemSettings);
@@ -573,6 +611,9 @@ export default function SettingsMenu({
         } else if (item.value === 'autoApprove') {
             setEditingItem('autoApproveCommands');
             setEditValue(systemSettings.autoApproveCommands || '');
+        } else if (item.value === 'autoDisallow') {
+            setEditingItem('autoDisallowCommands');
+            setEditValue(systemSettings.autoDisallowCommands || '');
         } else if (item.value === 'autoApproveGit') {
             setSystemSettings(s => ({ ...s, autoApproveGit: !s.autoApproveGit, sandboxPreset: 'Custom' }));
         } else if (item.value === 'customOpenAIBaseUrl') {
@@ -966,14 +1007,14 @@ export default function SettingsMenu({
     }
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor={colors.border} padding={0} width="100%" minHeight={32}>
+        <Box flexDirection="column" borderStyle="round" borderColor={colors.border} padding={0} width="100%" minHeight={26}>
             {/* Title Bar */}
             <Box paddingX={1} paddingY={0} marginBottom={0} borderStyle="single" borderColor={colors.borderMuted} width="100%">
                 <Text color={colors.text} bold>SYSTEM CONFIGURATION</Text>
             </Box>
 
             {/* Main Area: 2 Columns */}
-            <Box flexDirection="row" width="100%" minHeight={26}>
+            <Box flexDirection="row" width="100%" minHeight={20}>
                 {/* Left Column: Categories */}
                 <Box flexDirection="column" width="30%" maxWidth={40} borderStyle="round" borderColor={activeColumn === 'categories' ? colors.border : colors.borderMuted} padding={1} paddingY={0}>
                     <Box marginBottom={1}>
@@ -987,7 +1028,7 @@ export default function SettingsMenu({
                         return (
                             <Box
                                 key={cat.id}
-                                marginTop={isExit ? 15 : 0}
+                                marginTop={isExit ? 9 : 0}
                                 backgroundColor={isSelected ? (activeColumn === 'categories' ? colors.highlightBg : colors.cardBg) : undefined}
                                 paddingX={1}
                             >
@@ -1004,10 +1045,36 @@ export default function SettingsMenu({
 
                 {/* Right Column: Settings */}
                 <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor={activeColumn === 'items' ? colors.border : colors.borderMuted} paddingX={1} marginLeft={1} paddingY={0}>
-                    <Box marginBottom={1}>
+                    <Box marginBottom={1} flexDirection="row" justifyContent="space-between" alignItems="center">
                         <Text color={activeColumn === 'items' ? colors.text : colors.textDim} bold underline>
                             {CATEGORIES[selectedCategoryIndex].label.toUpperCase().includes('EXIT') ? 'Runtime Information' : `${CATEGORIES[selectedCategoryIndex].label} Settings`}
                         </Text>
+                        {currentCatId === 'security' && (
+                            <Box flexDirection="row">
+                                <Box
+                                    paddingX={1}
+                                    backgroundColor={securityTab === 'Sandbox' ? (activeColumn === 'items' ? colors.highlightBg : colors.cardBg) : undefined}
+                                >
+                                    <Text
+                                        bold={securityTab === 'Sandbox'}
+                                        color={securityTab === 'Sandbox' ? colors.primary || 'cyan' : colors.textDim}
+                                    >
+                                        [ Sandbox ]
+                                    </Text>
+                                </Box>
+                                <Box
+                                    paddingX={1}
+                                    backgroundColor={securityTab === 'Other' ? (activeColumn === 'items' ? colors.highlightBg : colors.cardBg) : undefined}
+                                >
+                                    <Text
+                                        bold={securityTab === 'Other'}
+                                        color={securityTab === 'Other' ? colors.primary || 'cyan' : colors.textDim}
+                                    >
+                                        [ Others ]
+                                    </Text>
+                                </Box>
+                            </Box>
+                        )}
                     </Box>
 
                     {currentItems.length > 0 ? (
@@ -1042,8 +1109,8 @@ export default function SettingsMenu({
                                     return item.status === 'ON' ? colors.statusOn : (item.status === 'OFF' ? colors.statusOff : colors.text);
                                 };
 
-                                // Render section header if it changed
-                                if (item.section && item.section !== lastSection) {
+                                // Render section header if it changed (skip for security since tabs denote section)
+                                if (item.section && item.section !== lastSection && currentCatId !== 'security') {
                                     lastSection = item.section;
                                     elements.push(
                                         <Box key={`sec-hdr-${item.section}`} marginTop={elements.length > 0 ? 1 : 0} marginBottom={0} paddingX={1}>
@@ -1058,8 +1125,10 @@ export default function SettingsMenu({
                                         (editingItem === 'autoApproveCommands' && item.value === 'autoApprove') ||
                                         (editingItem === 'autoDisallowCommands' && item.value === 'autoDisallow') ||
                                         (editingItem === 'customOpenAIBaseUrl' && item.value === 'customOpenAIBaseUrl') ||
-                                        (editingItem === 'customOpenAIKey' && item.value === 'customOpenAIKey'));
-                                const isCommandListItem = item.value === 'alwaysAsk' || item.value === 'alwaysAskFiles' || item.value === 'autoApprove' || item.value === 'autoDisallow';
+                                        (editingItem === 'customOpenAIKey' && item.value === 'customOpenAIKey') ||
+                                        (editingItem === 'profileNickname' && item.value === 'profileNickname') ||
+                                        (editingItem === 'profileInstructions' && item.value === 'profileInstructions'));
+                                const isCommandListItem = item.value === 'alwaysAsk' || item.value === 'alwaysAskFiles' || item.value === 'autoApprove' || item.value === 'autoDisallow' || item.value === 'profileInstructions';
                                 const isParserDownload = item.value === 'parserDownload';
 
                                 elements.push(
@@ -1091,27 +1160,50 @@ export default function SettingsMenu({
                                                     <Text color="gray" bold>{'> '} </Text>
                                                     <TextInput
                                                         value={editValue}
-                                                        onChange={setEditValue}
+                                                        onChange={(val) => {
+                                                            const max = editingItem === 'profileNickname' ? 20 : (editingItem === 'profileInstructions' ? 250 : Infinity);
+                                                            setEditValue(val.slice(0, max));
+                                                        }}
                                                         onSubmit={async (val) => {
                                                             if (editingItem === 'customOpenAIBaseUrl') {
-                                                                const cleanUrl = val.trim().replace(/\/+$/, '');
-                                                                const newSysSettings = { ...systemSettings, customOpenAIBaseUrl: cleanUrl };
-                                                                setSystemSettings(newSysSettings);
-                                                                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                                                                 const cleanUrl = val.trim().replace(/\/+$/, '');
+                                                                 const newSysSettings = { ...systemSettings, customOpenAIBaseUrl: cleanUrl };
+                                                                 setSystemSettings(newSysSettings);
+                                                                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                                                             } else if (editingItem === 'customOpenAIKey') {
-                                                                const { saveProviderAPIKey } = await import('../utils/secrets.js');
-                                                                await saveProviderAPIKey('c_openai', val.trim());
-                                                                setActiveProviderKeys(prev => ({ ...prev, c_openai: !!val.trim() }));
+                                                                 const { saveProviderAPIKey } = await import('../utils/secrets.js');
+                                                                 await saveProviderAPIKey('c_openai', val.trim());
+                                                                 setActiveProviderKeys(prev => ({ ...prev, c_openai: !!val.trim() }));
+                                                            } else if (editingItem === 'profileNickname') {
+                                                                 const newNick = val.trim().slice(0, 20);
+                                                                 const newProfile = { ...(profileData || {}), nickname: newNick };
+                                                                 if (setProfileData) setProfileData(newProfile);
+                                                                 saveSettings({ profileData: newProfile, systemSettings, apiTier, quotas });
+                                                            } else if (editingItem === 'profileInstructions') {
+                                                                 const newInstr = val.trim().slice(0, 250);
+                                                                 const newProfile = { ...(profileData || {}), instructions: newInstr };
+                                                                 if (setProfileData) setProfileData(newProfile);
+                                                                 saveSettings({ profileData: newProfile, systemSettings, apiTier, quotas });
                                                             } else {
-                                                                const newSysSettings = { ...systemSettings, [editingItem]: val.trim(), sandboxPreset: 'Custom' };
-                                                                setSystemSettings(newSysSettings);
-                                                                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                                                                 const newSysSettings = { ...systemSettings, [editingItem]: val.trim(), sandboxPreset: 'Custom' };
+                                                                 setSystemSettings(newSysSettings);
+                                                                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                                                             }
                                                             setEditingItem(null);
                                                         }}
                                                     />
                                                 </Box>
-                                                <Text color="gray" italic>  {editingItem === 'customOpenAIBaseUrl' ? 'Enter Base URL (.../v1) • Press Enter to save, Esc to cancel • Restart Required' : (editingItem === 'customOpenAIKey' ? 'Enter API Key • Press Enter to save, Esc to cancel • Restart Required' : 'Comma separated • Press Enter to save, Esc to cancel')}</Text>
+                                                <Text color="gray" italic>  {
+                                                    editingItem === 'customOpenAIBaseUrl'
+                                                        ? 'Enter Base URL (.../v1) • Press Enter to save, Esc to cancel • Restart Required'
+                                                        : (editingItem === 'customOpenAIKey'
+                                                            ? 'Enter API Key • Press Enter to save, Esc to cancel • Restart Required'
+                                                            : (editingItem === 'profileNickname'
+                                                                ? `Enter Nickname (${editValue.length}/20) • Press Enter to save, Esc to cancel`
+                                                                : (editingItem === 'profileInstructions'
+                                                                    ? `Enter Custom Instructions (${editValue.length}/250) • Press Enter to save, Esc to cancel`
+                                                                    : 'Comma separated • Press Enter to save, Esc to cancel')))
+                                                }</Text>
                                             </Box>
                                         )}
                                     </Box>
@@ -1216,7 +1308,9 @@ export default function SettingsMenu({
                 <Text color="gray" italic>
                     {activeColumn === 'categories'
                         ? '▲▼ Select Category • Enter/► to configure'
-                        : '▲▼ Select Option • Enter to Toggle • ◄/ESC to go back'}
+                        : (currentCatId === 'security'
+                            ? '▲▼ Select Option • TAB/◄► Switch Tab • Enter to Edit/Toggle • ESC to go back'
+                            : '▲▼ Select Option • Enter to Toggle • ◄/ESC to go back')}
                 </Text>
                 {activeColumn === 'categories' && (
                     <Text color="gray">

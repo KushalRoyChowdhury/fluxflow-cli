@@ -32,7 +32,6 @@ Trigger in chat via /command
 * /wildcard-tooling → Tool compatibility mode for non-tooling models
 * /wildercard-tooling → Extended version of /wildcard-tooling
 * /key → Manage saved API keys
-* /profile → Edit user persona, nickname, and custom instructions
 * /theme → Select UI color theme
 * /memory → View/manage agent persistent memory
 * /budget → Set/view token budget limits
