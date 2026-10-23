@@ -354,6 +354,7 @@ export default function SettingsMenu({
                     { label: 'Directory Tree Design', value: 'indentationTree', status: systemSettings.indentationTree !== false ? 'Modern' : 'Legacy' },
                     { label: 'Compact Large Tool Results', value: 'compressToolResults', status: systemSettings.compressToolResults ? 'ON' : 'OFF' },
                     { label: 'Auto Truncate Results', value: 'autoTruncateResults', status: systemSettings.autoTruncateResults ? 'ON' : 'OFF' },
+                    { label: 'Agent Finish Notification', value: 'agentFinishSound', status: systemSettings.agentFinishSound ? 'ON' : 'OFF' },
                     { label: 'Image History for CU', value: 'imageHistoryCU', status: systemSettings.imageHistoryCU || 'Standard' },
                     { label: 'Context Length', value: 'contextLength', status: systemSettings.contextLength || '256k' },
                     { label: 'Keep Reasoning Context', value: 'keepReasoningContext', status: systemSettings.keepReasoningContext ? 'ON' : 'OFF' },
@@ -687,6 +688,12 @@ export default function SettingsMenu({
         } else if (item.value === 'autoTruncateResults') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, autoTruncateResults: !s.autoTruncateResults };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'agentFinishSound') {
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, agentFinishSound: !s.agentFinishSound };
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });

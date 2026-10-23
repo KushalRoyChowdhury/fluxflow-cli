@@ -30,6 +30,16 @@ const withLock = (op) => {
  * }
  */
 
+export const getChatDisplayName = (chat, id = '') => {
+    const cleanTag = (str) => (str || '').replace(/\[\/?(?:STEERING HINT|QUESTION)(?::\s*\w+)?\]/gi, '').trim();
+    // Priority 1: Custom title set by Janitor/Memory Agent (anything not default Session ID)
+    if (chat?.name && !chat.name.startsWith('Session')) return cleanTag(chat.name);
+    // Priority 2: Latest user prompt preview
+    if (chat?.prompt) return cleanTag(chat.prompt);
+    // Priority 3: Fallback Session ID name
+    return cleanTag(chat?.name) || id;
+};
+
 export const loadHistory = async () => {
     await fs.ensureDir(HISTORY_DIR);
     let history = {};

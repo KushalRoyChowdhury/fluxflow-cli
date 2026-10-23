@@ -16,12 +16,13 @@ import SettingsMenu from './components/SettingsMenu.jsx';
 import AskUserModal from './components/AskUserModal.jsx';
 import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPIKey } from './utils/secrets.js';
-import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary } from './utils/ai.js';
+import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary, getActiveToolContext } from './utils/ai.js';
 import { subagentProgress } from './utils/subagent_state.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
+import { showAgentFinishNotification } from './utils/notifications.js';
 import { matchesPathPattern } from './utils/paths.js';
 import { getThemeColors } from './utils/theme.js';
-import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, saveChatContext, loadChatContext } from './utils/history.js';
+import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, saveChatContext, loadChatContext, getChatDisplayName } from './utils/history.js';
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
@@ -3974,7 +3975,7 @@ export default function App({ args = [] }) {
                         const history = await loadHistory();
                         const list = Object.entries(history)
                             .sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
-                            .map(([id, info]) => `⠀⠀\x1b[2m└─\x1b[22m ${id}: ${info.name}${id === chatId ? ' (current)' : ''}`)
+                            .map(([id, info]) => `⠀⠀\x1b[2m└─\x1b[22m ${id}: ${getChatDisplayName(info, id)}${id === chatId ? ' (current)' : ''}`)
                             .join('\n');
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
@@ -5015,6 +5016,19 @@ export default function App({ args = [] }) {
                             }
                             hasFiredJanitor = true;
 
+                            if (systemSettings?.agentFinishSound) {
+                                (async () => {
+                                    try {
+                                        const h = await loadHistory();
+                                        const chat = h[chatId];
+                                        const chatName = getChatDisplayName(chat, String(chatId));
+                                        showAgentFinishNotification(chatName);
+                                    } catch {
+                                        showAgentFinishNotification(String(chatId));
+                                    }
+                                })();
+                            }
+
                             clearBlocksCache();
 
                             if (systemSettings?.autoTruncateResults) {
@@ -5126,6 +5140,17 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'tool_result') {
+                            // Use ai.js's state-machine parser to accurately detect unclosed tools (respects quotes, escapes, backticks, code spans)
+                            let unclosedToolPrefix = '';
+                            if (activeStreamingMsgRef.current?.text) {
+                                const curText = activeStreamingMsgRef.current.text;
+                                const toolCtx = getActiveToolContext(curText);
+                                if (toolCtx.inside && typeof toolCtx.startIndex === 'number' && toolCtx.startIndex >= 0) {
+                                    unclosedToolPrefix = curText.substring(toolCtx.startIndex);
+                                    activeStreamingMsgRef.current.text = curText.substring(0, toolCtx.startIndex);
+                                }
+                            }
+
                             commitActiveStreamingMessage();
                             currentThinkId = null;
                             currentAgentId = null;
@@ -5148,6 +5173,13 @@ export default function App({ args = [] }) {
                                 setCompletedIndex(newMsgs.length);
                                 return newMsgs;
                             });
+
+                            // Restore any unclosed tool start to the new active message so it continues seamlessly without splitting across turns
+                            if (unclosedToolPrefix) {
+                                currentAgentId = 'agent-' + Date.now();
+                                activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: unclosedToolPrefix, isStreaming: true };
+                                inToolCall = true;
+                            }
 
                             // Track code changes
                             if (packet.toolName === 'update_file' && packet.aiContent) {

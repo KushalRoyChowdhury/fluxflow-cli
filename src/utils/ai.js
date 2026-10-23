@@ -968,7 +968,7 @@ const maskCodeSpans = (text) => {
     return chars.join('');
 };
 
-const getActiveToolContext = (text) => {
+export const getActiveToolContext = (text) => {
     // Strip leading thinking block ONLY so live tool sniffing ignores tool syntax drafted inside thinking
     const cleanText = stripLeadingThinking(text);
 
@@ -4978,12 +4978,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
 
                                             let aiContent;
-                                            if (processedResult.startsWith('[[SAME]]')) {
+                                            if (normToolName === 'write_file' && !processedResult.startsWith('ERROR:')) {
                                                 const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
                                                 const lines = cleanText.split(/\r?\n/);
                                                 const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
                                                 const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
-                                                aiContent = `[ACTION RESULT]: ${headerPart}\n[SYSTEM NOTE]: Content verified and persisted to disk. Full preview omitted to conserve context.`;
+                                                aiContent = `[ACTION RESULT]: ${headerPart}`;
+                                            } else if (processedResult.startsWith('[[SAME]]')) {
+                                                const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
+                                                const lines = cleanText.split(/\r?\n/);
+                                                const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
+                                                const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
+                                                aiContent = `[ACTION RESULT]: ${headerPart}`;
                                             } else {
                                                 aiContent = `[ACTION RESULT]: ${processedResult}`;
                                             }
@@ -5304,7 +5310,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 let aiContent;
-                                if (processedResult.startsWith('[[SAME]]')) {
+                                if (normToolName === 'write_file' && !processedResult.startsWith('ERROR:')) {
+                                    const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
+                                    const lines = cleanText.split(/\r?\n/);
+                                    const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
+                                    const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
+                                    aiContent = `[ACTION RESULT]: ${headerPart}`;
+                                } else if (processedResult.startsWith('[[SAME]]')) {
                                     const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
                                     const lines = cleanText.split(/\r?\n/);
                                     const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
@@ -5906,7 +5918,6 @@ Rules:
 - JSON escape literal sequences, backslash: \\\\, newLine: \\ n
 - Same file, multiple edits? ONE PatchFile ≤15 blocks
 - Need text or huge file? CodeSearch > Full Read
-- Avoid unnecessary large file chunk reads
 - Stuck on syntax error? Tell user > waste time
 
 # Provided Actions

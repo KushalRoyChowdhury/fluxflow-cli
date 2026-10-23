@@ -58,6 +58,7 @@ const DEFAULT_SETTINGS = {
         ollamaEndpoint: 'Cloud',
         compressToolResults: false,
         autoTruncateResults: true,
+        agentFinishSound: false,
         imageHistoryCU: 'Standard',
         contextLength: '256k',
         keepReasoningContext: false,

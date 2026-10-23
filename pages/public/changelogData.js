@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.41.0": {
+        "note": "OCTOBER 24",
+        "added": [
+            "Added notification popup when agent finishes its task. Turn on at `/settings → Others → Notifications`."
+        ],
+        "changed": [],
+        "fixes": [
+            "Bug fixes in animated typing engine."
+        ]
+    },
     "4.40.0": {
         "note": "OCTOBER 23",
         "added": [

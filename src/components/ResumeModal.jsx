@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { loadHistory } from '../utils/history.js';
+import { loadHistory, getChatDisplayName } from '../utils/history.js';
 import { emojiSpace } from '../utils/terminal.js';
 import { getThemeColors } from '../utils/theme.js';
 
@@ -86,15 +86,7 @@ export default function ResumeModal({ onSelect, onDelete, onClose, theme = 'Dark
                                 <Box flexGrow={1}>
                                     <Text color={isSelected ? colors.text : colors.textMuted} bold={isSelected}>
                                         {isSelected ? '❯ ' : '  '}
-                                        {(() => {
-                                            const cleanTag = (str) => (str || '').replace(/\[\/?(?:STEERING HINT|QUESTION)(?::\s*\w+)?\]/gi, '').trim();
-                                            // Priority 1: Custom title set by Janitor/Memory Agent (anything not default Session ID)
-                                            if (chat?.name && !chat.name.startsWith('Session')) return cleanTag(chat.name);
-                                            // Priority 2: Latest user prompt preview
-                                            if (chat?.prompt) return cleanTag(chat.prompt);
-                                            // Priority 3: Fallback Session ID name
-                                            return cleanTag(chat?.name) || id;
-                                        })()}
+                                        {getChatDisplayName(chat, id)}
                                         <Text color={colors.textMuted}> [{dateStr} • {id}]</Text>
                                     </Text>
                                 </Box>

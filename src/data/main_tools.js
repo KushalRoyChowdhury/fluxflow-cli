@@ -42,8 +42,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
 
     const fluxInstructions = `- JSON escape literal sequences, backslash: \\\\, newLine: \\ n
 - Same file, multiple edits? One PatchFile ≤15 blocks${autoExec ? '' : '\n- Action denied? Ask for guidance'}
-- Need text or huge file? CodeSearch > Full Read
-- Avoid unnecessary large file chunk reads
+- Need text or large file? CodeSearch > Full Read
 - Stuck on syntax error? Tell user > waste time
 `;
 
@@ -93,7 +92,7 @@ Invocations:
 
     return `
 -- ACTIONS --
-In chat output the format [action:ActionName(arg1="value1")] in NEW line
+In chat output the format \`[action:ActionName(arg1="value1")]\` in NEW line
 Rules:
 - Max 5 actions/turn
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
