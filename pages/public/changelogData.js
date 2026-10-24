@@ -1,6 +1,17 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.42.0": {
+        "note": "OCTOBER 25",
+        "added": [],
+        "changed": [
+            "Improved agent finish notification experience."
+        ],
+        "fixes": [
+            "Fixed several bug with tool parsing *(THIS is 582nd version of the app, and I STILL have tool parsing bugs)*.",
+            "Hopefully \"fixed\" animated typing engine bugs that didnt got fixed in `v4.41`."
+        ]
+    },
     "4.41.0": {
         "note": "OCTOBER 24",
         "added": [

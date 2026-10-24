@@ -26,27 +26,28 @@ const snoreToastPath = path.resolve(__dirname, '../../node_modules/node-notifier
 export const registerWindowsShortcut = () => {
     if (process.platform !== 'win32') return;
     try {
+        const pngPath = getAssetPath('logo.png');
         const icoPath = getAssetPath('logo.ico');
-        if (!fs.existsSync(icoPath)) return;
-        if (!fs.existsSync(shortcutDir)) {
-            fs.mkdirSync(shortcutDir, { recursive: true });
-        }
+        const iconForUri = fs.existsSync(pngPath) ? pngPath : icoPath;
 
+        // Register FluxFlow directly in AppUserModelId registry.
+        // This gives Windows the App Display Name & App Icon WITHOUT creating any Start Menu shortcut icon!
         const script = `
-$ws = New-Object -ComObject WScript.Shell
-$sc = $ws.CreateShortcut('${fluxLnk.replace(/'/g, "''")}')
-$sc.TargetPath = '${snoreToastPath.replace(/'/g, "''")}'
-$sc.IconLocation = '${icoPath.replace(/'/g, "''")},0'
-$sc.Description = 'FluxFlow'
-$sc.Save()
+$key = 'HKCU:\\Software\\Classes\\AppUserModelId\\FluxFlow'
+New-Item -Path $key -Force | Out-Null
+Set-ItemProperty -Path $key -Name 'DisplayName' -Value 'FluxFlow'
+Set-ItemProperty -Path $key -Name 'IconUri' -Value '${iconForUri.replace(/'/g, "''")}'
+Set-ItemProperty -Path $key -Name 'IconBackgroundColor' -Value '00000000'
+Set-ItemProperty -Path $key -Name 'ShowInSettings' -Value 0 -Type DWord -ErrorAction SilentlyContinue
+Remove-Item -Path '${shortcutDir.replace(/'/g, "''")}' -Recurse -Force -ErrorAction SilentlyContinue
 `.replace(/\r?\n\s*/g, '; ');
 
         execSync(`powershell -NoProfile -Command "${script}"`, { stdio: 'ignore' });
     } catch {
-        // Silently ignore shortcut creation failure
+        // Silently ignore registration failure
     }
 };
 
 export const getWindowsAppID = () => {
-    return snoreToastPath;
+    return 'FluxFlow';
 };

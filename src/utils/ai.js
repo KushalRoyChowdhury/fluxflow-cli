@@ -171,6 +171,11 @@ export const stripTrailingFluffAfterTools = (text) => {
     if (lastIdx === -1) return text;
 
     const endOfLastTool = lastIdx + lastTool.fullMatch.length;
+    const trailingPart = text.substring(endOfLastTool);
+    // If trailing part contains an attempted unexecuted tool call, preserve it so diagnostics can run!
+    if (/\[\s*(?:tool|action):/i.test(trailingPart)) {
+        return text.trimEnd();
+    }
     return text.substring(0, endOfLastTool).trimEnd();
 };
 
@@ -907,7 +912,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     }
 };
 
-const maskCodeSpans = (text) => {
+export const maskCodeSpans = (text) => {
     if (!text || typeof text !== 'string') return text;
     const chars = text.split('');
     let inFence = false;
@@ -1232,7 +1237,7 @@ const translateKimiToolCalls = (text) => {
 };
 
 
-const detectToolCalls = (text) => {
+export const detectToolCalls = (text) => {
     if (!text) return [];
     const translatedText = translateKimiToolCalls(text);
     // Strip leading thinking block ONLY if the response starts with thinking
@@ -5719,15 +5724,35 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (toolResults.length > 0) {
                     let combinedText = toolResults.map(tr => tr.text).join('\n\n');
                     const toolActionableText = stripLeadingThinking(turnText);
-                    // Eat all valid closed [tool:...)] calls so valid calls (and nested tool syntax inside them) are cleared
-                    const remainingUnclosedText = toolActionableText.replace(/\[{1,2}(?:tool|action):[\s\S]*?\)\s*\]{1,2}/gi, '');
-                    const unexecutedToolsCount = (remainingUnclosedText.match(/\[(?:tool|action):/gi) || []).length;
+                    const scanText = maskCodeSpans(toolActionableText);
+                    const executedTools = detectToolCalls(toolActionableText);
+
+                    // Find all attempted tool triggers outside code spans
+                    const triggerRegex = /\[\s*(?:tool:(?:functions\.)?|action:(?:functions\.)?|action:)([a-zA-Z0-9_]+)\s*\(/gi;
+                    const unclosedSegments = [];
+                    const triggerIndices = [];
+                    let trigMatch;
+                    while ((trigMatch = triggerRegex.exec(scanText)) !== null) {
+                        triggerIndices.push({ index: trigMatch.index, toolName: trigMatch[1] });
+                    }
+
+                    for (let idx = 0; idx < triggerIndices.length; idx++) {
+                        const curTrig = triggerIndices[idx];
+                        const nextTrigIdx = idx + 1 < triggerIndices.length ? triggerIndices[idx + 1].index : toolActionableText.length;
+                        // Check if this trigger index matches any successfully executed tool call
+                        const wasExecuted = executedTools.some(et => et.fullMatch && toolActionableText.startsWith(et.fullMatch, curTrig.index));
+                        if (!wasExecuted) {
+                            unclosedSegments.push(toolActionableText.substring(curTrig.index, nextTrigIdx));
+                        }
+                    }
+
+                    const unexecutedToolsCount = unclosedSegments.length;
                     const attemptedToolsCount = toolResults.length + unexecutedToolsCount;
-                    if (toolResults.length < attemptedToolsCount) {
+                    if (unexecutedToolsCount > 0) {
+                        const remainingUnclosedText = unclosedSegments.join('\n');
                         const diag = diagnoseUnexecutedTools(remainingUnclosedText);
                         combinedText += `\n\n[system] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed.\n${diag ? `Parsing Issues Detected:\n${diag}\n` : ''}Verify proper structure compliance [action:ActionName(arg="value")] & try failed calls again [/system]`;
-                        const missedCount = attemptedToolsCount - toolResults.length;
-                        for (let i = 0; i < missedCount; i++) await incrementUsage('toolFailure');
+                        for (let i = 0; i < unexecutedToolsCount; i++) await incrementUsage('toolFailure');
                     }
                     const binaryPart = toolResults.find(tr => tr.binaryPart)?.binaryPart || null;
                     modifiedHistory.push({ role: 'user', text: combinedText, binaryPart });

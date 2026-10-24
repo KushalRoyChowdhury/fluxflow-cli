@@ -1215,7 +1215,7 @@ const isInsideBacktick = (str, idx) => {
     }
     return inFence || inInlineCode;
 };
-const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[(?:TOOL|ACTION) RESULTS?\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL|ACTION).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gm;
+const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[(?:TOOL|ACTION) RESULTS?\]:?\s*|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL|ACTION).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gm;
 const REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
 const REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
 

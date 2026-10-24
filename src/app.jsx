@@ -16,7 +16,7 @@ import SettingsMenu from './components/SettingsMenu.jsx';
 import AskUserModal from './components/AskUserModal.jsx';
 import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPIKey } from './utils/secrets.js';
-import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary, getActiveToolContext } from './utils/ai.js';
+import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary, getActiveToolContext, detectToolCalls, maskCodeSpans } from './utils/ai.js';
 import { subagentProgress } from './utils/subagent_state.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
 import { showAgentFinishNotification } from './utils/notifications.js';
@@ -720,21 +720,46 @@ export default function App({ args = [] }) {
     const commitActiveStreamingMessage = () => {
         flushTypewriterNow();
         if (activeStreamingMsgRef.current) {
-            let msgText = flattenString(activeStreamingMsgRef.current.text);
+            let curText = flattenString(activeStreamingMsgRef.current.text || '');
+            let unclosedToolPrefix = '';
+
+            // Protect active tool call syntax from leaking into frozen UI bubbles across tool execution
+            if (activeStreamingMsgRef.current.role === 'agent' && curText) {
+                const toolCtx = getActiveToolContext(curText);
+                if (toolCtx.inside && typeof toolCtx.startIndex === 'number' && toolCtx.startIndex >= 0) {
+                    unclosedToolPrefix = curText.substring(toolCtx.startIndex);
+                    curText = curText.substring(0, toolCtx.startIndex);
+                }
+            }
+
+            let msgText = curText;
             if (activeStreamingMsgRef.current.role === 'think') {
                 msgText = msgText.replace(/^\r?\n+/, '').replace(/\r?\n+$/, '');
             }
-            const msg = {
-                ...activeStreamingMsgRef.current,
-                text: msgText,
-                isStreaming: false
-            };
-            setMessages(prev => {
-                const next = [...prev, msg];
-                setCompletedIndex(next.length);
-                return next;
-            });
-            activeStreamingMsgRef.current = null;
+
+            if (msgText.trim().length > 0 || activeStreamingMsgRef.current.role !== 'agent') {
+                const msg = {
+                    ...activeStreamingMsgRef.current,
+                    text: msgText,
+                    isStreaming: false
+                };
+                setMessages(prev => {
+                    const next = [...prev, msg];
+                    setCompletedIndex(next.length);
+                    return next;
+                });
+            }
+
+            if (unclosedToolPrefix) {
+                activeStreamingMsgRef.current = {
+                    id: 'agent-' + Date.now(),
+                    role: 'agent',
+                    text: unclosedToolPrefix,
+                    isStreaming: true
+                };
+            } else {
+                activeStreamingMsgRef.current = null;
+            }
         }
         chunkWordCountRef.current = 0;
         streamingWordStatsRef.current = { totalWords: 0, startTime: 0, wps: 0, chunks: [] };
@@ -785,6 +810,14 @@ export default function App({ args = [] }) {
     // Queue text for typewriter or append directly when OFF
     const appendStreamText = (chunkText) => {
         if (systemSettings.progressiveRendering && typewriterTickRef.current) {
+            const trimmed = chunkText.trim();
+            const isToolBlock = (trimmed.startsWith('[action:') || trimmed.startsWith('[tool:')) && trimmed.endsWith(']');
+            if (isToolBlock) {
+                // Pass tool call blocks atomically as 1 single piece so typewriter never splits arguments
+                typewriterQueueRef.current.push(chunkText);
+                return;
+            }
+
             // Split into fine-grained tokens (CJK characters, words, symbols, whitespace) for smooth progressive appearance
             const tokens = splitTypewriterTokens(chunkText);
             for (const tok of tokens) {
@@ -4492,8 +4525,10 @@ export default function App({ args = [] }) {
             const timestamp = `[Prompted on: ${new Date().toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}]`;
             const userMessage = { id: 'user-' + Date.now(), role: 'user', text: `${absoluteClean}\n\n${timestamp}` };
             setMessages(prev => {
-                setCompletedIndex(prev.length + 1); // Flush the user message immediately
-                return [...prev, userMessage];
+                const next = [...prev, userMessage];
+                setCompletedIndex(next.length); // Flush the user message immediately
+                saveChat(chatId, null, next); // Immediately persist latest user prompt into history index!
+                return next;
             });
 
             const streamChat = async () => {
@@ -4628,8 +4663,49 @@ export default function App({ args = [] }) {
                                         flushTurn();
                                     }
 
+                                    // Omit malformed/unclosed tool call strings entirely using detectToolCalls so they don't pollute context
+                                    let sanitizedAgentText = rawTrimmedText;
+                                    // Mask code fences (```...```) and inline backticks (`...`) so code examples are 100% ignored
+                                    const maskedScanText = maskCodeSpans(sanitizedAgentText);
+                                    const toolTriggerRegex = /\[\s*(?:tool:(?:functions\.)?|action:(?:functions\.)?|action:)([a-zA-Z0-9_]+)\s*\(/gi;
+                                    const triggerStarts = [];
+                                    let m;
+                                    while ((m = toolTriggerRegex.exec(maskedScanText)) !== null) {
+                                        triggerStarts.push(m.index);
+                                    }
+
+                                    if (triggerStarts.length > 0) {
+                                        const validTools = detectToolCalls(sanitizedAgentText);
+                                        const malformedRanges = [];
+
+                                        for (let k = 0; k < triggerStarts.length; k++) {
+                                            const startIdx = triggerStarts[k];
+                                            const nextTriggerIdx = k + 1 < triggerStarts.length ? triggerStarts[k + 1] : sanitizedAgentText.length;
+                                            // Check if any valid tool call begins exactly at this trigger index
+                                            const matchingValid = validTools.find(vt => vt.fullMatch && sanitizedAgentText.startsWith(vt.fullMatch, startIdx));
+
+                                            if (!matchingValid) {
+                                                // Strictly stop eating at the next tool boundary!
+                                                malformedRanges.push({ start: startIdx, end: nextTriggerIdx });
+                                            }
+                                        }
+
+                                        if (malformedRanges.length > 0) {
+                                            let cleaned = '';
+                                            let lastPos = 0;
+                                            for (const range of malformedRanges) {
+                                                cleaned += sanitizedAgentText.substring(lastPos, range.start);
+                                                lastPos = range.end;
+                                            }
+                                            cleaned += sanitizedAgentText.substring(lastPos);
+                                            sanitizedAgentText = cleaned.trim();
+                                        }
+                                    }
+
+                                    if (!sanitizedAgentText) continue;
+
                                     const endsWithNewline = rawOriginalText.endsWith('\n');
-                                    const hasToolCall = rawTrimmedText.toLowerCase().includes('tool:') || rawTrimmedText.toLowerCase().includes('action:');
+                                    const hasToolCall = sanitizedAgentText.toLowerCase().includes('tool:') || sanitizedAgentText.toLowerCase().includes('action:');
 
                                     // Find next agent message text to verify if it starts with '['
                                     let nextAgentStartsWithBracket = false;
@@ -4644,7 +4720,7 @@ export default function App({ args = [] }) {
                                         }
                                     }
 
-                                    turnAgentParts.push(rawTrimmedText);
+                                    turnAgentParts.push(sanitizedAgentText);
                                     if (hasToolCall && endsWithNewline && nextAgentStartsWithBracket) {
                                         isContinuingModelTurn = true;
                                     } else {
@@ -4878,6 +4954,7 @@ export default function App({ args = [] }) {
                     const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
                     // const signalRegex = /\[?_DISABLED_SIGNAL_REGEX_\]?/gi;
 
+                    // fs.writeFileSync("DEBUG.txt", '');
                     for await (const packet of stream) {
                         // fs.appendFileSync("DEBUG.txt", `${JSON.stringify(packet)}\n\n`);
                         await new Promise(resolve => setTimeout(resolve, 3));
@@ -5140,17 +5217,6 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'tool_result') {
-                            // Use ai.js's state-machine parser to accurately detect unclosed tools (respects quotes, escapes, backticks, code spans)
-                            let unclosedToolPrefix = '';
-                            if (activeStreamingMsgRef.current?.text) {
-                                const curText = activeStreamingMsgRef.current.text;
-                                const toolCtx = getActiveToolContext(curText);
-                                if (toolCtx.inside && typeof toolCtx.startIndex === 'number' && toolCtx.startIndex >= 0) {
-                                    unclosedToolPrefix = curText.substring(toolCtx.startIndex);
-                                    activeStreamingMsgRef.current.text = curText.substring(0, toolCtx.startIndex);
-                                }
-                            }
-
                             commitActiveStreamingMessage();
                             currentThinkId = null;
                             currentAgentId = null;
@@ -5174,10 +5240,8 @@ export default function App({ args = [] }) {
                                 return newMsgs;
                             });
 
-                            // Restore any unclosed tool start to the new active message so it continues seamlessly without splitting across turns
-                            if (unclosedToolPrefix) {
-                                currentAgentId = 'agent-' + Date.now();
-                                activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: unclosedToolPrefix, isStreaming: true };
+                            if (activeStreamingMsgRef.current) {
+                                currentAgentId = activeStreamingMsgRef.current.id;
                                 inToolCall = true;
                             }
 
