@@ -5579,6 +5579,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                     } else {
                         // CONNECTION RETRY
+                        const parts = modelName.split('/');
+                        const finalModelString = parts.slice(modelName.endsWith('/free') ? -2 : -1).join('/');
                         if (retryCount <= MAX_RETRIES) {
                             retryCount++;
                             inStreamRetryCount = 1;      // [BUGFIX] - Reset stream recovery budget on connection retry!
@@ -5587,14 +5589,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const jitter = 0.8 + Math.random() * 0.4;
                             const waitTime = Math.round(baseWaitTime * jitter);
                             isInitialAttempt = true;
-                            yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${(waitTime / 1000).toFixed(0)}s]` };
+                            yield { type: 'status', content: `Trying to reach ${finalModelString} (${retryCount}/${MAX_RETRIES}) [Retrying in ${(waitTime / 1000).toFixed(0)}s]` };
                             // show live decremental countdown
                             for (let i = waitTime / 1000; i > 0; i--) {
                                 if (TERMINATION_SIGNAL) break;
-                                yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i.toFixed(0)}s]` };
+                                yield { type: 'status', content: `Trying to reach ${finalModelString} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i.toFixed(0)}s]` };
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                             }
-                            yield { type: 'status', content: `Trying to reach ${modelName}` };
+                            yield { type: 'status', content: `Trying to reach ${finalModelString}` };
                         } else {
                             throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)\nError log can be found in \`/export logs\``);
                         }
