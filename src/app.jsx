@@ -19,7 +19,7 @@ import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPI
 import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary, getActiveToolContext, detectToolCalls, maskCodeSpans } from './utils/ai.js';
 import { subagentProgress } from './utils/subagent_state.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
-import { showAgentFinishNotification } from './utils/notifications.js';
+import { showAgentFinishNotification, showUserActionRequiredNotification } from './utils/notifications.js';
 import { matchesPathPattern } from './utils/paths.js';
 import { getThemeColors } from './utils/theme.js';
 import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, saveChatContext, loadChatContext, getChatDisplayName } from './utils/history.js';
@@ -4858,6 +4858,7 @@ export default function App({ args = [] }) {
                                     if (isAuto || (command && safeRegex.test(command.trim()))) return 'allow';
 
                                     return new Promise((resolve) => {
+                                        showUserActionRequiredNotification();
                                         setPendingApproval({ tool, args, resolve });
                                         setActiveView('terminalApproval');
                                     });
@@ -4866,6 +4867,7 @@ export default function App({ args = [] }) {
                                 if (isAuto) return 'allow';
 
                                 return new Promise((resolve) => {
+                                    showUserActionRequiredNotification();
                                     setPendingApproval({ tool, args, resolve });
                                     setActiveView('approval');
                                 });
@@ -4873,6 +4875,7 @@ export default function App({ args = [] }) {
                             onAskUser: async (question, options) => {
                                 flushTypewriterNow();
                                 commitActiveStreamingMessage();
+                                showUserActionRequiredNotification();
                                 return new Promise((resolve) => {
                                     let resolvedFlag = false;
                                     setPendingAsk({

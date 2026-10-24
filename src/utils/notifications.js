@@ -33,3 +33,33 @@ export const showAgentFinishNotification = (chatName = '') => {
         // Silently ignore notification errors
     }
 };
+
+/**
+ * Displays a native OS notification for user action required.
+ * Header: FluxFlow
+ * Body: User action required
+ */
+export const showUserActionRequiredNotification = (message = 'User action required') => {
+    const title = 'FluxFlow';
+
+    try {
+        if (!isShortcutRegistered) {
+            registerWindowsShortcut();
+            isShortcutRegistered = true;
+        }
+
+        const appID = process.platform === 'win32' ? getWindowsAppID() : 'FluxFlow';
+        const logoPath = getAssetPath('logo.png');
+
+        notifier.notify({
+            title,
+            message,
+            appID,
+            icon: logoPath,
+            contentImage: logoPath,
+            wait: false
+        });
+    } catch {
+        // Silently ignore notification errors
+    }
+};
