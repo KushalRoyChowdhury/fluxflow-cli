@@ -519,7 +519,10 @@ const getCachedUserMemories = (chatId, isMemoryEnabled) => {
             }
         } catch (e) {
             cachedUserMemories = '';
-            fs.appendFileSync(`${LOGS_DIR}/memory/error.txt`, `${e.message}\n-------------------------------------------------\n\n`);
+            try {
+                fs.mkdirSync(path.join(LOGS_DIR, 'memory'), { recursive: true });
+                fs.appendFileSync(path.join(LOGS_DIR, 'memory', 'error.txt'), `${e.message}\n-------------------------------------------------\n\n`);
+            } catch { /* logging must never crash the caller */ }
         }
     }
     return cachedUserMemories;

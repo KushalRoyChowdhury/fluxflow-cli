@@ -27,7 +27,7 @@ export const getProgress = async (args, context = {}) => {
         if (task.currentTool) output += `Current Tool: ${task.currentTool}\n`;
         const timeSinceLast = task.lastChunkTime ? (Date.now() - task.lastChunkTime) : 9999;
         const currentTps = timeSinceLast < 1000 && task.wps > 0 ? Math.round(task.wps) : 0;
-        if (currentTps > 0) output += `TPS: ${currentTps}\n`;
+        if (currentTps > 0) output += `tok/s: ${currentTps}\n`;
     }
 
     if (task.questions && task.questions.length > 0) {

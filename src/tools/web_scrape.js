@@ -146,6 +146,12 @@ export const web_scrape = async (args) => {
         } catch (err) {
             lastError = err;
             if (browser) await browser.close();
+            try {
+                const errDir = path.join(LOGS_DIR, "web_tools", "scrape");
+                fs.mkdirSync(errDir, { recursive: true });
+                const exePath = getPuppeteerConfig().executablePath || '(puppeteer default discovery)';
+                fs.writeFileSync(path.join(errDir, "ERROR.txt"), `[${new Date().toISOString()}] ${err.message}\nexecutablePath: ${exePath}\n`);
+            } catch { /* logging must never crash the tool */ }
             if (attempt < maxRetries) {
                 const backoff = Math.pow(2, attempt) * 1000;
                 await new Promise(r => setTimeout(r, backoff));

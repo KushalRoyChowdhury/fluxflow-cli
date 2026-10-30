@@ -743,11 +743,12 @@ export default function App({ args = [] }) {
                     text: msgText,
                     isStreaming: false
                 };
-                setMessages(prev => {
-                    const next = [...prev, msg];
-                    setCompletedIndex(next.length);
-                    return next;
-                });
+                setMessages(prev => [...prev, msg]);
+                // Advance completedIndex OUTSIDE the setMessages updater. React may
+                // invoke updater functions more than once (concurrent rendering /
+                // StrictMode), so a setState side-effect inside them can be dropped,
+                // leaving completedIndex behind and the finished message unfrozen.
+                setCompletedIndex(prev => prev + 1);
             }
 
             if (unclosedToolPrefix) {
@@ -4809,13 +4810,24 @@ export default function App({ args = [] }) {
                                 setExecOutput(prev => prev + chunk);
                             },
                             onExecEnd: () => {
+                                // Capture ref values as LOCALS before setMessages. The updater
+                                // runs during React's render phase (deferred/batched), so reading
+                                // activeCommandRef inside it and nulling the ref below in the same
+                                // sync block is a race: the ref can already be null when the
+                                // updater executes, dropping the terminal record and losing the
+                                // FINISHED state from the UI. Locals make it render-mode agnostic.
+                                const finishedCmd = activeCommandRef.current;
+                                const rawOutput = execOutputRef.current || '';
+                                // Null refs immediately so a second exec_end can't double-append.
+                                activeCommandRef.current = null;
+                                execOutputRef.current = '';
+
                                 setMessages(prev => {
-                                    if (!activeCommandRef.current) return prev;
+                                    if (!finishedCmd) return prev;
                                     // Normalize output for history/agent (resolve carriage returns and terminal movements to simulate terminal overwrite)
-                                    const rawOutput = execOutputRef.current || '';
                                     const normalizedOutput = cleanTerminalOutput(rawOutput);
                                     const finalStatus = `[TERMINAL_RECORD]
-                                    COMMAND: ${activeCommandRef.current}
+                                    COMMAND: ${finishedCmd}
                                     PTY: ${isActiveCommandPty}
                                     OUTPUT: ${normalizedOutput.replace(/\n{3,}/g, '\n\n')}`;
                                     const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
@@ -4826,9 +4838,6 @@ export default function App({ args = [] }) {
                                 setActiveCommand(null);
                                 setIsTerminalFocused(false);
                                 setExecOutput('');
-                                // Explicitly nullify refs immediately (not relying on useEffect mirroring)
-                                activeCommandRef.current = null;
-                                execOutputRef.current = '';
                             },
                             onToolResult: (status, toolName) => {
                                 if (status === 'success') {

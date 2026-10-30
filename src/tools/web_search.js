@@ -195,7 +195,12 @@ Sources:
                 return `AI Search results for [${query}]:\n\n${aiResult}`;
             } catch (err) {
                 lastError = err;
-                fs.writeFileSync(path.join(LOGS_DIR, "web_tools", "search", "ai_mode", "ERROR.txt"), err.message);
+                try {
+                    const errDir = path.join(LOGS_DIR, "web_tools", "search", "ai_mode");
+                    fs.mkdirSync(errDir, { recursive: true });
+                    const exePath = getPuppeteerConfig().executablePath || '(puppeteer default discovery)';
+                    fs.writeFileSync(path.join(errDir, "ERROR.txt"), `[${new Date().toISOString()}] ${err.message}\nexecutablePath: ${exePath}\n`);
+                } catch { /* logging must never crash the tool */ }
                 if (browser) await browser.close();
                 if (attempt < maxRetries) {
                     const backoff = Math.pow(2, attempt) * 1000;
@@ -272,7 +277,12 @@ Sources:
         } catch (err) {
             lastError = err;
             if (browser) await browser.close();
-            fs.writeFileSync(path.join(LOGS_DIR, "web_tools", "search", "standard_mode", "ERROR.txt"), err.message);
+            try {
+                const errDir = path.join(LOGS_DIR, "web_tools", "search", "standard_mode");
+                fs.mkdirSync(errDir, { recursive: true });
+                const exePath = getPuppeteerConfig().executablePath || '(puppeteer default discovery)';
+                fs.writeFileSync(path.join(errDir, "ERROR.txt"), `[${new Date().toISOString()}] ${err.message}\nexecutablePath: ${exePath}\n`);
+            } catch { /* logging must never crash the tool */ }
             if (attempt < maxRetries) {
                 const backoff = Math.pow(2, attempt) * 1000;
                 await new Promise(r => setTimeout(r, backoff));

@@ -9,7 +9,7 @@
 
 **A Beautiful, Autonomous Terminal AI Agent**
 ### One of the lightest, fastest, high-fidelity agentic CLI with sub-agents & computer use.
-#### *Only ~590 tokens total system prompt with tools.*
+#### *Only ~500 tokens total system prompt with tools.*
 
 📖 **[Official Documentation](https://fluxflow-cli.onrender.com/)**
 

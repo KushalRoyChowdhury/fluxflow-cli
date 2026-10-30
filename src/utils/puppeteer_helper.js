@@ -96,10 +96,14 @@ export function getPuppeteerConfig() {
                         if (stat.isDirectory()) {
                             dirsToSearch.push(fullPath);
                         } else if (file.toLowerCase() === execName.toLowerCase()) {
-                            // If we match the executable name
-                            // If a version is pinned, check if the path contains the version string
-                            if (!version || fullPath.includes(version)) {
-                                return fullPath;
+                            // A legitimate Chrome binary is multi-MB. A truncated/interrupted
+                            // download is tiny and causes an opaque "spawn UNKNOWN" on launch.
+                            // Reject suspiciously small candidates so we never spawn garbage.
+                            if (stat.size > 1024 * 1024) {
+                                // If a version is pinned, prefer a path containing the version string
+                                if (!version || fullPath.includes(version)) {
+                                    return fullPath;
+                                }
                             }
                         }
                     }
