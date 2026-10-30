@@ -34,6 +34,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **Token Harbor**
   - **APInex**
   - **Infron**
+  - **xKiro**
   - **9Router**
   - **Experimental Labs** (*Experimental*)
   - **AIHubMix** (*Experimental*)
