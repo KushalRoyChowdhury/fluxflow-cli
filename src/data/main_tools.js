@@ -84,8 +84,7 @@ Invocations:
 - Scroll(direction="up/down", gridId=int). Scrolls viewport, gridId to hover over window
 - KeyboardTyping(text=string, autoPressEnter?=bool). Type text string into currently active input. JSON escape literal escape sequences
 - KeyPress(key="key or ;-separated combination, eg: enter, back, backspace, clearInput, ctrl;c, alt;tab, f5, f11, alt;f4"). Press key, shortcut, function key (f1-f12), or clear active input field
-- RecaptureScreen(). Request fresh gridded screenshot
-- Wait(seconds?=int[..120]). Wait for process to finish`;
+- RecaptureScreen(canvasMode?=bool:false). Request fresh gridded screenshot. Use canvasMode when static grid needed, like paint`;
 
     // - Drag(fromGridId=int, toGridId=int). Drag mouse from start grid number to target grid number
     // =====================================================================================================

@@ -53,6 +53,7 @@ const PROVIDER_LOADERS = {
     TokenHarbor: () => import('./providers/tokenharbor.js').then(m => m.getTokenHarborStream),
     Infron: () => import('./providers/infron.js').then(m => m.getInfronStream),
     APInex: () => import('./providers/apinex.js').then(m => m.getAPInexStream),
+    xKiro: () => import('./providers/xkiro.js').then(m => m.getXKiroStream),
     c_openai: () => import('./providers/custom_openai.js').then(m => m.getCustomOpenAIStream),
 };
 const _providerCache = {};
@@ -950,10 +951,28 @@ export const maskCodeSpans = (text) => {
 
         // Check for single backtick inline span (when not in fence)
         if (chars[i] === '`') {
-            inInlineBacktick = !inInlineBacktick;
-            chars[i] = ' ';
-            i++;
-            continue;
+            if (!inInlineBacktick) {
+                // Only enter inline backtick span if there is a matching closing backtick on the same line
+                let hasClosing = false;
+                for (let k = i + 1; k < chars.length; k++) {
+                    if (chars[k] === '\n' || chars[k] === '\r') break;
+                    if (chars[k] === '`' && (k === 0 || chars[k - 1] !== '\\')) {
+                        hasClosing = true;
+                        break;
+                    }
+                }
+                if (hasClosing) {
+                    inInlineBacktick = true;
+                    chars[i] = ' ';
+                    i++;
+                    continue;
+                }
+            } else {
+                inInlineBacktick = false;
+                chars[i] = ' ';
+                i++;
+                continue;
+            }
         }
 
         if (inInlineBacktick) {
@@ -1546,6 +1565,8 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
                 stream = (await loadProvider('TokenHarbor'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'APInex' || aiProvider === 'apinex' || aiProvider === 'apx') {
                 stream = (await loadProvider('APInex'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === 'xKiro' || aiProvider === 'xkiro' || aiProvider === 'kiro') {
+                stream = (await loadProvider('xKiro'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
                 stream = (await loadProvider('c_openai'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, settings.systemSettings?.customOpenAIBaseUrl || '');
             } else {
@@ -1831,6 +1852,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
         if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') targetModel = getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813';
         if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') targetModel = getFallbackValue('tokenharbor_fallback') || 'deepseek-v4.1-flash:free';
         if (aiProvider === 'Infron' || aiProvider === 'infron') targetModel = getFallbackValue('infron_fallback');
+        if (aiProvider === 'xKiro' || aiProvider === 'xkiro' || aiProvider === 'kiro') targetModel = getFallbackValue('xkiro_fallback') || 'openai/gpt-5.6-sol';
 
         let attempts = 0;
         let success = false;
@@ -1914,7 +1936,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
     // }
 
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx' || settings?.aiProvider === 'Infron' || settings?.aiProvider === 'infron' || settings?.aiProvider === 'c_openai' || settings?.aiProvider === 'Custom (OpenAI)') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx' || settings?.aiProvider === 'xKiro' || settings?.aiProvider === 'xkiro' || settings?.aiProvider === 'kiro' || settings?.aiProvider === 'Infron' || settings?.aiProvider === 'infron' || settings?.aiProvider === 'c_openai' || settings?.aiProvider === 'Custom (OpenAI)') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -2131,9 +2153,32 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const isSysInstructionCached = !dynamicDirAwareness && systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
         let dirStructure = isSysInstructionCached ? '' : ('\n**Directory**\nCWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}` + '\n' + getDirTree(process.cwd(), 6));
 
-        const ideCtx = await getIDEContext();
+        const ideCtx = isBridgeConnected() ? await getIDEContext() : null;
+        const formatIDEComments = (comments) => {
+            if (!comments || !Array.isArray(comments) || comments.length === 0) return null;
+            const groups = new Map();
+            for (const c of comments) {
+                const rel = c.relPath || (c.file ? path.relative(process.cwd(), c.file) : 'unknown');
+                if (!groups.has(rel)) groups.set(rel, []);
+                groups.get(rel).push(c);
+            }
+            const parts = [];
+            for (const [rel, items] of groups.entries()) {
+                parts.push(`- ${rel}:`);
+                for (const item of items) {
+                    const snip = (item.snippet || '').trim().replace(/\r?\n/g, ' ');
+                    // const truncated = snip.length > 50 ? `${snip.slice(0, 50)}...` : snip;
+                    const line = item.line || 1;
+                    const commentText = (item.text || '').trim().replace(/\r?\n+/g, '. ');
+                    const commentPrefix = commentText ? ` [${commentText}]` : '';
+                    parts.push(`  ~L${line}${commentPrefix}`);
+                }
+            }
+            return parts.join('\n');
+        };
+        let IDEComments = formatIDEComments(ideCtx?.comments);
         let ideBlock = "";
-        if (isBridgeConnected()) {
+        if (ideCtx) {
             if (ideCtx.file_focused !== "none") {
                 ideBlock = "\n[Additional IDE Context]\n";
                 const relFocused = path.relative(process.cwd(), ideCtx.file_focused);
@@ -2475,7 +2520,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (shouldCheckExclude && !hasMovingParts) {
             firstUserMsg = cleanPromptForModel.trim();
         } else {
-            firstUserMsg = `[System Metadata] Time: ${dateTimeStrExclude}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${ideBlock}\nAction format: [action:ActionName(...)]\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${wildcardToolingPrompt}${clipboardContext.trim().length > 0 ? `[Clipboard Context:\n- ${clipboardContext.trim()}\n` : ''}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+            firstUserMsg = `[System Metadata] Time: ${dateTimeStrExclude}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${ideBlock}\n${clipboardContext.trim().length > 0 ? `[Clipboard Context]\n- ${clipboardContext.trim()}\n` : ''}${IDEComments ? `[Additional Comments]\n${IDEComments.trimEnd()}\n` : ''}Action format: [action:ActionName(...)]\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
         }
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
@@ -2512,6 +2557,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let hasTurnCompleted = false;
 
         let toolsThisUserTurn = [];
+
+        let didRecaptureInLastTurn = false;
 
         // 1 extra loop for grace period
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
@@ -2592,7 +2639,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             wasToolCalledInLastLoop = false
 
             // Auto-capture screenshot for vision feedback in ICU or FluxCU modes
-            if (mode === 'ICU' || mode === 'FluxCU') {
+            if ((mode === 'ICU' || mode === 'FluxCU') && !didRecaptureInLastTurn) {
                 try {
                     yield { type: 'status', content: 'Capturing Screen' };
                     // wait 3s to give time
@@ -2644,6 +2691,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     console.error('Vision screenshot capture error:', err);
                 }
             }
+            didRecaptureInLastTurn = false;
             if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
                 modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
             }
@@ -3010,8 +3058,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         yield { type: 'status', content: 'Verifying' };
                         const ideCtxJIT = await getIDEContext();
                         const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
+                        let IDECommentsJIT = formatIDEComments(ideCtxJIT?.comments);
                         if (ideErr && lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text) {
-                            lastUserMsg.parts[0].text += `\n\n${ideErr} [/ERROR]`;
+                            lastUserMsg.parts[0].text += `\n\n${ideErr}`;
+                        }
+                        if (IDEComments && lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text) {
+                            lastUserMsg.parts[0].text += `\n\n[Additional Comments]\n${IDECommentsJIT}`;
                         }
                         yield { type: 'status', content: 'Working' };
                     }
@@ -3259,6 +3311,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         );
                     } else if (aiProvider === 'APInex' || aiProvider === 'apinex' || aiProvider === 'apx') {
                         stream = (await loadProvider('APInex'))(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0
+                        );
+                    } else if (aiProvider === 'xKiro' || aiProvider === 'xkiro' || aiProvider === 'kiro') {
+                        stream = (await loadProvider('xKiro'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -4633,6 +4697,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         let isNewFileCreated = false;
                                         let preparedModifiedContent = "";
 
+                                        if (!approval && settings.onToolApproval) {
+                                            try {
+                                                const preCheck = await settings.onToolApproval(normToolName, toolCall.args, { checkOnly: true });
+                                                if (preCheck === 'allow' || preCheck === 'deny') {
+                                                    approval = preCheck;
+                                                    if (approval === 'deny') denyReason = 'user';
+                                                }
+                                            } catch (e) { }
+                                        }
+
                                         if (!approval) {
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 try {
@@ -5783,6 +5857,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             if (systemSettings?.advanceRollback) {
                 await AdvanceRevertManager.recordTurnDelta(chatId, loop + 1, currentTurnTools);
             }
+            didRecaptureInLastTurn = currentTurnTools.includes('recapture_screen');
             wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
         }
 
@@ -5870,6 +5945,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'tokenharbor' || lower === 'token harbor' || lower === 'token_harbor' || lower === 'thk') return 'TokenHarbor';
         if (lower === 'infron') return 'Infron';
         if (lower === 'apinex' || lower === 'apx') return 'APInex';
+        if (lower === 'xkiro' || lower === 'kiro') return 'xKiro';
         if (lower === 'c_openai' || lower === 'custom_openai' || lower === 'custom (openai)' || lower === 'custom') return 'c_openai';
         return null;
     };

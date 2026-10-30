@@ -12,6 +12,8 @@ let lastCursorLine = 0;
 const activeDecs: vscode.TextEditorDecorationType[] = [];
 let statusBarItem: vscode.StatusBarItem;
 let isCliConnected = false;
+let commentController: vscode.CommentController | undefined;
+const activeCommentThreads = new Map<string, vscode.CommentThread>();
 const pendingInlineRequests = new Map<string, { resolve: (v: string) => void; timer: NodeJS.Timeout }>();
 
 // Gated debug log — silent by default, enabled via AUTOCOMPLETE_DEBUG env var.
@@ -563,6 +565,7 @@ export function getCompletionApiKey(provider: string): string | null {
     if (p === 'TokenHarbor' || p === 'tokenharbor' || p === 'thk') return s.TOKENHARBOR_API_KEY || s.TOKEN_HARBOR_API_KEY || null;
     if (p === 'Infron') return s.INFRON_API_KEY || null;
     if (p === 'APInex' || p === 'apinex' || p === 'apx') return s.APINEX_API_KEY || null;
+    if (p === 'xKiro' || p === 'xkiro' || p === 'kiro') return s.XKIRO_API_KEY || null;
     if (p === 'c_openai' || p === 'Custom (OpenAI)') return s.CUSTOM_OPENAI_API_KEY || s.C_OPENAI_API_KEY || null;
     // Generic fallback (e.g. AIHubMix → AIHUBMIX_API_KEY).
     return s[`${p.toUpperCase()}_API_KEY`] || null;
@@ -939,6 +942,56 @@ export function activate(context: vscode.ExtensionContext) {
         });
     }));
 
+    // Setup FluxFlow Comment Controller
+    commentController = vscode.comments.createCommentController('fluxflow-comments', 'FluxFlow');
+    context.subscriptions.push(commentController);
+    commentController.options = {
+        prompt: 'Add a comment / instruction for FluxFlow...',
+        placeHolder: 'Add a comment / instruction for FluxFlow...'
+    };
+
+    commentController.commentingRangeProvider = {
+        provideCommentingRanges: (document: vscode.TextDocument) => {
+            // Available across all lines of documents
+            const lineCount = document.lineCount;
+            return [new vscode.Range(0, 0, lineCount >= 1 ? lineCount - 1 : 0, 0)];
+        }
+    };
+
+    // Command triggered when adding a comment (or clicking "Add Comment to Chat")
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.createComment', async (reply: vscode.CommentReply) => {
+        if (!reply) return;
+        const thread = reply.thread;
+        const text = reply.text?.trim();
+        if (!text) return;
+
+        const newComment: vscode.Comment = {
+            body: new vscode.MarkdownString(text),
+            mode: vscode.CommentMode.Preview,
+            author: { name: 'You' }
+        };
+
+        thread.comments = [...thread.comments, newComment];
+        thread.label = text.slice(0, 30) + (text.length > 30 ? '...' : '');
+
+        const startLine = thread.range ? thread.range.start.line : 0;
+        const endLine = thread.range ? thread.range.end.line : 0;
+        const threadKey = `${thread.uri.toString()}:${startLine}-${endLine}`;
+        activeCommentThreads.set(threadKey, thread);
+    }));
+
+    // Command to delete a comment thread
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.deleteCommentThread', (thread: vscode.CommentThread) => {
+        if (!thread) return;
+        for (const [key, t] of activeCommentThreads.entries()) {
+            if (t === thread) {
+                activeCommentThreads.delete(key);
+                break;
+            }
+        }
+        thread.dispose();
+    }));
+
     // Headless session context toggle state (persisted across sessions)
     let useHeadlessContext = context.globalState.get<boolean>('fluxflow.useHeadlessContext', false);
     vscode.commands.executeCommand('setContext', 'fluxflow.isHeadlessContextEnabled', useHeadlessContext);
@@ -1188,6 +1241,11 @@ export function activate(context: vscode.ExtensionContext) {
                     ws.send(JSON.stringify({ command: 'contextResponse', data: ctx }));
                     accumulatedEdits.clear();
                     manualEditBaseContents.clear();
+                    // Clear FluxFlow comment threads immediately after delivering context to CLI
+                    activeCommentThreads.forEach(thread => {
+                        try { thread.dispose(); } catch { }
+                    });
+                    activeCommentThreads.clear();
                 } else if (message.command === 'status') {
                     updateStatusBar(message.status);
                 } else if (message.command === 'version') {
@@ -1597,6 +1655,61 @@ async function getIDEContext() {
         }
 
         context.full_content = activeEditor.document.getText();
+
+        // Extract FluxFlow comments across files
+        if (activeCommentThreads.size > 0) {
+            const commentsData: Array<{
+                file: string;
+                relPath: string;
+                line: number;
+                end_line: number;
+                snippet: string;
+                text: string;
+            }> = [];
+
+            for (const thread of activeCommentThreads.values()) {
+                const threadUri = thread.uri;
+                const filePath = threadUri.fsPath;
+                const relPath = vscode.workspace.asRelativePath(threadUri);
+                const startLine = (thread.range ? thread.range.start.line : 0) + 1;
+                const endLine = (thread.range ? thread.range.end.line : 0) + 1;
+
+                let snippet = '';
+                try {
+                    const doc = vscode.workspace.textDocuments.find(d => d.uri.toString() === threadUri.toString());
+                    if (doc && thread.range) {
+                        const snippetRange = new vscode.Range(
+                            thread.range.start.line,
+                            0,
+                            thread.range.end.line,
+                            doc.lineAt(thread.range.end.line).text.length
+                        );
+                        snippet = doc.getText(snippetRange);
+                    }
+                } catch { }
+
+                const texts = thread.comments.map(c => {
+                    if (typeof c.body === 'string') return c.body;
+                    if ('value' in c.body) return c.body.value;
+                    return '';
+                }).filter(Boolean);
+
+                if (texts.length > 0) {
+                    commentsData.push({
+                        file: filePath,
+                        relPath,
+                        line: startLine,
+                        end_line: endLine,
+                        snippet,
+                        text: texts.join('\n')
+                    });
+                }
+            }
+
+            if (commentsData.length > 0) {
+                context.comments = commentsData;
+            }
+        }
 
         if (accumulatedEdits.size > 0) {
             const manualEditsParts: string[] = [];

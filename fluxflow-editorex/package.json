@@ -4,7 +4,7 @@
     "publisher": "fluxflow-cli",
     "icon": "fluxflow-cli-companion.png",
     "description": "Enable FluxFlow CLI with direct access to your IDE workspace.",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "engines": {
         "vscode": "^1.90.0"
     },
@@ -76,6 +76,16 @@
             {
                 "command": "fluxflow-editorex.disableHeadlessContext",
                 "title": "FluxFlow: Disable Headless Session Context"
+            },
+            {
+                "command": "fluxflow-editorex.createComment",
+                "title": "Add Comment to Chat",
+                "icon": "$(comment-discussion)"
+            },
+            {
+                "command": "fluxflow-editorex.deleteCommentThread",
+                "title": "Delete Comment Thread",
+                "icon": "$(trash)"
             }
         ],
         "submenus": [
@@ -162,6 +172,20 @@
                     "command": "fluxflow-editorex.disableHeadlessContext",
                     "group": "9_fluxflow",
                     "when": "fluxflow.isHeadlessContextEnabled"
+                }
+            ],
+            "comments/commentThread/title": [
+                {
+                    "command": "fluxflow-editorex.deleteCommentThread",
+                    "group": "navigation",
+                    "when": "commentController == 'fluxflow-comments' && commentThreadLength > 0"
+                }
+            ],
+            "comments/commentThread/context": [
+                {
+                    "command": "fluxflow-editorex.createComment",
+                    "group": "inline",
+                    "when": "commentController == 'fluxflow-comments'"
                 }
             ]
         }

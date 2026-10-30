@@ -17,6 +17,12 @@ export const GRID_CONFIG = {
     ROWS: 30
 };
 
+// Canvas Mode Grid Configuration: reduced density for clean, highly legible static coordinate grid
+export const CANVAS_GRID_CONFIG = {
+    COLS: 20,
+    ROWS: 15
+};
+
 // Debug & Model Toggle: Set to false to bypass the ONNX model completely and use only heuristic math
 export const useModel = process.env.USE_UI_MODEL !== 'false' && true;
 
@@ -25,6 +31,7 @@ export const rawModelOnly = process.env.RAW_MODEL_ONLY === 'true' || false;
 
 // Store detected element bounding boxes for dynamic targeting
 let detectedUIElements = [];
+let isCanvasGridActive = false;
 
 /**
  * Detects UI element bounding boxes by analyzing pixel luminance variance / edge density in 40x30 fine grid cells.
@@ -643,52 +650,127 @@ function mergeDetections(modelBoxes = [], heuristicBoxes = []) {
 }
 
 /**
- * Captures desktop screenshot, detects active UI elements, composites Set-of-Marks overlay, saves debug preview, and returns base64 PNG payload.
+ * Generates a clean static coordinate grid SVG overlay with reduced density.
  */
-export async function captureGriddedScreenshot() {
+function generateStaticGridSvgOverlay(width, height, cols, rows) {
+    const cellWidth = width / cols;
+    const cellHeight = height / rows;
+    let gridContent = '';
+
+    // Draw grid lines
+    for (let c = 0; c <= cols; c++) {
+        const x = c * cellWidth;
+        gridContent += `<line x1="${x}" y1="0" x2="${x}" y2="${height}" stroke="rgba(255, 255, 255, 0.28)" stroke-width="1.2"/>`;
+    }
+    for (let r = 0; r <= rows; r++) {
+        const y = r * cellHeight;
+        gridContent += `<line x1="0" y1="${y}" x2="${width}" y2="${y}" stroke="rgba(255, 255, 255, 0.28)" stroke-width="1.2"/>`;
+    }
+
+    // Number every cell sequentially
+    let cellNum = 1;
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const cx = Math.floor(c * cellWidth + cellWidth / 2);
+            const cy = Math.floor(r * cellHeight + cellHeight / 2) + 5;
+            gridContent += `<text x="${cx}" y="${cy}" font-family="'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#FFFF00" stroke="#000000" stroke-width="2" paint-order="stroke fill" stroke-linejoin="round" opacity="0.95" text-anchor="middle">${cellNum}</text>`;
+            cellNum++;
+        }
+    }
+
+    return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${gridContent}</svg>`;
+}
+
+/**
+ * Captures desktop screenshot, detects active UI elements, composites Set-of-Marks overlay, saves debug preview, and returns base64 PNG payload.
+ * @param {Object} [options={}] - Options
+ * @param {boolean} [options.canvasMode=false] - If true, disables AI/ONNX and heuristic element detection and applies a full static coordinate grid with reduced density.
+ */
+export async function captureGriddedScreenshot(options = {}) {
+    const canvasMode = typeof options === 'boolean' ? options : (options?.canvasMode === true || options?.canvas_mode === true);
     try {
         const rawBuffer = await captureStableScreenshot();
 
         let activeCells = null;
+        let svgOverlay = '';
 
-        if (useModel) {
-            // 1. Run ONNX Model (and optionally heuristic math in parallel)
-            const onnxPromise = (async () => {
-                try {
-                    const { detectUIBoxesONNX } = await import('./ui_detector_onnx.js');
-                    return await detectUIBoxesONNX(rawBuffer, GRID_CONFIG.TARGET_WIDTH, GRID_CONFIG.TARGET_HEIGHT);
-                } catch (e) {
-                    return null;
+        if (canvasMode) {
+            // In canvasMode, disable all AI & fancy detection stuff and use reduced density static grid
+            isCanvasGridActive = true;
+            const cols = CANVAS_GRID_CONFIG.COLS;
+            const rows = CANVAS_GRID_CONFIG.ROWS;
+            const cellW = GRID_CONFIG.TARGET_WIDTH / cols;
+            const cellH = GRID_CONFIG.TARGET_HEIGHT / rows;
+
+            const staticCells = [];
+            let cNum = 1;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const startX = Math.floor(c * cellW);
+                    const startY = Math.floor(r * cellH);
+                    staticCells.push({
+                        badgeId: cNum,
+                        cellNum: cNum,
+                        startX,
+                        startY,
+                        cellW,
+                        cellH,
+                        cx: Math.floor(startX + cellW / 2),
+                        cy: Math.floor(startY + cellH / 2)
+                    });
+                    cNum++;
                 }
-            })();
-
-            if (rawModelOnly) {
-                // Debug Mode: Pure raw model output with zero heuristic math merging
-                const modelBoxes = await onnxPromise;
-                activeCells = modelBoxes || [];
-            } else {
-                const heuristicPromise = detectActiveGridCells(rawBuffer, true);
-                const [modelBoxes, heuristicBoxes] = await Promise.all([onnxPromise, heuristicPromise]);
-
-                // 2. Merge detections (Model as primary base + non-overlapping heuristic boxes)
-                activeCells = (modelBoxes && modelBoxes.length > 0)
-                    ? mergeDetections(modelBoxes, heuristicBoxes)
-                    : (await detectActiveGridCells(rawBuffer, false));
             }
+            detectedUIElements = staticCells;
+            activeCells = staticCells;
+
+            svgOverlay = generateStaticGridSvgOverlay(
+                GRID_CONFIG.TARGET_WIDTH,
+                GRID_CONFIG.TARGET_HEIGHT,
+                cols,
+                rows
+            );
         } else {
-            // Debug Mode: Model disabled, use only heuristic math detection
-            activeCells = await detectActiveGridCells(rawBuffer, false);
+            isCanvasGridActive = false;
+            if (useModel) {
+                // 1. Run ONNX Model (and optionally heuristic math in parallel)
+                const onnxPromise = (async () => {
+                    try {
+                        const { detectUIBoxesONNX } = await import('./ui_detector_onnx.js');
+                        return await detectUIBoxesONNX(rawBuffer, GRID_CONFIG.TARGET_WIDTH, GRID_CONFIG.TARGET_HEIGHT);
+                    } catch (e) {
+                        return null;
+                    }
+                })();
+
+                if (rawModelOnly) {
+                    // Debug Mode: Pure raw model output with zero heuristic math merging
+                    const modelBoxes = await onnxPromise;
+                    activeCells = modelBoxes || [];
+                } else {
+                    const heuristicPromise = detectActiveGridCells(rawBuffer, true);
+                    const [modelBoxes, heuristicBoxes] = await Promise.all([onnxPromise, heuristicPromise]);
+
+                    // 2. Merge detections (Model as primary base + non-overlapping heuristic boxes)
+                    activeCells = (modelBoxes && modelBoxes.length > 0)
+                        ? mergeDetections(modelBoxes, heuristicBoxes)
+                        : (await detectActiveGridCells(rawBuffer, false));
+                }
+            } else {
+                // Debug Mode: Model disabled, use only heuristic math detection
+                activeCells = await detectActiveGridCells(rawBuffer, false);
+            }
+
+            detectedUIElements = activeCells;
+
+            svgOverlay = generateSmartGridSvgOverlay(
+                GRID_CONFIG.TARGET_WIDTH,
+                GRID_CONFIG.TARGET_HEIGHT,
+                GRID_CONFIG.COLS,
+                GRID_CONFIG.ROWS,
+                activeCells
+            );
         }
-
-        detectedUIElements = activeCells;
-
-        const svgOverlay = generateSmartGridSvgOverlay(
-            GRID_CONFIG.TARGET_WIDTH,
-            GRID_CONFIG.TARGET_HEIGHT,
-            GRID_CONFIG.COLS,
-            GRID_CONFIG.ROWS,
-            activeCells
-        );
 
         const processedBuffer = await sharp(rawBuffer)
             .resize(GRID_CONFIG.TARGET_WIDTH, GRID_CONFIG.TARGET_HEIGHT, { fit: 'fill' })
@@ -710,7 +792,7 @@ export async function captureGriddedScreenshot() {
         }
 
         const base64 = processedBuffer.toString('base64');
-        const detectedCount = activeCells.length;
+        const detectedCount = activeCells ? activeCells.length : 0;
 
         // Nullify raw and processed Buffer references immediately for V8 Garbage Collection
         let _raw = rawBuffer;
@@ -763,8 +845,9 @@ export function parseGridCodeTo720p(gridInput) {
         const badgeMatch = detectedUIElements.find(box => box.badgeId === cellNum) ||
                            detectedUIElements.find(box => box.cellNum === cellNum);
         if (badgeMatch) {
-            const rawCol = Math.floor((badgeMatch.cellNum - 1) % GRID_CONFIG.COLS);
-            const rawRow = Math.floor((badgeMatch.cellNum - 1) / GRID_CONFIG.COLS);
+            const cols = isCanvasGridActive ? CANVAS_GRID_CONFIG.COLS : GRID_CONFIG.COLS;
+            const rawCol = badgeMatch.col !== undefined ? badgeMatch.col : Math.floor((badgeMatch.cellNum - 1) % cols);
+            const rawRow = badgeMatch.row !== undefined ? badgeMatch.row : Math.floor((badgeMatch.cellNum - 1) / cols);
             return {
                 x: badgeMatch.cx,
                 y: badgeMatch.cy,
@@ -775,15 +858,17 @@ export function parseGridCodeTo720p(gridInput) {
         }
     }
 
-    const maxCells = GRID_CONFIG.COLS * GRID_CONFIG.ROWS;
+    const curCols = isCanvasGridActive ? CANVAS_GRID_CONFIG.COLS : GRID_CONFIG.COLS;
+    const curRows = isCanvasGridActive ? CANVAS_GRID_CONFIG.ROWS : GRID_CONFIG.ROWS;
+    const maxCells = curCols * curRows;
     if (cellNum < 1 || cellNum > maxCells) return null;
 
     const zeroIndex = cellNum - 1;
-    const rowIdx = Math.floor(zeroIndex / GRID_CONFIG.COLS);
-    const colIdx = zeroIndex % GRID_CONFIG.COLS;
+    const rowIdx = Math.floor(zeroIndex / curCols);
+    const colIdx = zeroIndex % curCols;
 
-    const cellWidth = GRID_CONFIG.TARGET_WIDTH / GRID_CONFIG.COLS;
-    const cellHeight = GRID_CONFIG.TARGET_HEIGHT / GRID_CONFIG.ROWS;
+    const cellWidth = GRID_CONFIG.TARGET_WIDTH / curCols;
+    const cellHeight = GRID_CONFIG.TARGET_HEIGHT / curRows;
 
     const centerX = Math.floor(colIdx * cellWidth + cellWidth / 2);
     const centerY = Math.floor(rowIdx * cellHeight + cellHeight / 2);
@@ -895,11 +980,13 @@ export function coordinates720pToGridId(point720) {
     }
 
     // Mathematical grid calculation fallback
-    const cellWidth = GRID_CONFIG.TARGET_WIDTH / GRID_CONFIG.COLS;
-    const cellHeight = GRID_CONFIG.TARGET_HEIGHT / GRID_CONFIG.ROWS;
+    const cols = isCanvasGridActive ? CANVAS_GRID_CONFIG.COLS : GRID_CONFIG.COLS;
+    const rows = isCanvasGridActive ? CANVAS_GRID_CONFIG.ROWS : GRID_CONFIG.ROWS;
+    const cellWidth = GRID_CONFIG.TARGET_WIDTH / cols;
+    const cellHeight = GRID_CONFIG.TARGET_HEIGHT / rows;
 
-    const colIdx = Math.max(0, Math.min(GRID_CONFIG.COLS - 1, Math.floor(point720.x / cellWidth)));
-    const rowIdx = Math.max(0, Math.min(GRID_CONFIG.ROWS - 1, Math.floor(point720.y / cellHeight)));
+    const colIdx = Math.max(0, Math.min(cols - 1, Math.floor(point720.x / cellWidth)));
+    const rowIdx = Math.max(0, Math.min(rows - 1, Math.floor(point720.y / cellHeight)));
 
-    return (rowIdx * GRID_CONFIG.COLS) + colIdx + 1;
+    return (rowIdx * cols) + colIdx + 1;
 }

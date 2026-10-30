@@ -1199,8 +1199,8 @@ export const TOOL_LABELS = {
 const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:(?:functions\.)?|tool\.functions|action:(?:functions\.)?|action:|action\.functions|\s*turn\s*:))/gi;
 // Helper: returns true when `idx` in `str` falls inside a backtick code block or inline code span
 const isInsideBacktick = (str, idx) => {
-    let inInlineCode = false;
     let inFence = false;
+    let inInlineCode = false;
     let i = 0;
     while (i < idx) {
         if (str.startsWith('```', i)) {
@@ -1208,12 +1208,29 @@ const isInsideBacktick = (str, idx) => {
             i += 3;
             continue;
         }
-        if (!inFence && str[i] === '`' && (i === 0 || str[i - 1] !== '\\')) {
+        if (inFence) {
+            i++;
+            continue;
+        }
+        if (str[i] === '\n') {
+            inInlineCode = false;
+            i++;
+            continue;
+        }
+        if (str[i] === '`' && (i === 0 || str[i - 1] !== '\\')) {
             inInlineCode = !inInlineCode;
         }
         i++;
     }
-    return inFence || inInlineCode;
+    if (inFence) return true;
+    if (inInlineCode) {
+        // Ensure there is a matching closing backtick on the current line
+        const nextNewline = str.indexOf('\n', idx);
+        const lineEnd = nextNewline === -1 ? str.length : nextNewline;
+        const restOfLine = str.substring(idx, lineEnd);
+        if (restOfLine.includes('`')) return true;
+    }
+    return false;
 };
 const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[(?:TOOL|ACTION) RESULTS?\]:?\s*|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL|ACTION).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gm;
 const REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;

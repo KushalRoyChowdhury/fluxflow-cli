@@ -27,6 +27,7 @@
         "explabs_fallback": "",
         "tokenharbor_fallback": "",
         "infron_fallback": "",
+        "xkiro_fallback": "",
         "c_openai_fallback": ""
     },
     "providers": {}

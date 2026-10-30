@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS = {
             TokenHarbor: 'Free',
             Infron: 'Free',
             APInex: 'Free',
+            xKiro: 'Free',
             c_openai: 'Free'
         }
     },
@@ -108,6 +109,7 @@ export const PROVIDER_BASE_URLS = {
     'TokenHarbor': 'https://tokenharbor.ai/v1/chat/completions',
     'Infron': 'https://llm.onerouter.pro/v1/chat/completions',
     'APInex': 'https://api.apinex.bond/v1/chat/completions',
+    'xKiro': 'https://api.xkiro.com/v1/chat/completions',
     'AIHubMix': 'https://aihubmix.com/v1/chat/completions',
     // Google: CLI path uses the SDK directly; this endpoint is only used by the
     // extension's direct OpenAI-compatible fetch path.

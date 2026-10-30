@@ -1,6 +1,19 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.43.0": {
+        "note": "OCTOBER 30",
+        "added": [
+            "Added support for IDE Code comments (Needs FluxFlow Companion v1.7+).",
+            "Added support for new Gemini API key type.",
+            "Added new provider: xKiro."
+        ],
+        "changed": [
+            "Improved security.",
+            "Improved Computer Use accuracy on canvas based UIs."
+        ],
+        "fixes": []
+    },
     "4.42.0": {
         "note": "OCTOBER 25",
         "added": [],

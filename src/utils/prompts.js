@@ -591,7 +591,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const preset = profile.preset;
     const presetPrompt = {
         'Sassy': 'Sassy',
-        'Friendly': 'Warm & Chatty',
+        'Friendly': 'Sassy, Warm & Chatty',
         'Playful': 'Playful',
         'Efficient': 'Quick, Concise & Efficient',
         'Professional': 'Professional'

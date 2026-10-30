@@ -904,7 +904,7 @@ export default function App({ args = [] }) {
                 const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
                 const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 
-                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'];
+                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'xKiro'];
                 const normalizeProvider = (pStr) => {
                     if (!pStr) return null;
                     const lower = pStr.toLowerCase();
@@ -922,6 +922,7 @@ export default function App({ args = [] }) {
                     if (lower === 'explabs' || lower === 'experientiallabs' || lower === 'experimentallabs' || lower === 'experiential labs' || lower === 'experimental labs' || lower === 'experiential' || lower === 'experimental') return 'ExpLabs';
                     if (lower === 'tokenharbor' || lower === 'token harbor' || lower === 'token_harbor' || lower === 'thk') return 'TokenHarbor';
                     if (lower === 'apinex' || lower === 'apx') return 'APInex';
+                    if (lower === 'xkiro' || lower === 'kiro') return 'xKiro';
                     if (lower === 'infron') return 'Infron';
                     return null;
                 };
@@ -1029,7 +1030,7 @@ export default function App({ args = [] }) {
                     const parts = val.split('@');
                     const keyPart = parts[0];
                     const provPart = parts[1].toLowerCase();
-                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r', 'explabs', 'tokenharbor', 'token_harbor', 'thk', 'infron', 'apinex', 'apx'].includes(provPart)) {
+                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r', 'explabs', 'tokenharbor', 'token_harbor', 'thk', 'infron', 'apinex', 'apx', 'xkiro', 'kiro'].includes(provPart)) {
                         let mapped = 'Google';
                         if (provPart === 'google') mapped = 'Google';
                         else if (provPart === 'deepseek') mapped = 'DeepSeek';
@@ -1046,6 +1047,7 @@ export default function App({ args = [] }) {
                         else if (provPart === 'tokenharbor' || provPart === 'token_harbor' || provPart === 'thk') mapped = 'TokenHarbor';
                         else if (provPart === 'infron') mapped = 'Infron';
                         else if (provPart === 'apinex' || provPart === 'apx') mapped = 'APInex';
+                        else if (provPart === 'xkiro' || provPart === 'kiro') mapped = 'xKiro';
                         parsed.key = keyPart;
                         parsed.provider = mapped;
                     }
@@ -1117,7 +1119,7 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
                 const val = args[i + 1].toLowerCase();
-                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r', 'explabs', 'tokenharbor', 'token_harbor', 'thk', 'infron', 'apinex', 'apx'].includes(val)) {
+                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r', 'explabs', 'tokenharbor', 'token_harbor', 'thk', 'infron', 'apinex', 'apx', 'xkiro', 'kiro'].includes(val)) {
                     let mapped = 'Google';
                     if (val === 'google') mapped = 'Google';
                     else if (val === 'deepseek') mapped = 'DeepSeek';
@@ -1134,6 +1136,7 @@ export default function App({ args = [] }) {
                     else if (val === 'tokenharbor' || val === 'token_harbor' || val === 'thk') mapped = 'TokenHarbor';
                     else if (val === 'infron') mapped = 'Infron';
                     else if (val === 'apinex' || val === 'apx') mapped = 'APInex';
+                    else if (val === 'xkiro' || val === 'kiro') mapped = 'xKiro';
                     parsed.provider = mapped;
                 }
                 i++;
@@ -1528,6 +1531,9 @@ export default function App({ args = [] }) {
     useEffect(() => { execOutputRef.current = execOutput; }, [execOutput]);
 
     const [autoAcceptWrites, setAutoAcceptWrites] = useState(false);
+    const approvedExtensionsRef = useRef(new Set());
+    const approvedFilesRef = useRef(new Set());
+    const approvedCommandsRef = useRef(new Set());
     const [pendingApproval, setPendingApproval] = useState(null);
     const [pendingAsk, setPendingAsk] = useState(null);
 
@@ -2032,7 +2038,7 @@ export default function App({ args = [] }) {
 
         // Provider Budget Select keyboard handling
         if (activeView === 'providerBudgetSelect') {
-            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'];
+            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'xKiro'];
             if (key.upArrow) {
                 setPbsCursor(c => (c - 1 + PBS_PROVIDERS.length) % PBS_PROVIDERS.length);
                 return;
@@ -2681,24 +2687,24 @@ export default function App({ args = [] }) {
 
         const validators = {
             Google: {
-                prefix: 'AIzaSy',
-                minLength: 39,
+                prefix: '',
+                minLength: 0,
             },
             OpenRouter: {
-                prefix: 'sk-or-v1-',
-                minLength: 73,
+                prefix: '',
+                minLength: 0,
             },
             DeepSeek: {
-                prefix: 'sk-',
-                minLength: 35,
+                prefix: '',
+                minLength: 0,
             },
             Mistral: {
                 prefix: '',
-                minLength: 32,
+                minLength: 0,
             },
             NVIDIA: {
-                prefix: 'nvapi-',
-                minLength: 70,
+                prefix: '',
+                minLength: 0,
             },
             Ollama: {
                 prefix: '',
@@ -2713,8 +2719,8 @@ export default function App({ args = [] }) {
                 minLength: 0,
             },
             AIHubMix: {
-                prefix: 'sk-',
-                minLength: 10,
+                prefix: '',
+                minLength: 0,
             },
             Poolside: {
                 prefix: '',
@@ -2725,11 +2731,11 @@ export default function App({ args = [] }) {
                 minLength: 0,
             },
             ExpLabs: {
-                prefix: 'xpl_',
+                prefix: '',
                 minLength: 0,
             },
             TokenHarbor: {
-                prefix: 'thk_',
+                prefix: '',
                 minLength: 0,
             },
             Infron: {
@@ -2737,7 +2743,11 @@ export default function App({ args = [] }) {
                 minLength: 0,
             },
             APInex: {
-                prefix: 'sk-apx',
+                prefix: '',
+                minLength: 0,
+            },
+            xKiro: {
+                prefix: '',
                 minLength: 0,
             },
         };
@@ -2803,7 +2813,7 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-ai/deepseek-v4-flash';
             } else if (aiProvider === 'Ollama' || aiProvider === '9router') {
                 defaultModel = activeModel || '';
-            } else if (aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'Infron' || aiProvider === 'APInex') {
+            } else if (aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'Infron' || aiProvider === 'APInex' || aiProvider === 'xKiro') {
                 defaultModel = getDefaultModel(aiProvider, apiTier) || '';
             }
             setActiveModel(defaultModel);
@@ -2813,7 +2823,7 @@ export default function App({ args = [] }) {
                 newSys = { ...newSys, ollamaEndpoint: 'Local' };
                 setSystemSettings(newSys);
             }
-            if (aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'Infron' || aiProvider === 'APInex') {
+            if (aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'Infron' || aiProvider === 'APInex' || aiProvider === 'xKiro') {
                 newSys = { ...newSys, memory: false };
                 setSystemSettings(newSys);
             }
@@ -2825,7 +2835,7 @@ export default function App({ args = [] }) {
                 }
             }
 
-            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape && aiProvider === 'Ollama' ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'Infron' || aiProvider === 'APInex' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.${warningMsg}\n⠀`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape && aiProvider === 'Ollama' ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'TokenHarbor' || aiProvider === 'Infron' || aiProvider === 'APInex' || aiProvider === 'xKiro' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.${warningMsg}\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
@@ -4215,7 +4225,8 @@ export default function App({ args = [] }) {
                                 ExpLabs: 'Free',
                                 TokenHarbor: 'Free',
                                 Infron: 'Free',
-                                APInex: 'Free'
+                                APInex: 'Free',
+                                xKiro: 'Free'
                             }
                         };
                         setQuotas(defaultQuotas);
@@ -4843,19 +4854,30 @@ export default function App({ args = [] }) {
                                 }
                             },
                             onIDEApproval: resetPendingApproval,
-                            onToolApproval: async (tool, args) => {
+                            onToolApproval: async (tool, args, options = {}) => {
                                 const parsed = parseArgs(args || '{}');
                                 const filePath = parsed.path || parsed.targetPath || parsed.file || '';
                                 const patternList = systemSettings?.alwaysAskFiles || '.env, .env.*, *.env';
                                 const isSensitiveFile = (tool === 'view_file' || tool === 'write_file' || tool === 'update_file') && matchesPathPattern(filePath, patternList);
 
-                                const isAuto = !isSensitiveFile && (autoAcceptWrites || systemSettings.autoExec);
+                                const normalizedFilePath = filePath ? path.resolve(filePath).toLowerCase() : '';
+                                const fileExt = filePath ? path.extname(filePath).toLowerCase() : '';
+
+                                const isAuto = !isSensitiveFile && (
+                                    systemSettings.autoExec ||
+                                    autoAcceptWrites ||
+                                    (tool === 'write_file' && fileExt && approvedExtensionsRef.current.has(fileExt)) ||
+                                    (tool === 'update_file' && normalizedFilePath && approvedFilesRef.current.has(normalizedFilePath))
+                                );
 
                                 if (tool === 'exec_command') {
                                     const { command } = parsed;
+                                    const rawCmd = (command || '').trim();
                                     const safeRegex = /^(echo|ls|dir|pwd|cd|git status|git log|git diff|type|cat|help)\b/i;
 
-                                    if (isAuto || (command && safeRegex.test(command.trim()))) return 'allow';
+                                    if (systemSettings.autoExec || autoAcceptWrites || approvedCommandsRef.current.has(rawCmd) || (rawCmd && safeRegex.test(rawCmd))) return 'allow';
+
+                                    if (options.checkOnly) return null;
 
                                     return new Promise((resolve) => {
                                         showUserActionRequiredNotification();
@@ -4865,6 +4887,8 @@ export default function App({ args = [] }) {
                                 }
 
                                 if (isAuto) return 'allow';
+
+                                if (options.checkOnly) return null;
 
                                 return new Promise((resolve) => {
                                     showUserActionRequiredNotification();
@@ -5697,7 +5721,7 @@ export default function App({ args = [] }) {
     // Effect: initialize pbsSelected when entering providerBudgetSelect, pre-checking already-configured providers
     useEffect(() => {
         if (activeView !== 'providerBudgetSelect') return;
-        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'];
+        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'xKiro'];
         const existingBudgets = quotas.providerBudgets || {};
         const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
             acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit || existingBudgets[p].monthlyTokenLimit || existingBudgets[p].dailyCostLimit || existingBudgets[p].monthlyCostLimit));
@@ -5845,6 +5869,7 @@ export default function App({ args = [] }) {
                             { label: 'Token Harbor', value: 'TokenHarbor' },
                             { label: 'Infron', value: 'Infron' },
                             { label: 'APInex', value: 'APInex' },
+                            { label: 'xKiro', value: 'xKiro' },
                             { label: 'Ollama', value: 'Ollama' },
                             ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router        [Local Proxy]', value: '9router' }] : []),
                             { label: 'AIHubMix       [Experimental]', value: 'AIHubMix' },
@@ -5913,7 +5938,7 @@ export default function App({ args = [] }) {
                                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                                 setActiveModel(defaultModel);
                                 setApiTier(targetTier);
-                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'Infron' || selectedProvider === 'APInex' || selectedProvider === 'c_openai') {
+                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'Infron' || selectedProvider === 'APInex' || selectedProvider === 'xKiro' || selectedProvider === 'c_openai') {
                                     setSystemSettings(s => ({ ...s, memory: false }));
                                     saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
                                 } else {
@@ -5924,7 +5949,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${displayProvName} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'Infron' || selectedProvider === 'APInex' || selectedProvider === 'c_openai') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${displayProvName}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}${warningMsg}\n⠀`,
+                                        text: `✦ Switched to ${displayProvName} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'Infron' || selectedProvider === 'APInex' || selectedProvider === 'xKiro' || selectedProvider === 'c_openai') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${displayProvName}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}${warningMsg}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -6094,7 +6119,7 @@ export default function App({ args = [] }) {
                 );
 
             case 'providerBudgetSelect': {
-                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'];
+                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'xKiro'];
                 const anySelected = PROVIDERS_LIST.some(p => pbsSelected[p]);
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
@@ -6363,7 +6388,7 @@ export default function App({ args = [] }) {
                 const isFreeTier = apiTier !== 'Paid';
                 const usingProviderBudgets = !!(quotas.providerBudgets?.__useProvider);
                 const providerBudgetsMap = quotas.providerBudgets || {};
-                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex'].filter(
+                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'xKiro'].filter(
                     p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit || providerBudgetsMap[p].dailyCostLimit || providerBudgetsMap[p].monthlyCostLimit)
                 );
                 const limitsNotSet = !usingProviderBudgets && (shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit)) && (shouldClearValue(dailyCostLimit) || shouldClearValue(monthlyCostLimit));
@@ -6690,14 +6715,14 @@ export default function App({ args = [] }) {
                                         newSettings.activeModel = defaultModel;
                                         newSettings.apiTier = targetTier;
 
-                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' || prov === 'ExpLabs' || prov === 'TokenHarbor' || prov === 'Infron' || prov === 'APInex') {
+                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' || prov === 'ExpLabs' || prov === 'TokenHarbor' || prov === 'Infron' || prov === 'APInex' || prov === 'xKiro') {
                                             setSystemSettings(s => ({ ...s, memory: false }));
                                             newSettings.systemSettings = { ...systemSettings, memory: false };
                                         }
 
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀\x1b[2m└─\x1b[22m Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' || prov === 'ExpLabs' || prov === 'TokenHarbor' || prov === 'Infron' || prov === 'APInex' ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available' : ''}${warningMsg}\n⠀⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀\x1b[2m└─\x1b[22m Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' || prov === 'ExpLabs' || prov === 'TokenHarbor' || prov === 'Infron' || prov === 'APInex' || prov === 'xKiro' ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available' : ''}${warningMsg}\n⠀⠀`, isMeta: true }];
                                         });
                                     }
 
@@ -7637,23 +7662,50 @@ export default function App({ args = [] }) {
                         ))}
 
                         <Box marginTop={1}>
-                            <CommandMenu
-                                title="Action Required"
-                                items={[
-                                    { label: 'Accept this time', value: 'allow' },
-                                    ...(pendingApproval?.tool === 'view_file' ? [] : [{ label: 'Accept for this session', value: 'always' }]),
-                                    { label: 'Don\'t accept', value: 'deny' }
-                                ]}
-                                onSelect={(item) => {
-                                    if (item.value === 'always') setAutoAcceptWrites(true);
+                            {(() => {
+                                const tool = pendingApproval?.tool;
+                                const parsedArgs = parseArgs(pendingApproval?.args || '{}');
+                                const filePath = parsedArgs.path || parsedArgs.targetPath || parsedArgs.file || '';
+                                const fileExt = filePath ? path.extname(filePath).toLowerCase() : '';
+                                const fileName = filePath ? path.basename(filePath) : 'this file';
 
-                                    const decision = item.value === 'deny' ? 'deny' : 'allow';
-                                    pendingApproval.resolve(decision);
-                                    setPendingApproval(null);
-                                    setActiveView('chat');
-                                }}
-                                theme={systemSettings.theme}
-                            />
+                                let sessionLabel = 'Accept for this session';
+                                if (tool === 'write_file' && fileExt) {
+                                    sessionLabel = `Accept for this session (*${fileExt})`;
+                                } else if (tool === 'update_file' && fileName) {
+                                    sessionLabel = `Accept for this session (${fileName})`;
+                                }
+
+                                return (
+                                    <CommandMenu
+                                        title="Action Required"
+                                        items={[
+                                            { label: 'Accept this time', value: 'allow' },
+                                            ...(tool === 'view_file' ? [] : [{ label: sessionLabel, value: 'always' }]),
+                                            { label: 'Don\'t accept', value: 'deny' }
+                                        ]}
+                                        onSelect={(item) => {
+                                            if (item.value === 'always') {
+                                                if (tool === 'write_file') {
+                                                    if (fileExt) approvedExtensionsRef.current.add(fileExt);
+                                                    else setAutoAcceptWrites(true);
+                                                } else if (tool === 'update_file') {
+                                                    if (filePath) approvedFilesRef.current.add(path.resolve(filePath).toLowerCase());
+                                                    else setAutoAcceptWrites(true);
+                                                } else {
+                                                    setAutoAcceptWrites(true);
+                                                }
+                                            }
+
+                                            const decision = item.value === 'deny' ? 'deny' : 'allow';
+                                            pendingApproval.resolve(decision);
+                                            setPendingApproval(null);
+                                            setActiveView('chat');
+                                        }}
+                                        theme={systemSettings.theme}
+                                    />
+                                );
+                            })()}
                         </Box>
                     </Box>
                 );
@@ -7786,19 +7838,32 @@ export default function App({ args = [] }) {
                         </Box>
 
                         <Box marginTop={1}>
-                            <CommandMenu
-                                title="Risk Assessment Required"
-                                items={[
-                                    { label: 'Run', value: 'allow' },
-                                    { label: 'Deny', value: 'deny' }
-                                ]}
-                                onSelect={(item) => {
-                                    pendingApproval.resolve(item.value);
-                                    setPendingApproval(null);
-                                    setActiveView('chat');
-                                }}
-                                theme={systemSettings.theme}
-                            />
+                            {(() => {
+                                const parsedArgs = parseArgs(pendingApproval?.args || '{}');
+                                const rawCmd = (parsedArgs.command || '').trim();
+
+                                return (
+                                    <CommandMenu
+                                        title="Risk Assessment Required"
+                                        items={[
+                                            { label: 'Run', value: 'allow' },
+                                            { label: 'Accept for this session', value: 'always' },
+                                            { label: 'Deny', value: 'deny' }
+                                        ]}
+                                        onSelect={(item) => {
+                                            if (item.value === 'always') {
+                                                if (rawCmd) approvedCommandsRef.current.add(rawCmd);
+                                            }
+
+                                            const decision = item.value === 'deny' ? 'deny' : 'allow';
+                                            pendingApproval.resolve(decision);
+                                            setPendingApproval(null);
+                                            setActiveView('chat');
+                                        }}
+                                        theme={systemSettings.theme}
+                                    />
+                                );
+                            })()}
                         </Box>
                     </Box>
                 );
@@ -8082,6 +8147,7 @@ export default function App({ args = [] }) {
                                                         { label: 'Token Harbor', value: 'TokenHarbor' },
                                                         { label: 'Infron', value: 'Infron' },
                                                         { label: 'APInex', value: 'APInex' },
+                                                        { label: 'xKiro', value: 'xKiro' },
                                                         { label: 'Ollama', value: 'Ollama' },
                                                         ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router      [Local Proxy]', value: '9router' }] : []),
                                                         { label: 'AIHubMix     [Experimental]', value: 'AIHubMix' },
