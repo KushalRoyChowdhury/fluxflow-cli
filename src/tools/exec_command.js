@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import { parseArgs } from '../utils/arg_parser.js';
-import { isPsAvailable, isPwshAvailable, getPreferredWindowsShell } from '../data/main_tools.js';
+import { isPsAvailable, isPwshAvailable, getPreferredWindowsShell, getGitBashPath } from '../data/main_tools.js';
 
 // Attempt to load node-pty for a more authentic terminal experience
 let pty = null;
@@ -551,10 +551,19 @@ export const adjustWindowsCommand = (command, usePowerShell = false) => {
 };
 
 export const exec_command = async (args, options = {}) => {
-    const { command: rawCommand } = parseArgs(args);
+    const parsed = parseArgs(args);
+    const rawCommand = parsed.command;
     const { onChunk } = options;
 
     if (!rawCommand) return 'ERROR: Missing "command" argument for Run.';
+
+    const forceAlternative = parsed.usePowershell === true || parsed.usePowershell === 'true' ||
+        parsed.usePowershell === 1 || parsed.forcePowershell === true ||
+        parsed.forcePowershell === 'true' || parsed.forcePowershell === 1 ||
+        parsed.useCwd === true || parsed.useCwd === 'true' || parsed.useCwd === 1 ||
+        parsed.useCmd === true || parsed.useCmd === 'true' || parsed.useCmd === 1 ||
+        parsed.forceCwd === true || parsed.forceCwd === 'true' || parsed.forceCwd === 1 ||
+        parsed.forceCmd === true || parsed.forceCmd === 'true' || parsed.forceCmd === 1;
 
     const isWin = process.platform === 'win32';
     const systemSettings = options.systemSettings || {};
@@ -572,11 +581,14 @@ export const exec_command = async (args, options = {}) => {
     return new Promise((resolve) => {
         const attempt = (shellType) => {
             const isPowerShell = shellType === 'pwsh' || shellType === 'powershell';
-            const command = adjustWindowsCommand(rawCommand, isPowerShell);
+            const isBash = shellType === 'bash';
+            const command = isBash ? rawCommand : adjustWindowsCommand(rawCommand, isPowerShell);
 
             let shell;
             if (isWin) {
-                if (shellType === 'pwsh') {
+                if (shellType === 'bash') {
+                    shell = getGitBashPath() || 'bash.exe';
+                } else if (shellType === 'pwsh') {
                     shell = 'pwsh.exe';
                 } else if (shellType === 'powershell') {
                     shell = 'powershell.exe';
@@ -588,7 +600,7 @@ export const exec_command = async (args, options = {}) => {
             }
 
             let shellArgs = isWin
-                ? (isPowerShell ? ['-NoProfile', '-Command', command] : ['/c', command])
+                ? (isBash ? ['-c', command] : (isPowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]))
                 : ['-c', command];
 
             // --- 🔒 UNIX LOW-LEVEL KERNEL SANDBOXING 🔒 ---
@@ -655,7 +667,7 @@ export const exec_command = async (args, options = {}) => {
                     });
                     return true;
                 } catch (err) {
-                    if (isWin && (shellType === 'pwsh' || shellType === 'powershell') && err.code === 'ENOENT') {
+                    if (isWin && (shellType === 'bash' || shellType === 'pwsh' || shellType === 'powershell') && err.code === 'ENOENT') {
                         return false; // Trigger fallback attempt
                     }
                     // Fallback to child_process if pty fails for other reasons
@@ -669,10 +681,19 @@ export const exec_command = async (args, options = {}) => {
         };
 
         if (isWin) {
-            const preferredShell = getPreferredWindowsShell();
+            const preferBash = !forceAlternative && systemSettings.preferBash !== false;
+            const preferredShell = getPreferredWindowsShell(preferBash);
             if (!attempt(preferredShell)) {
-                if (preferredShell === 'pwsh' && !attempt('powershell')) {
-                    attempt('cmd');
+                if (preferredShell === 'bash') {
+                    if (!attempt('pwsh')) {
+                        if (!attempt('powershell')) {
+                            attempt('cmd');
+                        }
+                    }
+                } else if (preferredShell === 'pwsh') {
+                    if (!attempt('powershell')) {
+                        attempt('cmd');
+                    }
                 } else if (preferredShell === 'powershell') {
                     attempt('cmd');
                 }
@@ -689,10 +710,13 @@ export const exec_command = async (args, options = {}) => {
 const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, shellType = 'powershell', systemSettings = {}) => {
     const isWin = process.platform === 'win32';
     const isPowerShell = shellType === 'pwsh' || shellType === 'powershell';
+    const isBash = shellType === 'bash';
 
     let shell;
     if (isWin) {
-        if (shellType === 'pwsh') {
+        if (shellType === 'bash') {
+            shell = getGitBashPath() || 'bash.exe';
+        } else if (shellType === 'pwsh') {
             shell = 'pwsh.exe';
         } else if (shellType === 'powershell') {
             shell = 'powershell.exe';
@@ -704,7 +728,7 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, shellTy
     }
 
     let shellArgs = isWin
-        ? (isPowerShell ? ['-NoProfile', '-Command', command] : ['/c', command])
+        ? (isBash ? ['-c', command] : (isPowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]))
         : ['-c', command];
 
     // --- 🔒 UNIX LOW-LEVEL KERNEL SANDBOXING FOR FALLBACK ---
@@ -794,7 +818,10 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, shellTy
 
     child.on('error', (err) => {
         if (isWin && err.code === 'ENOENT') {
-            if (shellType === 'pwsh') {
+            if (shellType === 'bash') {
+                const nextCommand = adjustWindowsCommand(rawCommand, true);
+                return runStandardSpawn(resolve, nextCommand, rawCommand, netEnv, onChunk, 'pwsh', systemSettings);
+            } else if (shellType === 'pwsh') {
                 const nextCommand = adjustWindowsCommand(rawCommand, true);
                 return runStandardSpawn(resolve, nextCommand, rawCommand, netEnv, onChunk, 'powershell', systemSettings);
             } else if (shellType === 'powershell') {

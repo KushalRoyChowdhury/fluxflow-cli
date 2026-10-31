@@ -16,6 +16,8 @@ import SettingsMenu from './components/SettingsMenu.jsx';
 import AskUserModal from './components/AskUserModal.jsx';
 import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPIKey } from './utils/secrets.js';
+import { runKeyCommand } from './utils/keyCommand.js';
+import { clearAllTempKeys, setNoticeHandler } from './utils/secrets_v2.js';
 import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary, getActiveToolContext, detectToolCalls, maskCodeSpans } from './utils/ai.js';
 import { subagentProgress } from './utils/subagent_state.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
@@ -679,6 +681,13 @@ export default function App({ args = [] }) {
 
     const [input, setInput] = useState('');
     const [inputKey, setInputKey] = useState(0);
+    // In-memory prompt history (prompts + commands). -1 = not browsing.
+    const promptHistoryRef = useRef([]);
+    const [historyCursor, setHistoryCursor] = useState(-1);
+    const historyDraftRef = useRef('');
+    // The exact value a history hop wrote into the input. Any onChange that
+    // echoes this value back is a programmatic echo (remount), not a user edit.
+    const historyAppliedValueRef = useRef(null);
     const [isExpanded, setIsExpanded] = useState(false);
     const [mode, setMode] = useState('Flux');
     const [activeDisplay, setActiveDisplay] = useState(0);
@@ -974,7 +983,7 @@ export default function App({ args = [] }) {
                 // Add models from other providers that have saved keys
                 for (const p of ALL_PROVIDERS) {
                     try {
-                        const key = await getProviderAPIKey(p);
+                        const key = await getProviderAPIKey(p, { silent: true });
                         if (key) {
                             const tier = quotasObj?.providerTiers?.[p] || 'Free';
                             const pModels = getModels(p, tier) || [];
@@ -2209,7 +2218,9 @@ export default function App({ args = [] }) {
         }
 
         // 2. Suggestion Interaction (Arrows & Enter)
-        if (suggestions.length > 0 && activeView === 'chat') {
+        // When the user is cycling prompt history, arrows belong to history —
+        // don't let the suggestion selector swallow them.
+        if (suggestions.length > 0 && activeView === 'chat' && historyCursor === -1) {
             if (key.upArrow) {
                 setSelectedIndex(prev => {
                     let nextIdx = prev > 0 ? prev - 1 : suggestions.length - 1;
@@ -2878,6 +2889,19 @@ export default function App({ args = [] }) {
         }
     }, [activeView]);
 
+    // Surface auto-pick / key-store notices as inline meta messages.
+    useEffect(() => {
+        try {
+            setNoticeHandler((msg) => {
+                setMessages(prev => {
+                    setCompletedIndex(prev.length + 1);
+                    return [...prev, { id: 'keynotice-' + Date.now(), role: 'system', text: `✦ ${msg}\n⠀`, isMeta: true }];
+                });
+            });
+        } catch (e) {}
+        return () => { try { setNoticeHandler(null); } catch (e) {} };
+    }, []);
+
     // Duration Watcher (Telemetry & Daemon Heartbeat)
     useEffect(() => {
         const interval = setInterval(async () => {
@@ -2949,8 +2973,8 @@ export default function App({ args = [] }) {
             cmd: '/model',
             desc: 'Select Agent Model',
             subs: (mode === 'ICU' || mode.toLowerCase() === 'fluxcu'
-                ? getModels(aiProvider, apiTier).filter(m => isModelMultimodal(m.cmd || m))
-                : getModels(aiProvider, apiTier))
+                ? getModels(aiProvider, apiTier, systemSettings?.customOpenAIBaseUrl).filter(m => isModelMultimodal(m.cmd || m))
+                : getModels(aiProvider, apiTier, systemSettings?.customOpenAIBaseUrl))
         },
         {
             cmd: '/wildcard-tooling',
@@ -2980,7 +3004,17 @@ export default function App({ args = [] }) {
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
         { cmd: '/theme', desc: 'Customize UI color theme' },
-        { cmd: '/key', desc: 'Manage API keys' },
+        {
+            cmd: '/key',
+            desc: 'Manage API keys',
+            subs: [
+                { cmd: 'list', desc: 'List saved keys' },
+                { cmd: 'add', desc: 'Add a key' },
+                { cmd: 'remove', desc: 'Remove a key' },
+                { cmd: 'use', desc: 'Select active key' },
+                { cmd: 'clean', desc: 'Remove gaps between slots' }
+            ]
+        },
         { cmd: '/files', desc: 'List loaded instruction and skill files' },
         {
             cmd: '/memory', desc: 'Manage agent memory', subs: [
@@ -3019,19 +3053,22 @@ export default function App({ args = [] }) {
 
     const handleSubmit = async (value, isProgrammatic = false) => {
         // [INTELLIGENT AUTOCOMPLETE] If suggestions are active, Enter fills the command instead of submitting.
+        // EXCEPT when the typed text already equals the completed command — then Enter
+        // submits, otherwise fully-typed commands can never be run.
         if (!isProgrammatic && suggestions.length > 0) {
             const nextMatch = suggestions[selectedIndex] || suggestions[0];
             const parts = value.split(' ');
-            if (parts.length === 1) {
-                setInput(nextMatch.cmd + ' ');
-            } else {
-                // Replace the last part (the query) with the selected command
-                const parentParts = parts.slice(0, -1);
-                setInput(parentParts.join(' ') + ' ' + nextMatch.cmd + ' ');
+            const completed = parts.length === 1
+                ? nextMatch.cmd
+                : parts.slice(0, -1).join(' ') + ' ' + nextMatch.cmd;
+
+            if (completed.trim() !== value.trim()) {
+                setInput(completed + ' ');
+                setSelectedIndex(0);
+                setInputKey(prev => prev + 1);
+                return;
             }
-            setSelectedIndex(0);
-            setInputKey(prev => prev + 1);
-            return;
+            // Exact match — fall through and submit normally.
         }
 
         didSignalTerminationRef.current = false;
@@ -3057,6 +3094,17 @@ export default function App({ args = [] }) {
 
         // Prevent sending empty or whitespace-only prompts
         if (!absoluteClean.trim()) return;
+
+        // Record prompt history (in-memory). Skip programmatic submits.
+        if (!isProgrammatic) {
+            try {
+                const h = promptHistoryRef.current;
+                if (h[h.length - 1] !== absoluteClean) h.push(absoluteClean);
+                if (h.length > 200) h.shift();
+                setHistoryCursor(-1);
+                historyDraftRef.current = '';
+            } catch (e) {}
+        }
 
         if (isProcessing) {
             // STEERING HINT ENGINE
@@ -3722,7 +3770,8 @@ export default function App({ args = [] }) {
                                         return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide a model ID to save. Example: /model my-custom-model --save`, isMeta: true }];
                                     });
                                 } else {
-                                    const res = saveModelToProvider(aiProvider, modelToSave, isMultimodalFlag, parsedPricing);
+                                    const customUrl = aiProvider === 'c_openai' ? systemSettings.customOpenAIBaseUrl : null;
+                                    const res = saveModelToProvider(aiProvider, modelToSave, isMultimodalFlag, parsedPricing, customUrl);
                                     if (res.success) {
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
@@ -3919,7 +3968,36 @@ export default function App({ args = [] }) {
                     break;
                 }
                 case '/key': {
-                    setActiveView('key');
+                    const runKey = async () => {
+                        try {
+                            const remainder = parts.slice(1).join(' ');
+                            const res = await runKeyCommand(remainder, { currentProvider: aiProvider });
+                            const text = (res.lines || []).join('\n');
+                            if (text) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text, isMeta: true }];
+                                });
+                            }
+                            if (res.switchedBaseUrl) {
+                                setSystemSettings(s => ({ ...s, customOpenAIBaseUrl: res.switchedBaseUrl, memory: false }));
+                            }
+                            if (res.switchedKey !== undefined) {
+                                setApiKey(res.switchedKey);
+                                initAI(res.switchedKey, { aiProvider, onIDEApproval: resetPendingApproval });
+                            }
+                            if (res.promptNewKey) {
+                                setApiKey(null);
+                                setActiveView('chat');
+                            }
+                        } catch (err) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ Key command error: ${err.message}`, isMeta: true }];
+                            });
+                        }
+                    };
+                    runKey();
                     break;
                 }
                 case '/stats': {
@@ -4433,7 +4511,7 @@ export default function App({ args = [] }) {
                             if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.includes('...Success result truncated to save tokens')) {
+                            if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || fullTextStr.includes('...Success result truncated to save tokens')) {
                                 return m;
                             }
                             truncatedCount++;
@@ -5151,7 +5229,7 @@ export default function App({ args = [] }) {
                                         if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed')) {
+                                        if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:')) {
                                             return m;
                                         }
                                         return {
@@ -5837,6 +5915,8 @@ export default function App({ args = [] }) {
                         profileData={profileData}
                         setProfileData={setProfileData}
                         setProviderReturnView={setProviderReturnView}
+                        setApiKey={setApiKey}
+                        initAI={initAI}
                     />
                 );
 
@@ -5859,6 +5939,8 @@ export default function App({ args = [] }) {
                         initialSelectingTheme={true}
                         onCloseTheme={() => setActiveView('chat')}
                         setProviderReturnView={setProviderReturnView}
+                        setApiKey={setApiKey}
+                        initAI={initAI}
                     />
                 );
 
@@ -5918,6 +6000,7 @@ export default function App({ args = [] }) {
                                 }
 
                                 const effectiveKey = key || '';
+                                try { clearAllTempKeys(); } catch (e) {}
                                 setAiProvider(selectedProvider);
                                 setApiKey(effectiveKey);
                                 initAI(effectiveKey, { aiProvider: selectedProvider, onIDEApproval: resetPendingApproval });
@@ -5940,6 +6023,7 @@ export default function App({ args = [] }) {
                             }
 
                             if (key) {
+                                try { clearAllTempKeys(); } catch (e) {}
                                 setAiProvider(selectedProvider);
                                 setApiKey(key);
                                 initAI(key, { aiProvider: selectedProvider, onIDEApproval: resetPendingApproval });
@@ -7331,59 +7415,8 @@ export default function App({ args = [] }) {
                     </Box>
                 );
             case 'key':
-                return (
-                    <CommandMenu
-                        title="API KEY MANAGEMENT"
-                        items={[
-                            { label: 'Edit Current Key (Update)', value: 'edit' },
-                            { label: 'Remove Current Key (Delete)', value: 'remove' },
-                            { label: 'Cancel', value: 'Cancel' }
-                        ]}
-                        onSelect={(item) => {
-                            if (item.value === 'edit') {
-                                setApiKey(null); // Re-triggers manual setup mode
-                                setActiveView('chat');
-                                const s = emojiSpace(2);
-                                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `✦ Flux waiting for new API Key...\n⠀` }]);
-                            } else if (item.value === 'remove') {
-                                setActiveView('deleteKey');
-                            } else {
-                                setActiveView('chat');
-                            }
-                        }}
-                    />
-                );
             case 'deleteKey':
-                return (
-                    <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1}>
-                        {(() => {
-                            const s = emojiSpace(2);
-                            return <Text color="white" bold>DANGER: CLEAR CREDENTIALS</Text>;
-                        })()}
-                        <Text marginTop={1}>This will permanently delete all saved API keys in credential cache. You will need to enter it again to use Flux.</Text>
-                        <Box marginTop={1}>
-                            <CommandMenu
-                                title="Are you sure?"
-                                items={[
-                                    { label: 'YES, CLEAR CREDENTIALS', value: 'yes' },
-                                    { label: 'NO, GO BACK', value: 'no' }
-                                ]}
-                                onSelect={async (item) => {
-                                    if (item.value === 'yes') {
-                                        await removeAPIKey();
-                                        setApiKey(null);
-                                        setActiveView('chat');
-                                        const s = emojiSpace(2);
-                                        setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `[CREDENTIAL CLEARED] API Key removed successfully.` }]);
-                                    } else {
-                                        setActiveView('key');
-                                    }
-                                }}
-                                theme={systemSettings.theme}
-                            />
-                        </Box>
-                    </Box>
-                );
+                return null;
             case 'exit':
                 return null;
             case 'ask':
@@ -8058,6 +8091,50 @@ export default function App({ args = [] }) {
                                                         const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
                                                         setInput(cleanVal);
                                                         setIsFilePickerDismissed(false);
+                                                        // Any manual edit exits history browsing mode —
+                                                        // unless the change is the echo of a history hop.
+                                                        if (historyAppliedValueRef.current !== null && cleanVal === historyAppliedValueRef.current) {
+                                                            historyAppliedValueRef.current = null;
+                                                        } else if (historyCursor !== -1) {
+                                                            setHistoryCursor(-1);
+                                                        }
+                                                    }}
+                                                    historyEnabled={activeView === 'chat' && !isCompressing && (suggestions.length === 0 || historyCursor !== -1)}
+                                                    isBrowsingHistory={historyCursor !== -1}
+                                                    onHistoryPrev={() => {
+                                                        const h = promptHistoryRef.current;
+                                                        if (h.length === 0) return;
+                                                        if (historyCursor === -1) {
+                                                            historyDraftRef.current = input;
+                                                            const idx = h.length - 1;
+                                                            historyAppliedValueRef.current = h[idx];
+                                                            setHistoryCursor(idx);
+                                                            setInput(h[idx]);
+                                                            setInputKey(prev => prev + 1);
+                                                        } else if (historyCursor > 0) {
+                                                            const idx = historyCursor - 1;
+                                                            historyAppliedValueRef.current = h[idx];
+                                                            setHistoryCursor(idx);
+                                                            setInput(h[idx]);
+                                                            setInputKey(prev => prev + 1);
+                                                        }
+                                                    }}
+                                                    onHistoryNext={() => {
+                                                        const h = promptHistoryRef.current;
+                                                        if (historyCursor === -1) return;
+                                                        if (historyCursor < h.length - 1) {
+                                                            const idx = historyCursor + 1;
+                                                            historyAppliedValueRef.current = h[idx];
+                                                            setHistoryCursor(idx);
+                                                            setInput(h[idx]);
+                                                            setInputKey(prev => prev + 1);
+                                                        } else {
+                                                            const draft = historyDraftRef.current || '';
+                                                            historyAppliedValueRef.current = draft;
+                                                            setHistoryCursor(-1);
+                                                            setInput(draft);
+                                                            setInputKey(prev => prev + 1);
+                                                        }
                                                     }}
                                                     onSubmit={handleSubmit}
                                                     rows={1}

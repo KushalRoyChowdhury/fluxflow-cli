@@ -37,7 +37,7 @@ export const getProgress = async (args, context = {}) => {
             pending.forEach((q) => {
                 output += `"${q.question}"\n`;
             });
-            output += `Respond using tool: [tool:functions.Answer(id="${task.id}", answer="...")]\n\n`;
+            output += `Respond using action: [action:Answer(id="${task.id}", answer="...")]\n\n`;
         }
     }
 
@@ -52,11 +52,22 @@ export const getProgress = async (args, context = {}) => {
                 const header = '[Subagent Response]';
                 const body = log.substring(header.length);
                 let result = body;
-                const trigger = 'tool:';
+                const triggers = ['action:', 'tool:'];
                 while (true) {
                     const lowerResult = result.toLowerCase();
-                    const triggerIdx = lowerResult.indexOf(trigger);
-                    if (triggerIdx === -1) break;
+                    let earliestIdx = -1;
+                    let matchedTrigger = '';
+
+                    for (const trig of triggers) {
+                        const idx = lowerResult.indexOf(trig);
+                        if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
+                            earliestIdx = idx;
+                            matchedTrigger = trig;
+                        }
+                    }
+
+                    if (earliestIdx === -1) break;
+                    const triggerIdx = earliestIdx;
 
                     let startIdx = triggerIdx;
                     let hasOuterBracket = false;
@@ -118,9 +129,7 @@ export const getProgress = async (args, context = {}) => {
         output += processedLogs.join('\n') + '\n\n';
     });
 
-    if (task.status === 'completed' && task.finalAnswer) {
-        output += `Final Answer:\n${task.finalAnswer}\n`;
-    } else if (task.status === 'failed' && task.error) {
+    if (task.status === 'failed' && task.error) {
         output += `Failure Error: ${task.error}\n`;
     }
 

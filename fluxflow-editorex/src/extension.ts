@@ -548,6 +548,51 @@ export function readFluxSecrets(forceReload = false): any | null {
 /** Resolve an API key for a provider (mirrors src/utils/secrets.js). */
 export function getCompletionApiKey(provider: string): string | null {
     if (!provider) return null;
+
+    // --- v2 multi-key store (secret/secrets_v2.json) takes precedence ---
+    try {
+        const v2Path = path.join(resolveDataDir(), 'secret', 'secrets_v2.json');
+        if (fs.existsSync(v2Path)) {
+            const v2 = parseVault(fs.readFileSync(v2Path));
+            if (v2 && typeof v2 === 'object') {
+                // Canonicalize a few common aliases the CLI accepts.
+                const canonMap: Record<string, string> = {
+                    'custom': 'c_openai', 'custom (openai)': 'c_openai',
+                    'deepseek-ai': 'DeepSeek', '9router': '9router', '9-router': '9router',
+                    'explabs': 'ExpLabs', 'tokenharbor': 'TokenHarbor', 'apinex': 'APInex',
+                    'xkiro': 'xKiro', 'infron': 'Infron', 'sensenova': 'SenseNova'
+                };
+                const lower = provider.toLowerCase();
+                const canonical = canonMap[lower] || provider;
+                const slots = v2[canonical];
+
+                // Resolve saved active index from settings.json.
+                let activeIdx: number | null = null;
+                try {
+                    const map = readFluxSettings()?.activeKeyIndex || {};
+                    if (Number.isInteger(map[canonical])) activeIdx = map[canonical];
+                } catch {}
+
+                const slotKey = (slot: any): string | null => {
+                    if (!slot) return null;
+                    if (typeof slot === 'string') return slot.trim() ? slot : null;
+                    if (typeof slot === 'object' && slot.key) return slot.key;
+                    return null;
+                };
+
+                if (Array.isArray(slots)) {
+                    if (activeIdx !== null && slotKey(slots[activeIdx])) return slotKey(slots[activeIdx]);
+                    for (const s2 of slots) {
+                        const k = slotKey(s2);
+                        if (k) return k;
+                    }
+                } else if (typeof slots === 'string' && slots.trim()) {
+                    return slots;
+                }
+            }
+        }
+    } catch {}
+
     const s = readFluxSecrets();
     if (!s) return null;
     const p = provider;

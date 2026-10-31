@@ -31,7 +31,12 @@ Trigger in chat via /command
 * /thinking effort → Set reasoning effort. Can be mapped based on provider & model support (/thinking effort --map provider-effort-value/'rm' to unmap). Changes the Translation Table only for the currently selected provider and model
 * /wildcard-tooling → Tool compatibility mode for non-tooling models
 * /wildercard-tooling → Extended version of /wildcard-tooling
-* /key → Manage saved API keys
+* /key → Manage saved API keys (10-slot array per provider)
+  - /key list [--provider <name>] → Show slots 1-10 (active marked); no --provider value = all-providers summary
+  - /key add <key> [--index <n>] | /key new → Add a key (alias: new)
+  - /key remove [<index>|<key>|--all] → Remove by index/key/substring, or all
+  - /key use <index>|<key> → Set active key    |    /key use <key> --temp → Session-only key
+  - /key clean [--provider <name>] → Remove gaps between slots (no --provider = whole DB)
 * /theme → Select UI color theme
 * /memory → View/manage agent persistent memory
 * /budget → Set/view token budget limits

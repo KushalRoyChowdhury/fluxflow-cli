@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
     thinkingLevel: 'Medium',
     aiProvider: "",
     activeModel: "",
+    activeKeyIndex: {},
 
     showFullThinking: true,
     apiTier: 'Free',
@@ -65,6 +66,7 @@ const DEFAULT_SETTINGS = {
         keepReasoningContext: false,
         autoExcludeMetadata: false,
         disableTodo: false,
+        preferBash: false,
         clipboardContext: false,
         cacheCalculateMode: 'Session',
         alwaysAskFiles: '.env, .env.*, *.env'

@@ -14,6 +14,7 @@ export default function DocLayout() {
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsDark(mediaQuery.matches)
 
         const handler = (e) => setIsDark(e.matches)

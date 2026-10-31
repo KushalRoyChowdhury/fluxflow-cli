@@ -371,6 +371,10 @@ export const MultilineInput = ({
     useCustomInput = (inputHandler, isActive) => useInput(inputHandler, { isActive }),
     onPasteStateChange,
     cursorColor,
+    historyEnabled = false,
+    isBrowsingHistory = false,
+    onHistoryPrev,
+    onHistoryNext,
     ...controlledProps
 }) => {
     const [cursorIndex, setCursorIndex] = useState(value.length);
@@ -563,6 +567,18 @@ export const MultilineInput = ({
 
         if (key.upArrow || key.downArrow) {
             flushPasteTransaction();
+            // Prompt history navigation: only when the box is empty or the user is
+            // already cycling history (so continued presses keep walking it).
+            if (historyEnabled) {
+                if (key.upArrow && (val === '' || isBrowsingHistory)) {
+                    onHistoryPrev?.();
+                    return;
+                }
+                if (key.downArrow && isBrowsingHistory) {
+                    onHistoryNext?.();
+                    return;
+                }
+            }
             if (showCursor) {
                 const { visualLines, cursorLine, cursorCol } = computeVisualMatrix(val, curIdx, wrapWidth, identity, currentPasteBlocks);
                 const targetLine = key.upArrow ? cursorLine - 1 : cursorLine + 1;

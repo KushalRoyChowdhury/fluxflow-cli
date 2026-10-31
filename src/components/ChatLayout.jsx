@@ -90,7 +90,7 @@ const formatThinkText = (cleaned, columns = 80) => {
 // ============================================================================
 // PRE-COMPILED REGEXES (Prevents V8 recompilation during React render loop)
 // ============================================================================
-const REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`\r\n]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\\\(.*?\\\)|\\\[.*?\\\]|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
+const REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`\r\n]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\\\(.*?\\\)|\\\[.*?\\\]|\$.*?\$|\[.*?\]\s*\(.*?\)|\[[^\x1b\[\]\r\n]+\]\s*\[(?:https?:\/\/[^\s\]]+|#[^\s\]]+)\]|https?:\/\/[^\s)]+)/g;
 const REGEX_FENCED_CODE = /```(\w*)\n?([\s\S]*?)(?:```|$)/;
 const REGEX_LATEX_FRAC = /\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g;
 const REGEX_LATEX_STYLE = /(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g;
@@ -129,7 +129,7 @@ const REGEX_MATH_BARE_BRACK = /\\\[|\\\]/g;
 const REGEX_AT_REF = /@\[(.*?)\]/g;
 const REGEX_COLON_L = /:L/gi;
 const REGEX_MD_LINK_PAREN = /\[(.*?)\]\s*\((.*?)\)/;
-const REGEX_MD_LINK_BRACKET = /\[(.*?)\]\s*\[(.*?)\]/;
+const REGEX_MD_LINK_BRACKET = /\[([^\x1b\[\]\r\n]+)\]\s*\[(https?:\/\/[^\s\]]+|#[^\s\]]+)\]/;
 const REGEX_LATEX_CMD = /\\(\w+)\{([^{}]*)\}/;
 
 const parseMathSymbols = (content) => {
@@ -1270,7 +1270,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/provider', desc: 'Select AI Provider' },
             { cmd: '/settings', desc: 'Configure system prefs' },
             { cmd: '/theme', desc: 'Customize UI color theme' },
-            { cmd: '/key', desc: 'Manage API keys' },
+            { cmd: '/key', desc: 'Manage API keys (list/add/remove/use/clean)' },
             { cmd: '/memory', desc: 'Manage agent memory' },
             { cmd: '/stats', desc: 'Show session usage' },
             { cmd: '/usage', desc: 'Open graphical token usage & analytics in browser' },

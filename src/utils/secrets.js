@@ -2,6 +2,10 @@ import fs from 'fs-extra';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
 import { SECRET_DIR } from './paths.js';
 import path from 'path';
+import { resolveAPIKey, migrateFromLegacy, getProviderSlots, normalizeProvider } from './secrets_v2.js';
+
+// One-time migration of legacy single keys into the v2 slot store.
+migrateFromLegacy();
 
 const SECRET_FILE = path.join(SECRET_DIR, 'secrets.json');
 
@@ -21,7 +25,15 @@ export const getAPIKey = async () => {
     return null; // Triggers CLI Prompt
 };
 
-export const getProviderAPIKey = async (provider) => {
+export const getProviderAPIKey = async (provider, opts = {}) => {
+    // Resolve via the v2 multi-key store first (temp > active index > auto-pick).
+    // `silent` avoids side effects (no active-index write, no chat notice) for
+    // preflight "does this provider have a key?" checks.
+    try {
+        const resolved = await resolveAPIKey(provider, opts);
+        if (resolved) return resolved;
+    } catch (e) {}
+
     try {
         const secrets = readEncryptedJson(SECRET_FILE, {});
         if (provider === 'Google') return secrets.GOOGLE_API_KEY || secrets.API_KEY || null;
@@ -45,6 +57,21 @@ export const getProviderAPIKey = async (provider) => {
 };
 
 export const saveProviderAPIKey = async (provider, key) => {
+    // Persist into the v2 multi-key store (slot 1 if empty, else first empty slot).
+    try {
+        const { addProviderKey } = await import('./secrets_v2.js');
+        const canonical = normalizeProvider(provider) || provider;
+        const existing = getProviderSlots(canonical);
+        const hasAny = existing.some(s => s && (typeof s === 'string' ? s.trim() : s.key));
+        if (!hasAny) {
+            // Force into slot 1 for a fresh provider.
+            await addProviderKey(canonical, key, { index: 0 });
+        } else {
+            await addProviderKey(canonical, key);
+        }
+        return;
+    } catch (e) {}
+
     if (provider === 'Google') {
         await saveSecret('GOOGLE_API_KEY', key);
         await saveSecret('API_KEY', key);

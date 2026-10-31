@@ -1,4 +1,58 @@
 import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+
+let _gitBashPath = undefined;
+export const getGitBashPath = () => {
+    if (process.platform !== 'win32') return 'bash';
+    if (_gitBashPath !== undefined) return _gitBashPath;
+
+    if (process.env.GIT_BASH_PATH && fs.existsSync(process.env.GIT_BASH_PATH)) {
+        _gitBashPath = process.env.GIT_BASH_PATH;
+        return _gitBashPath;
+    }
+
+    const commonPaths = [
+        'C:\\Program Files\\Git\\bin\\bash.exe',
+        'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+        path.join(process.env.LOCALAPPDATA || '', 'Programs\\Git\\bin\\bash.exe')
+    ];
+    for (const p of commonPaths) {
+        if (p && fs.existsSync(p)) {
+            _gitBashPath = p;
+            return _gitBashPath;
+        }
+    }
+
+    try {
+        const gitOutput = execSync('where.exe git.exe', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+        const gitExe = gitOutput.split(/\r?\n/).find(line => line.trim().length > 0);
+        if (gitExe) {
+            const derived = path.resolve(path.dirname(gitExe), '..', 'bin', 'bash.exe');
+            if (fs.existsSync(derived)) {
+                _gitBashPath = derived;
+                return _gitBashPath;
+            }
+        }
+    } catch (e) {}
+
+    try {
+        const bashOutput = execSync('where.exe bash.exe', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+        const bashExe = bashOutput.split(/\r?\n/).find(line => line.trim().length > 0);
+        if (bashExe && !bashExe.toLowerCase().includes('system32')) {
+            _gitBashPath = bashExe;
+            return _gitBashPath;
+        }
+    } catch (e) {}
+
+    _gitBashPath = null;
+    return null;
+};
+
+export const isBashAvailable = () => {
+    if (process.platform !== 'win32') return true;
+    return !!getGitBashPath();
+};
 
 let _isPwshAvailable = null;
 export const isPwshAvailable = () => {
@@ -26,7 +80,8 @@ export const isPsAvailable = () => {
     return _isPsAvailable;
 };
 
-export const getPreferredWindowsShell = () => {
+export const getPreferredWindowsShell = (preferBash = false) => {
+    if (preferBash && isBashAvailable()) return 'bash';
     if (isPwshAvailable()) return 'pwsh';
     if (isPsAvailable()) return 'powershell';
     return 'cmd';
@@ -35,9 +90,21 @@ export const getPreferredWindowsShell = () => {
 let _cachedAdvanceRollback = null;
 
 
-export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true, autoExec, disableTodo = false) => {
+export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true, autoExec, disableTodo = false, preferBash = true) => {
     if (_cachedAdvanceRollback === null) {
         _cachedAdvanceRollback = advanceRollback;
+    }
+
+    const isWin = osDetected === 'Windows';
+    const bashActive = isWin && preferBash && isBashAvailable();
+    let runSignature = `Run(command=string)`;
+    let runDesc = `Runs ${isWin ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command`;
+
+    if (bashActive) {
+        const hasPs = isPwshAvailable() || isPsAvailable();
+        const fallbackParam = hasPs ? `forcePowershell?=bool:false` : `forceCwd?=bool:false`;
+        runSignature = `Run(command=string, ${fallbackParam})`;
+        runDesc = `Runs in git bash. Or force native shell`;
     }
 
     const fluxInstructions = `- JSON escape literal sequences, backslash: \\\\, newLine: \\ n
@@ -55,7 +122,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchor: ^LINE:...$ syntax, must for large blocks &  escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
 - CodeSearch(keyword=string, path?="file/glob, inclusion !exclusion ;-separated", regex?=bool:auto)
-- Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user${!disableTodo ? `\n- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. get + markDone marks complete` : ''}
+- ${runSignature}. ${runDesc}. Destructive command → Ask user${!disableTodo ? `\n- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. get + markDone marks complete` : ''}
 ${_cachedAdvanceRollback ? `
 **Emergency**
 Info: initial = current task prompt. Revert id = turn before disaster (eg. disaster: turn_3 → revert: turn_2). Reason explicitly

@@ -24,6 +24,7 @@ import { subagentProgress } from './subagent_state.js';
 import { isModelMultimodal, getFallbackValue, hasModelReasoning } from '../data/model_config.js';
 import { getMappedThinkingLevel } from '../data/thinking_config.js';
 import { getProviderAPIKey } from './secrets.js';
+import { resolveBaseUrl as resolveKeyBaseUrl } from './secrets_v2.js';
 import { getThemeColors } from './theme.js';
 
 import { RevertManager } from './revert.js';
@@ -31,7 +32,7 @@ import { AdvanceRevertManager } from './advanceRevert.js';
 import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected, registerSecurityListener } from './editor.js';
 import { getDirTreeIndentation } from './getDirTree/indentation.js';
 import { getDirTreeBox } from './getDirTree/box.js';
-import { isPsAvailable } from '../data/main_tools.js';
+import { isPsAvailable, isPwshAvailable, isBashAvailable } from '../data/main_tools.js';
 import { bypassBacktick } from './text.js';
 
 // ─── Provider Stream Functions (lazy loaded – mirrors tools.js TOOL_MAP pattern) ───
@@ -1568,7 +1569,9 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
             } else if (aiProvider === 'xKiro' || aiProvider === 'xkiro' || aiProvider === 'kiro') {
                 stream = (await loadProvider('xKiro'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
-                stream = (await loadProvider('c_openai'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, settings.systemSettings?.customOpenAIBaseUrl || '');
+                let cBaseUrl = settings.systemSettings?.customOpenAIBaseUrl || '';
+                try { cBaseUrl = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl; } catch (e) {}
+                stream = (await loadProvider('c_openai'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, cBaseUrl);
             } else {
                 const googleClient = getGoogleClient(apiKey);
                 const { serviceTier: simpleServiceTier, cleanModel: simpleCleanModel } = getServiceTierFromModel(model);
@@ -3334,6 +3337,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.0
                         );
                     } else if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
+                        let cBaseUrl2 = systemSettings?.customOpenAIBaseUrl || '';
+                        try { cBaseUrl2 = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl2; } catch (e) {}
                         stream = (await loadProvider('c_openai'))(
                             settings.apiKey,
                             targetModel,
@@ -3344,7 +3349,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             isMultiModal,
                             abortController.signal,
                             1.0,
-                            systemSettings?.customOpenAIBaseUrl || ''
+                            cBaseUrl2
                         );
                     } else {
                         const googleClient = getGoogleClient(settings?.apiKey);
@@ -5408,7 +5413,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 anyToolExecutedInThisTurn = true;
 
                                 let uiContent = `[ACTION RESULT]: ${result.replaceAll('[[VERIFIED]]\n', '').replaceAll('\n[[/VERIFIED]]', '') || ''}`;
-                                if (normToolName === 'view_file' || normToolName === 'web_scrape' || normToolName === 'file_map') {
+                                if (normToolName === 'view_file' || normToolName === 'web_scrape' || normToolName === 'file_map' || normToolName === 'search_keyword' || normToolName === 'get_progress' || normToolName === 'getprogress') {
                                     uiContent = `[ACTION RESULT]: ${label} (Context Locked for UI Clarity)`;
                                 }
 
@@ -6015,6 +6020,18 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const targetModel = model || subAgentCustomModel || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
+    const isWin = osDetected === 'Windows';
+    const subBashActive = isWin && (mergedSettings?.systemSettings?.preferBash !== false) && isBashAvailable();
+    let subRunSignature = `Run(command=string)`;
+    let subRunDesc = `Runs ${isWin ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command`;
+
+    if (subBashActive) {
+        const hasPs = isPwshAvailable() || isPsAvailable();
+        const fallbackParam = hasPs ? `forcePowershell?=bool:false` : `forceCwd?=bool:false`;
+        subRunSignature = `Run(command=string, ${fallbackParam})`;
+        subRunDesc = `Runs in git bash. Or force native shell`;
+    }
+
     const providedToolsSection = `-- ACTIONS (path = relative to CWD, path separator: '/') --
 In chat output the format \`[action:ActionName(arg1="value1")]\` in NEW line
 Rules:
@@ -6039,7 +6056,7 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 - ReadFile(path=string, startLine?=int, endLine?=int)
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchors: ^LINE:...$ syntax, must for large blocks & escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
-- Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user`.trim();
+- ${subRunSignature}. ${subRunDesc}. Destructive command → Ask user`.trim();
 
     const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
 Identity: FluxFlow subagent helping the main Agent
@@ -6049,7 +6066,7 @@ CWD: ${process.cwd()}
 ${providedToolsSection.trimEnd()}
 
 -- THINKING GUIDANCE --
-NO EXPLICIT THINKING REQUIRED. FOCUS ON TASK COMPLETION
+Use minimal reasoning. Prefer simplest path; avoid branching; waste NO tokens overthinking. Just focus on task completion. Before actions, provide user facing summary of findings & decisions IN detail
 Main focus: actions and task, not chatting
 On completion, provide a detailed summary in Tables/Markdown Format with file modified info. If any task failed report back in detail
 

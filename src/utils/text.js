@@ -962,6 +962,12 @@ export const parseMessageToBlocks = (msg, columns) => {
 
     // If it's a system message, special record, user message, it's a single completed block
     if (msg.role === 'system' || msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === 'user') {
+        // Drop empty system messages (e.g. hidden internal error messages or empty tool results)
+        if (!text && !msg.isLogo && !msg.isHelpRecord && !msg.isTerminalRecord && !msg.isHomeWarning && !msg.isImageStats && !msg.isAskRecord && !msg.isAboutRecord && !msg.isUpdateNotification) {
+            const emptyResult = { completed: [], active: [] };
+            blocksCache.set(cacheKey, emptyResult);
+            return emptyResult;
+        }
         return {
             completed: [getBlock(`${msg.id || Date.now()}-full`, 'full-message', text)],
             active: []
@@ -1258,6 +1264,9 @@ export const cleanSignals = (text, role = 'agent') => {
     }
 
     let result = normalizedText;
+
+    // Hide internal error messages from the UI entirely (regardless of role: system, agent, etc.)
+    if (normalizedText.trimStart().startsWith('ERROR: [INTERNAL CRITICAL] ')) return '';
 
     if (isAgentRole) {
         // Strip only the <think_fluxflow> and </think_fluxflow> tags from agent responses if not wrapped in code backticks

@@ -83,7 +83,9 @@ export default function SettingsMenu({
     setProfileData,
     initialSelectingTheme = false,
     onCloseTheme = null,
-    setProviderReturnView = null
+    setProviderReturnView = null,
+    setApiKey = null,
+    initAI = null
 }) {
     const activeTheme = (systemSettings.theme === 'Chaos' || systemSettings.theme === 'Mystery') ? 'Mystery' : (systemSettings.theme || 'Dark');
     const defaultIdx = themeOptions.indexOf(activeTheme);
@@ -112,7 +114,7 @@ export default function SettingsMenu({
             const keyMap = {};
             for (const p of providers) {
                 try {
-                    const k = await getProviderAPIKey(p);
+                    const k = await getProviderAPIKey(p, { silent: true });
                     if (k) keyMap[p] = true;
                 } catch (e) { }
             }
@@ -133,7 +135,7 @@ export default function SettingsMenu({
 
         // Primary: current active provider first
         const activeTier = quotas?.providerTiers?.[aiProvider] || apiTier || 'Free';
-        const currentModels = getModels(aiProvider, activeTier) || [];
+        const currentModels = getModels(aiProvider, activeTier, systemSettings?.customOpenAIBaseUrl) || [];
         if (currentModels.length > 0) {
             items.push({ label: `── ${aiProvider.toUpperCase()}${activeTier !== 'Free' ? ` (${activeTier})` : ''} ──`, isHeader: true });
             currentModels.forEach(m => {
@@ -360,6 +362,7 @@ export default function SettingsMenu({
                     { label: 'Keep Reasoning Context', value: 'keepReasoningContext', status: systemSettings.keepReasoningContext ? 'ON' : 'OFF' },
                     { label: 'Auto Exclude Metadata', value: 'autoExcludeMetadata', status: systemSettings.autoExcludeMetadata ? 'ON' : 'OFF' },
                     { label: 'Disable Todo', value: 'disableTodo', status: systemSettings.disableTodo ? 'ON' : 'OFF' },
+                    ...(process.platform === 'win32' ? [{ label: 'Prefer Bash', value: 'preferBash', status: systemSettings.preferBash !== false ? 'ON' : 'OFF' }] : []),
                     { label: 'Cache Calculate Mode', value: 'cacheCalculateMode', status: systemSettings.cacheCalculateMode || 'Session' },
                     // { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' } // Dont remove this comment
                 ];
@@ -730,6 +733,13 @@ export default function SettingsMenu({
         } else if (item.value === 'disableTodo') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, disableTodo: !s.disableTodo };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'preferBash') {
+            setSystemSettings(s => {
+                const currentVal = s.preferBash !== false;
+                const newSysSettings = { ...s, preferBash: !currentVal };
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });
@@ -1191,6 +1201,10 @@ export default function SettingsMenu({
                                                                  const { saveProviderAPIKey } = await import('../utils/secrets.js');
                                                                  await saveProviderAPIKey('c_openai', val.trim());
                                                                  setActiveProviderKeys(prev => ({ ...prev, c_openai: !!val.trim() }));
+                                                                 if (aiProvider === 'c_openai') {
+                                                                     if (setApiKey) setApiKey(val.trim());
+                                                                     if (initAI) initAI(val.trim(), { aiProvider: 'c_openai' });
+                                                                 }
                                                             } else if (editingItem === 'profileNickname') {
                                                                  const newNick = val.trim().slice(0, 20);
                                                                  const newProfile = { ...(profileData || {}), nickname: newNick };
@@ -1212,9 +1226,9 @@ export default function SettingsMenu({
                                                 </Box>
                                                 <Text color="gray" italic>  {
                                                     editingItem === 'customOpenAIBaseUrl'
-                                                        ? 'Enter Base URL (.../v1) • Press Enter to save, Esc to cancel • Restart Required'
+                                                        ? 'Enter Base URL (.../v1) • Press Enter to save, Esc to cancel'
                                                         : (editingItem === 'customOpenAIKey'
-                                                            ? 'Enter API Key • Press Enter to save, Esc to cancel • Restart Required'
+                                                            ? 'Enter API Key • Press Enter to save, Esc to cancel'
                                                             : (editingItem === 'profileNickname'
                                                                 ? `Enter Nickname (${editValue.length}/20) • Press Enter to save, Esc to cancel`
                                                                 : (editingItem === 'profileInstructions'

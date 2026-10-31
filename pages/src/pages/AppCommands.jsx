@@ -56,7 +56,17 @@ export default function AppCommands() {
                 <li><strong><code>/settings</code></strong> — Opens the main configuration menu for system preferences, external data, and sandbox presets.</li>
                 <li><strong><code>/budget</code></strong> — Set or view request and token quota limits.</li>
                 <li><strong><code>/provider</code> or <code>/providers</code></strong> — Switch the active AI provider.</li>
-                <li><strong><code>/key</code></strong> — Open the API Key management view to update or remove credentials.</li>
+                <li>
+                    <strong><code>/key</code></strong> — Manage API keys as a fixed 10-slot array per provider. Run bare <code>/key</code> to see subcommand suggestions, or use:
+                    <ul>
+                        <li><code>/key list [--provider &lt;name&gt;] [--unmask]</code> — Show all 10 slots (active marked, middle third masked). With no <code>--provider</code> value, lists every provider's key count.</li>
+                        <li><code>/key add &lt;key&gt; [--index &lt;n&gt;]</code> or <code>/key new</code> — Add a key to the first empty slot, or a specific slot. Adding a provider's first key also makes it active.</li>
+                        <li><code>/key remove [&lt;index&gt;|&lt;key&gt;|--all]</code> — Remove the active key, a specific slot, a matching key/substring (ambiguous matches error out), or all keys for the provider.</li>
+                        <li><code>/key use &lt;index&gt;|&lt;key&gt;</code> — Set the active key for the provider (persisted).</li>
+                        <li><code>/key use &lt;key&gt; --temp</code> — Use a session-only key held in memory, never saved to disk.</li>
+                        <li><code>/key clean [--provider &lt;name&gt;]</code> — Compact gaps between slots (no deletions). With no <code>--provider</code>, cleans the entire key store.</li>
+                    </ul>
+                    Keys live in an encrypted <code>secrets_v2.json</code> vault; the active slot per provider is tracked in settings. <code>--provider</code> works with every subcommand and auto-resolves to the current provider when omitted (the <code>custom</code> provider maps to your Custom OpenAI endpoint and is listed separately with its saved base URL).</li>
                 <li><strong><code>/profile</code></strong> — Update developer persona, nickname, and custom instructions.</li>
                 <li><strong><code>/memory [view|migrate]</code></strong> — View persistent memories or migrate them to the global <code>AGENTS.md</code>.</li>
             </ul>

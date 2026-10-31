@@ -130,7 +130,7 @@ export const saveModelConfigToDisk = () => {
     }
 };
 
-export const saveModelToProvider = (provider, modelId, multimodal = false, info = null) => {
+export const saveModelToProvider = (provider, modelId, multimodal = false, info = null, baseUrl = null) => {
     if (!provider || !modelId) return { success: false, reason: 'Invalid provider or model ID' };
     const id = modelId.trim();
     if (!id) return { success: false, reason: 'Model ID cannot be empty' };
@@ -147,22 +147,26 @@ export const saveModelToProvider = (provider, modelId, multimodal = false, info 
     if (!p.models) p.models = { Free: [], Paid: [] };
     if (!Array.isArray(p.models.Free)) p.models.Free = [];
 
+    const cleanBaseUrl = baseUrl ? String(baseUrl).trim().replace(/\/+$/, '') : null;
     const existingItem = p.models.Free.find(m => (typeof m === 'string' ? m : m?.cmd) === id);
     if (!existingItem) {
         const newModel = { cmd: id, multimodal: !!multimodal, desc: id };
         if (info && Object.keys(info).length > 0) newModel.info = info;
+        if (cleanBaseUrl) newModel.baseUrl = cleanBaseUrl;
         p.models.Free.push(newModel);
     } else {
         if (typeof existingItem === 'string') {
             const idx = p.models.Free.indexOf(existingItem);
             const updated = { cmd: id, multimodal: !!multimodal, desc: id };
             if (info && Object.keys(info).length > 0) updated.info = info;
+            if (cleanBaseUrl) updated.baseUrl = cleanBaseUrl;
             p.models.Free[idx] = updated;
         } else {
             existingItem.multimodal = !!multimodal;
             if (info && Object.keys(info).length > 0) {
                 existingItem.info = { ...(existingItem.info || {}), ...info };
             }
+            if (cleanBaseUrl) existingItem.baseUrl = cleanBaseUrl;
         }
     }
     rebuildMultimodalSet();
@@ -368,10 +372,20 @@ export const hasModelReasoning = (model) => {
     return reasoningModelsSet.has(lower);
 };
 
-export const getModels = (provider, apiTier) => {
+export const getModels = (provider, apiTier, currentBaseUrl = null) => {
     const p = activeConfig.providers[provider];
     if (!p) return [];
-    return p.models[apiTier === 'Free' ? 'Free' : 'Paid'] || [];
+    const models = p.models[apiTier === 'Free' ? 'Free' : 'Paid'] || [];
+    if (provider === 'c_openai' && currentBaseUrl) {
+        const cleanUrl = String(currentBaseUrl).trim().replace(/\/+$/, '');
+        return models.filter(m => {
+            if (typeof m === 'object' && m?.baseUrl) {
+                return m.baseUrl.replace(/\/+$/, '') === cleanUrl;
+            }
+            return true; // Backward compatibility for previously saved models with no baseUrl
+        });
+    }
+    return models;
 };
 
 export const getDefaultModel = (provider, apiTier) => {
