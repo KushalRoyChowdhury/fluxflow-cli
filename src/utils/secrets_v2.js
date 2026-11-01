@@ -256,6 +256,56 @@ export const setActiveIndex = async (provider, index) => {
 };
 
 // ---------------------------------------------------------------------------
+// Persisted "no key" mode (--null). Saved slots are left untouched.
+// ---------------------------------------------------------------------------
+
+const loadNullMap = async () => {
+    try {
+        const { loadSettings } = await import('./settings.js');
+        const s = await loadSettings();
+        return (s && s.nullKeyProviders) || {};
+    } catch {
+        return {};
+    }
+};
+
+const persistNullMap = async (map) => {
+    try {
+        const { loadSettings, saveSettings } = await import('./settings.js');
+        const s = await loadSettings();
+        s.nullKeyProviders = map;
+        await saveSettings(s);
+    } catch {
+        // silent
+    }
+};
+
+/** Providers where "use no key" makes sense (local / keyless endpoints). */
+const NULL_KEY_PROVIDERS = new Set(['c_openai', 'Ollama']);
+
+/** Truthy sentinel meaning "send no key" (providers recognise and skip auth). */
+export const NULL_KEY_SENTINEL = '__FLUX_NULL_KEY__';
+
+export const supportsNullKey = (provider) => NULL_KEY_PROVIDERS.has(normalizeProvider(provider) || provider);
+
+/** True when the provider is in persisted no-key mode. */
+export const isNullMode = async (provider) => {
+    const canonical = normalizeProvider(provider) || provider;
+    const map = await loadNullMap();
+    return map[canonical] === true;
+};
+
+/** Toggle persisted no-key mode. Does NOT delete or alter any slot. */
+export const setNullMode = async (provider, on = true) => {
+    const canonical = normalizeProvider(provider) || provider;
+    const map = await loadNullMap();
+    if (on) map[canonical] = true;
+    else delete map[canonical];
+    await persistNullMap(map);
+    return on === true;
+};
+
+// ---------------------------------------------------------------------------
 // Temp (in-memory, session-only) keys
 // ---------------------------------------------------------------------------
 
@@ -317,6 +367,9 @@ export const resolveAPIKey = async (provider, opts = {}) => {
     const temp = tempKeys.get(canonical);
     if (temp && temp.key) return temp.key;
 
+    // 1b. Persisted no-key mode -> send no key (saved slots are ignored).
+    if (await isNullMode(canonical)) return NULL_KEY_SENTINEL;
+
     // 2. Saved active index.
     const slots = getProviderSlots(canonical);
     const activeIdx = await getActiveIndex(canonical);
@@ -352,6 +405,9 @@ export const resolveBaseUrl = async (provider) => {
         // Temp custom key uses the current settings base URL unless explicitly provided.
         return temp.baseUrl !== undefined ? temp.baseUrl : await getCurrentCustomBaseUrl();
     }
+
+    // No-key mode: keep whatever custom base URL is configured (e.g. localhost).
+    if (await isNullMode(canonical)) return await getCurrentCustomBaseUrl();
 
     const slots = getProviderSlots(canonical);
     const activeIdx = await getActiveIndex(canonical);
@@ -456,6 +512,7 @@ export const addProviderKey = async (provider, key, opts = {}) => {
         slots[i] = await buildSlotValue(canonical, addKey, existingBaseUrl, overrideBaseUrl);
         store[canonical] = slots;
         writeStore(store);
+        await setNullMode(canonical, false);
         return { ok: true, index: i };
     }
 
@@ -467,7 +524,48 @@ export const addProviderKey = async (provider, key, opts = {}) => {
     slots[emptyIdx] = await buildSlotValue(canonical, addKey, undefined, overrideBaseUrl);
     store[canonical] = slots;
     writeStore(store);
+    await setNullMode(canonical, false);
     return { ok: true, index: emptyIdx };
+};
+
+/**
+ * Replace the ACTIVE key with a new key (settings-page semantics).
+ * Overwrites the active slot in place instead of appending a new slot.
+ * Fallback: lowest filled slot -> slot 1 (then marks it active).
+ * @returns {object} { ok, index?, error? }
+ */
+export const replaceActiveProviderKey = async (provider, key, opts = {}) => {
+    const canonical = normalizeProvider(provider) || provider;
+    if (!key || !String(key).trim()) return { ok: false, error: 'Empty key.' };
+    const newKey = String(key).trim();
+
+    let overrideBaseUrl;
+    if (opts.baseUrl !== undefined) {
+        if (!isUrlBearing(canonical)) {
+            return { ok: false, error: 'Base URL is only supported for the custom provider.' };
+        }
+        const validated = validateOpenAIBaseUrl(opts.baseUrl);
+        if (!validated.ok) return { ok: false, error: `Invalid URL: ${validated.error}` };
+        overrideBaseUrl = validated.url;
+    }
+
+    const store = readStore();
+    const slots = normalizeSlots(store[canonical]);
+
+    const activeIdx = await getActiveIndex(canonical);
+    let idx = (Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < SLOT_COUNT && isSlotFilled(slots[activeIdx]))
+        ? activeIdx
+        : slots.findIndex(isSlotFilled);
+    if (idx === -1) idx = 0;
+
+    const existingBaseUrl = (slots[idx] && typeof slots[idx] === 'object') ? slots[idx].baseUrl : undefined;
+    slots[idx] = await buildSlotValue(canonical, newKey, existingBaseUrl, overrideBaseUrl);
+    store[canonical] = slots;
+    writeStore(store);
+    await setActiveIndex(canonical, idx);
+    // A freshly saved key means we are no longer in no-key mode.
+    await setNullMode(canonical, false);
+    return { ok: true, index: idx };
 };
 
 /**
@@ -549,6 +647,8 @@ export const useProviderKey = async (provider, target) => {
     }
 
     await setActiveIndex(canonical, idx);
+    // Picking a real slot always leaves no-key mode.
+    await setNullMode(canonical, false);
 
     let switchedBaseUrl = null;
     if (isUrlBearing(canonical)) {
@@ -654,6 +754,10 @@ export const buildListLines = async (provider, opts = {}) => {
 
     if (temp && temp.key) {
         lines.push(`Temporary: ${unmask ? temp.key : maskKey(temp.key)}`);
+    }
+
+    if (await isNullMode(canonical)) {
+        lines.push('Mode: NO KEY (null)  <- active');
     }
 
     for (let i = 0; i < SLOT_COUNT; i++) {

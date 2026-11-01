@@ -101,8 +101,45 @@ export const searchIndex = [
         title: 'Agent Control Commands',
         path: '/app-commands',
         section: 'agent-controls',
-        keywords: ['mode', 'model', 'thinking', 'depth'],
+        keywords: ['mode', 'thinking', 'depth', 'key', 'api key', 'model'],
         description: 'Dynamically adjusting agent behavior and reasoning.'
+    },
+
+    // API Keys
+    {
+        title: 'API Keys & Providers',
+        path: '/api-keys',
+        section: 'api-keys',
+        keywords: ['key', 'keys', 'api key', 'vault', 'slots', 'provider', 'apikey'],
+        description: 'Managing API keys in the 10-slot per-provider vault.'
+    },
+    {
+        title: '/key use --null',
+        path: '/api-keys',
+        section: 'key-null',
+        keywords: ['null', 'no key', 'keyless', 'localhost', 'ollama', 'no api key'],
+        description: 'Send no API key at all for local endpoints (custom / Ollama).'
+    },
+    {
+        title: '/key add',
+        path: '/api-keys',
+        section: 'key-add',
+        keywords: ['add key', 'new key', 'index', 'url', 'endpoint'],
+        description: 'Add a key to the first empty slot or a specific slot.'
+    },
+    {
+        title: '/key use',
+        path: '/api-keys',
+        section: 'key-use',
+        keywords: ['use key', 'switch key', 'active key', 'temp'],
+        description: 'Switch the active key, or use a temporary session key.'
+    },
+    {
+        title: 'Custom Endpoints & --url',
+        path: '/api-keys',
+        section: 'custom-endpoints',
+        keywords: ['custom', 'openai', 'localhost', 'base url', 'url', 'compatible'],
+        description: 'Point the custom provider at any OpenAI-compatible endpoint.'
     },
 
     // Architecture

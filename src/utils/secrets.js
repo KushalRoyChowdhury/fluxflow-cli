@@ -2,7 +2,8 @@ import fs from 'fs-extra';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
 import { SECRET_DIR } from './paths.js';
 import path from 'path';
-import { resolveAPIKey, migrateFromLegacy, getProviderSlots, normalizeProvider } from './secrets_v2.js';
+import { resolveAPIKey, migrateFromLegacy, getProviderSlots, normalizeProvider, replaceActiveProviderKey as replaceActiveProviderKeyV2, NULL_KEY_SENTINEL } from './secrets_v2.js';
+export { NULL_KEY_SENTINEL } from './secrets_v2.js';
 
 // One-time migration of legacy single keys into the v2 slot store.
 migrateFromLegacy();
@@ -26,6 +27,12 @@ export const getAPIKey = async () => {
 };
 
 export const getProviderAPIKey = async (provider, opts = {}) => {
+    // Persisted no-key mode (/key use --null) -> send no key whatsoever.
+    try {
+        const { isNullMode } = await import('./secrets_v2.js');
+        if (await isNullMode(provider)) return NULL_KEY_SENTINEL;
+    } catch (e) {}
+
     // Resolve via the v2 multi-key store first (temp > active index > auto-pick).
     // `silent` avoids side effects (no active-index write, no chat notice) for
     // preflight "does this provider have a key?" checks.
@@ -105,6 +112,19 @@ export const saveProviderAPIKey = async (provider, key) => {
         await saveSecret('XKIRO_API_KEY', key);
     } else if (provider === 'c_openai' || provider === 'Custom (OpenAI)') {
         await saveSecret('CUSTOM_OPENAI_API_KEY', key);
+    }
+};
+
+/**
+ * Replace the currently ACTIVE key for a provider with a new one.
+ * Used by the Settings page so entering a key overwrites the active slot
+ * instead of appending to a new slot. Other flows keep using saveProviderAPIKey.
+ */
+export const replaceActiveProviderKey = async (provider, key, opts = {}) => {
+    try {
+        return await replaceActiveProviderKeyV2(provider, key, opts);
+    } catch (e) {
+        return { ok: false, error: (e && e.message) || 'Failed to replace key.' };
     }
 };
 

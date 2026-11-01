@@ -1,5 +1,6 @@
 import { Ollama } from 'ollama';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
+import { NULL_KEY_SENTINEL } from '../secrets_v2.js';
 
 export const getOllamaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0, endpointType = 'Cloud') {
     const messages = [];
@@ -33,7 +34,9 @@ export const getOllamaStream = async function* (apiKey, model, contents, systemI
         }
     }
 
-    const isLocal = endpointType === 'Local' || !apiKey || apiKey === 'LOCAL';
+    // /key use --null: treat as keyless local endpoint (no Authorization header).
+    const isNullKey = apiKey === NULL_KEY_SENTINEL;
+    const isLocal = isNullKey || endpointType === 'Local' || !apiKey || apiKey === 'LOCAL';
     const host = isLocal
         ? (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434')
         : (process.env.OLLAMA_HOST || 'https://ollama.com');
@@ -53,7 +56,7 @@ export const getOllamaStream = async function* (apiKey, model, contents, systemI
     const customThink = getMappedThinkingLevel('Ollama', model, thinkingLevel);
     const thinkMap = {
         'Fast': false,
-        'Low': 'medium',
+        'Low': 'low',
         'Medium': 'medium',
         'Standard': 'medium',
         'High': 'high',

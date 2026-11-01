@@ -6046,8 +6046,8 @@ Rules:
 ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web**
-- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). Proactive use for unknown/latest info
-- WebScrape(url=string). Proactive use for specific webpage/docs
+- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). For unknown topics, time sensitive, fact checking
+- WebScrape(url=string). JS supported
 
 **Workspace**
 - CodeSearch(keyword=string, path?="file/glob, inclusion !exclusion ;-separated", regex?=bool:auto)

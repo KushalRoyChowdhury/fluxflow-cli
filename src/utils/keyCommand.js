@@ -13,8 +13,11 @@ import {
     buildListLines,
     setTempKey,
     clearTempKey,
+    setNullMode,
+    supportsNullKey,
     isUrlBearing,
     isHiddenFromSummary,
+    NULL_KEY_SENTINEL,
 } from './secrets_v2.js';
 
 /**
@@ -24,7 +27,7 @@ import {
  */
 export const parseKeyArgs = (raw) => {
     const tokens = String(raw || '').trim().split(/\s+/).filter(Boolean);
-    const result = { sub: null, args: [], provider: null, providerBare: false, index: null, url: null, temp: false, all: false, unmask: false };
+    const result = { sub: null, args: [], provider: null, providerBare: false, index: null, url: null, temp: false, all: false, unmask: false, nullMode: false };
     const rest = [];
 
     for (let i = 0; i < tokens.length; i++) {
@@ -45,6 +48,8 @@ export const parseKeyArgs = (raw) => {
             if (next && !next.startsWith('--')) { result.url = next; i++; }
         } else if (t === '--temp') {
             result.temp = true;
+        } else if (t === '--null') {
+            result.nullMode = true;
         } else if (t === '--all') {
             result.all = true;
         } else if (t === '--unmask' || t === '--reveal') {
@@ -67,6 +72,7 @@ const HELP_LINES = [
     '⠀⠀\x1b[2m└─\x1b[22m /key add <key> [--index <n>] [--provider <name>] [--url <endpoint>]',
     '⠀⠀\x1b[2m└─\x1b[22m /key remove [<index>|<key>|--all] [--provider <name>]',
     '⠀⠀\x1b[2m└─\x1b[22m /key use <index>|<key>   |   /key use <key> --temp',
+    '⠀⠀\x1b[2m└─\x1b[22m /key use --null   (no key sent; c_openai / Ollama only)',
     '⠀⠀\x1b[2m└─\x1b[22m /key clean [--provider <name>]',
     '⠀',
 ];
@@ -112,7 +118,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
             return done();
         }
         const listLines = await buildListLines(provider, { unmask: parsed.unmask });
-        lines.push(`✦ ${getProviderLabel(provider)} API KEYS`);
+        lines.push(`✦ ${getProviderLabel(provider.replace('c_openai', 'Custom Endpoints'))} API KEYS`);
         lines.push(...listLines);
         lines.push('⠀');
         return done();
@@ -137,7 +143,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         // A newly added provider with no active index -> make it active.
         const active = await getActiveIndex(provider);
         if (active === null) await setActiveIndex(provider, res.index);
-        lines.push(`✦ Key added to ${provider} slot ${res.index + 1}.`);
+        lines.push(`✦ Key added to ${provider.replace('c_openai', 'Custom Endpoints')} slot ${res.index + 1}.`);
         if (parsed.url !== null && isUrlBearing(provider)) {
             lines.push(`⠀⠀\x1b[2m└─\x1b[22m Using URL: ${parsed.url}`);
         }
@@ -158,11 +164,11 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         if (!res.ok) return { lines: [`✦ ${res.error}`] };
 
         if (res.all) {
-            lines.push(`✦ Cleared all keys for ${provider}.`);
+            lines.push(`✦ Cleared all keys for ${provider.replace('c_openai', 'Custom Endpoints') }.`);
             return done({ promptNewKey: true });
         }
 
-        lines.push(`✦ Removed key from ${provider} slot ${res.removedIndex + 1}.`);
+        lines.push(`✦ Removed key from ${provider.replace('c_openai', 'Custom Endpoints')} slot ${res.removedIndex + 1}.`);
         if (res.needsNewKey) {
             lines.push(`⠀⠀\x1b[2m└─\x1b[22m No keys remain for ${provider}. Please enter a new key.`);
             return done({ promptNewKey: true });
@@ -173,16 +179,33 @@ export const runKeyCommand = async (raw, ctx = {}) => {
     // ---- use ----
     if (sub === 'use') {
         const argStr = parsed.args.join(' ').trim();
-        if (!argStr) return { lines: ['✦ Usage: /key use <index> | <key> [--temp]'] };
+
+        // --null: send NO api key at all. Persisted; saved slots are untouched.
+        if (parsed.nullMode) {
+            if (!supportsNullKey(provider)) {
+                return { lines: [`✦ --null is only supported for Custom Endpoints and Ollama.`] };
+            }
+            await setNullMode(provider, true);
+            clearTempKey(provider);
+            const label = provider.replace('c_openai', 'Custom Endpoints');
+            lines.push(`✦ ${label} now using NO API key (persisted).`);
+            lines.push('⠀⠀└─ Saved key slots were kept, they are just ignored.');
+            if (provider === 'c_openai') {
+                lines.push('⠀⠀└─ No Authorization header will be sent. Base URL is unchanged.');
+            }
+            return done({ switchedKey: NULL_KEY_SENTINEL });
+        }
+
+        if (!argStr) return { lines: ['✦ Usage: /key use <index> | <key> [--temp] | /key use --null'] };
 
         if (parsed.temp) {
             // Temp key: full key only, session-scoped in memory.
             setTempKey(provider, argStr);
-            lines.push(`✦ Temporary key set for ${provider} (session only).`);
+            lines.push(`✦ Temporary key set for ${provider.replace('c_openai', 'Custom Endpoints')} (session only).`);
             if (isUrlBearing(provider)) {
                 lines.push('⠀⠀\x1b[2m└─\x1b[22m Will use the current Custom base URL.');
             }
-            return done();
+            return done({ switchedKey: argStr });
         }
 
         const target = /^\d+$/.test(argStr) ? parseInt(argStr, 10) - 1 : argStr;
@@ -190,7 +213,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         if (!res.ok) return { lines: [`✦ ${res.error}`] };
         // Using a saved key clears any temp override for that provider.
         clearTempKey(provider);
-        lines.push(`✦ ${provider} now using slot ${res.index + 1}.`);
+        lines.push(`✦ ${provider.replace('c_openai', 'Custom Endpoints') } now using slot ${res.index + 1}.`);
         if (res.switchedBaseUrl) {
             lines.push(`⠀⠀\x1b[2m└─\x1b[22m Switched Base URL to: ${res.switchedBaseUrl}`);
         }
@@ -203,7 +226,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         const scope = parsed.provider ? provider : null;
         const res = await cleanProviderKeys(scope);
         lines.push(scope
-            ? `✦ Compacted ${scope} key slots.`
+            ? `✦ Compacted ${scope.replace('c_openai', 'Custom Endpoints') } key slots.`
             : `✦ Compacted all key stores (${res.touched} provider(s) touched).`);
         return done();
     }

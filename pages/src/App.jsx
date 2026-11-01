@@ -5,6 +5,7 @@ import GettingStarted from './pages/GettingStarted'
 import StartupArgs from './pages/StartupArgs'
 import AppCommands from './pages/AppCommands'
 import StableModels from './pages/StableModels'
+import ApiKeys from './pages/ApiKeys'
 import Architecture from './pages/Architecture'
 import Tools from './pages/Tools'
 
@@ -17,6 +18,7 @@ function App() {
                 <Route path="startup-args" element={<StartupArgs />} />
                 <Route path="app-commands" element={<AppCommands />} />
                 <Route path="models" element={<StableModels />} />
+                <Route path="api-keys" element={<ApiKeys />} />
                 <Route path="architecture" element={<Architecture />} />
                 <Route path="tools" element={<Tools />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

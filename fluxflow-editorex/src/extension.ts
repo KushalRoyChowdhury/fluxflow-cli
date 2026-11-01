@@ -549,6 +549,20 @@ export function readFluxSecrets(forceReload = false): any | null {
 export function getCompletionApiKey(provider: string): string | null {
     if (!provider) return null;
 
+    // --- /key use --null: persisted no-key mode (c_openai / Ollama only) ---
+    // Saved slots are left untouched; we just return the keyless sentinel so
+    // resolveDirectEndpoint fires without an Authorization header.
+    try {
+        const nullMap = readFluxSettings()?.nullKeyProviders || {};
+        const nl = provider.toLowerCase();
+        const nullCanon = (nl === 'custom' || nl === 'custom (openai)' || nl === 'c_openai')
+            ? 'c_openai'
+            : (nl === 'ollama')
+                ? 'Ollama'
+                : provider;
+        if (nullMap[nullCanon] === true) return 'LOCAL';
+    } catch {}
+
     // --- v2 multi-key store (secret/secrets_v2.json) takes precedence ---
     try {
         const v2Path = path.join(resolveDataDir(), 'secret', 'secrets_v2.json');
@@ -804,7 +818,13 @@ function resolveDirectEndpoint(cfg: any, settings: any): { baseUrl: string; apiK
         baseUrl = isLocal
             ? (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434/v1')
             : (process.env.OLLAMA_HOST || 'https://ollama.com/v1');
-        if (isLocal) apiKey = 'LOCAL';
+        if (isLocal) {
+            // /key use --null (or a keyless local setup): send NO Authorization
+            // header at all. The Ollama server ignores it anyway, but --null
+            // promises "no key on the wire", so don't emit a dummy "LOCAL".
+            const nullMap = readFluxSettings()?.nullKeyProviders || {};
+            apiKey = nullMap['Ollama'] === true ? undefined : 'LOCAL';
+        }
     }
 
     return { baseUrl, apiKey };

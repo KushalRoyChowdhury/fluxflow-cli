@@ -14,6 +14,7 @@ export const navItems = [
             { title: 'Tools', path: '/tools' },
             { title: 'Architecture', path: '/architecture' },
             { title: 'Models Management', path: '/models' },
+            { title: 'API Keys', path: '/api-keys' },
         ],
     },
 ]

@@ -1,5 +1,6 @@
 import { fetchWithBackoff } from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
+import { NULL_KEY_SENTINEL } from '../secrets_v2.js';
 
 /**
  * Universally Compatible Custom OpenAI-compatible Provider Stream
@@ -102,8 +103,12 @@ export const getCustomOpenAIStream = async function* (apiKey, model, contents, s
         'User-Agent': 'Flux-Flow'
     };
 
-    const effectiveKey = (apiKey && apiKey !== 'LOCAL') ? apiKey : (process.env.CUSTOM_OPENAI_API_KEY || process.env.C_OPENAI_API_KEY || '');
-    if (effectiveKey && effectiveKey.trim() !== '') {
+    // /key use --null: explicitly send no auth header (local keyless endpoints).
+    const isNullKey = apiKey === NULL_KEY_SENTINEL;
+    const effectiveKey = isNullKey
+        ? ''
+        : ((apiKey && apiKey !== 'LOCAL') ? apiKey : (process.env.CUSTOM_OPENAI_API_KEY || process.env.C_OPENAI_API_KEY || ''));
+    if (!isNullKey && effectiveKey && effectiveKey.trim() !== '') {
         const trimmedKey = effectiveKey.trim();
         headers['Authorization'] = trimmedKey.startsWith('Bearer ') ? trimmedKey : `Bearer ${trimmedKey}`;
         headers['api-key'] = trimmedKey; // Azure & custom gateway compatibility

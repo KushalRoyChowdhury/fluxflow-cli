@@ -166,8 +166,8 @@ ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : "
 - AskUser(question=string, optionA?="title::description", ...MAX4). Any Ambiguity
 
 **Web**
-- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). Proactive use for unknown/latest info
-- WebScrape(url=string). Proactive use for specific webpage/docs
+- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). For unknown topics, time sensitive, fact checking
+- WebScrape(url=string). JS supported
 
 ${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();
 };

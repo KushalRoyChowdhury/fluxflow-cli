@@ -1198,12 +1198,15 @@ export default function SettingsMenu({
                                                                  setSystemSettings(newSysSettings);
                                                                  saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                                                             } else if (editingItem === 'customOpenAIKey') {
-                                                                 const { saveProviderAPIKey } = await import('../utils/secrets.js');
-                                                                 await saveProviderAPIKey('c_openai', val.trim());
-                                                                 setActiveProviderKeys(prev => ({ ...prev, c_openai: !!val.trim() }));
-                                                                 if (aiProvider === 'c_openai') {
-                                                                     if (setApiKey) setApiKey(val.trim());
-                                                                     if (initAI) initAI(val.trim(), { aiProvider: 'c_openai' });
+                                                                 const trimmedKey = val.trim();
+                                                                 const { replaceActiveProviderKey } = await import('../utils/secrets.js');
+                                                                 const result = await replaceActiveProviderKey('c_openai', trimmedKey);
+                                                                 if (trimmedKey && (!result || result.ok !== false)) {
+                                                                     setActiveProviderKeys(prev => ({ ...prev, c_openai: true }));
+                                                                     if (aiProvider === 'c_openai') {
+                                                                         if (setApiKey) setApiKey(trimmedKey);
+                                                                         if (initAI) initAI(trimmedKey, { aiProvider: 'c_openai' });
+                                                                     }
                                                                  }
                                                             } else if (editingItem === 'profileNickname') {
                                                                  const newNick = val.trim().slice(0, 20);

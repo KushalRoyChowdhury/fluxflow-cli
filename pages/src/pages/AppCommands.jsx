@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import DocPage from '../components/DocPage'
 
 const headings = [
@@ -40,7 +41,7 @@ export default function AppCommands() {
                         <li><code>fluxcu</code>: Autonomous workspace and desktop execution.</li>
                     </ul>
                 </li>
-                <li><strong><code>/model [name]</code></strong> — Select a model. Supports <code>--multimodal</code>, <code>--save</code>, <code>--remove</code>, <code>--rename</code>, and <code>--default</code>.</li>
+                <li><strong><code>/model [name]</code></strong> — Select, save, rename, and remove models, including multimodal and default-model flags. See the <Link to="/models" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">Model Management</Link> page for the full guide.</li>
                 <li><strong><code>/thinking [fast|low|medium|standard|high|xhigh|custom|max]</code></strong> — Adjust reasoning depth. Supports <code>--map</code>, <code>--bypass</code>, and <code>--force</code>.</li>
                 <li><strong><code>/wildcard-tooling</code></strong> — Toggle compatibility mode for models without native tooling support.</li>
                 <li>
@@ -56,17 +57,8 @@ export default function AppCommands() {
                 <li><strong><code>/settings</code></strong> — Opens the main configuration menu for system preferences, external data, and sandbox presets.</li>
                 <li><strong><code>/budget</code></strong> — Set or view request and token quota limits.</li>
                 <li><strong><code>/provider</code> or <code>/providers</code></strong> — Switch the active AI provider.</li>
-                <li>
-                    <strong><code>/key</code></strong> — Manage API keys as a fixed 10-slot array per provider. Run bare <code>/key</code> to see subcommand suggestions, or use:
-                    <ul>
-                        <li><code>/key list [--provider &lt;name&gt;] [--unmask]</code> — Show all 10 slots (active marked, middle third masked). With no <code>--provider</code> value, lists every provider's key count.</li>
-                        <li><code>/key add &lt;key&gt; [--index &lt;n&gt;] [--url &lt;endpoint&gt;]</code> or <code>/key new</code> — Add a key to the first empty slot, or a specific slot. Adding a provider's first key also makes it active.</li>
-                        <li><code>/key remove [&lt;index&gt;|&lt;key&gt;|--all]</code> — Remove the active key, a specific slot, a matching key/substring (ambiguous matches error out), or all keys for the provider.</li>
-                        <li><code>/key use &lt;index&gt;|&lt;key&gt;</code> — Set the active key for the provider (persisted).</li>
-                        <li><code>/key use &lt;key&gt; --temp</code> — Use a session-only key held in memory, never saved to disk.</li>
-                        <li><code>/key clean [--provider &lt;name&gt;]</code> — Compact gaps between slots (no deletions). With no <code>--provider</code>, cleans the entire key store.</li>
-                    </ul>
-                    <code>--url</code> is only valid for the <code>custom</code> provider. It pins the slot to the given OpenAI-compatible endpoint instead of the base URL saved in settings; the URL must start with <code>http://</code> or <code>https://</code> and end in <code>/v1</code> or <code>/v1/chat/completions</code> (trailing slashes stripped, <code>/v1</code> resolved to the chat completions path at request time). Omit it to reuse the slot's existing URL, or fall back to the settings base URL. Keys live in an encrypted <code>secrets_v2.json</code> vault; the active slot per provider is tracked in settings. <code>--provider</code> works with every subcommand and auto-resolves to the current provider when omitted (the <code>custom</code> provider maps to your Custom OpenAI endpoint and is listed separately with its saved base URL).</li>
+                <li><strong><code>/key</code></strong> — Manage API keys in a fixed 10-slot vault per provider, switch active keys, use temporary session keys, or run keyless against local endpoints. See the <Link to="/api-keys" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">API Keys &amp; Providers</Link> page for the full guide.</li>
+
                 <li><strong><code>/profile</code></strong> — Update developer persona, nickname, and custom instructions.</li>
                 <li><strong><code>/memory [view|migrate]</code></strong> — View persistent memories or migrate them to the global <code>AGENTS.md</code>.</li>
             </ul>
