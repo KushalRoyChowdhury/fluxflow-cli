@@ -24,7 +24,7 @@ import {
  */
 export const parseKeyArgs = (raw) => {
     const tokens = String(raw || '').trim().split(/\s+/).filter(Boolean);
-    const result = { sub: null, args: [], provider: null, providerBare: false, index: null, temp: false, all: false, unmask: false };
+    const result = { sub: null, args: [], provider: null, providerBare: false, index: null, url: null, temp: false, all: false, unmask: false };
     const rest = [];
 
     for (let i = 0; i < tokens.length; i++) {
@@ -40,6 +40,9 @@ export const parseKeyArgs = (raw) => {
         } else if (t === '--index') {
             const next = tokens[i + 1];
             if (next && /^\d+$/.test(next)) { result.index = parseInt(next, 10) - 1; i++; }
+        } else if (t === '--url') {
+            const next = tokens[i + 1];
+            if (next && !next.startsWith('--')) { result.url = next; i++; }
         } else if (t === '--temp') {
             result.temp = true;
         } else if (t === '--all') {
@@ -61,7 +64,7 @@ export const parseKeyArgs = (raw) => {
 const HELP_LINES = [
     '✦ API KEY MANAGEMENT',
     '⠀⠀\x1b[2m└─\x1b[22m /key list [--provider <name>] [--unmask]',
-    '⠀⠀\x1b[2m└─\x1b[22m /key add <key> [--index <n>] [--provider <name>]',
+    '⠀⠀\x1b[2m└─\x1b[22m /key add <key> [--index <n>] [--provider <name>] [--url <endpoint>]',
     '⠀⠀\x1b[2m└─\x1b[22m /key remove [<index>|<key>|--all] [--provider <name>]',
     '⠀⠀\x1b[2m└─\x1b[22m /key use <index>|<key>   |   /key use <key> --temp',
     '⠀⠀\x1b[2m└─\x1b[22m /key clean [--provider <name>]',
@@ -121,7 +124,10 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         if (!keyArg) {
             return done({ promptNewKey: true });
         }
-        const res = await addProviderKey(provider, keyArg, { index: parsed.index !== null ? parsed.index : undefined });
+        const res = await addProviderKey(provider, keyArg, {
+            index: parsed.index !== null ? parsed.index : undefined,
+            baseUrl: parsed.url !== null ? parsed.url : undefined,
+        });
         if (!res.ok) {
             if (res.full) {
                 return { lines: [`✦ ${res.error}`, '⠀⠀\x1b[2m└─\x1b[22m Use /key add <key> --index <n> to overwrite a slot.'] };
@@ -132,6 +138,9 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         const active = await getActiveIndex(provider);
         if (active === null) await setActiveIndex(provider, res.index);
         lines.push(`✦ Key added to ${provider} slot ${res.index + 1}.`);
+        if (parsed.url !== null && isUrlBearing(provider)) {
+            lines.push(`⠀⠀\x1b[2m└─\x1b[22m Using URL: ${parsed.url}`);
+        }
         return done();
     }
 

@@ -371,12 +371,35 @@ export const resolveBaseUrl = async (provider) => {
 // Mutations: add / remove / use / clean
 // ---------------------------------------------------------------------------
 
-const buildSlotValue = async (provider, key, existingBaseUrl) => {
+const buildSlotValue = async (provider, key, existingBaseUrl, overrideBaseUrl) => {
     if (isUrlBearing(provider)) {
-        const baseUrl = existingBaseUrl !== undefined ? existingBaseUrl : await getCurrentCustomBaseUrl();
+        const baseUrl = overrideBaseUrl !== undefined
+            ? overrideBaseUrl
+            : (existingBaseUrl !== undefined ? existingBaseUrl : await getCurrentCustomBaseUrl());
         return { key, baseUrl };
     }
     return key;
+};
+
+/**
+ * Validate a user-supplied OpenAI-compatible endpoint.
+ * Accepts URLs ending in `/v1` or `/v1/chat/completions` (trailing slashes ok).
+ * @returns {{ok: boolean, url?: string, error?: string}}
+ */
+export const validateOpenAIBaseUrl = (raw) => {
+    const url = String(raw || '').trim();
+    if (!url) return { ok: false, error: 'URL is empty.' };
+    if (!/^https?:\/\/\S+$/i.test(url)) {
+        return { ok: false, error: 'URL must start with http:// or https://' };
+    }
+    const clean = url.replace(/\/+$/, '');
+    const lower = clean.toLowerCase();
+    const isV1 = /(^|\/)v1$/.test(lower);
+    const isChat = /(^|\/)v1\/chat\/completions$/.test(lower);
+    if (!isV1 && !isChat) {
+        return { ok: false, error: 'URL must end with /v1 or /v1/chat/completions' };
+    }
+    return { ok: true, url: clean };
 };
 
 /** Find slots whose key equals or contains `query`. Returns matching indices. */
@@ -402,6 +425,17 @@ export const addProviderKey = async (provider, key, opts = {}) => {
     if (!key || !String(key).trim()) return { ok: false, error: 'Empty key.' };
     const addKey = String(key).trim();
 
+    // Optional explicit base URL (custom provider only).
+    let overrideBaseUrl;
+    if (opts.baseUrl !== undefined) {
+        if (!isUrlBearing(canonical)) {
+            return { ok: false, error: '--url is only supported for the custom provider.' };
+        }
+        const validated = validateOpenAIBaseUrl(opts.baseUrl);
+        if (!validated.ok) return { ok: false, error: `Invalid URL: ${validated.error}` };
+        overrideBaseUrl = validated.url;
+    }
+
     const store = readStore();
     const slots = normalizeSlots(store[canonical]);
 
@@ -419,7 +453,7 @@ export const addProviderKey = async (provider, key, opts = {}) => {
         }
         // Overwrite semantics (caller is responsible for confirm).
         const existingBaseUrl = (slots[i] && typeof slots[i] === 'object') ? slots[i].baseUrl : undefined;
-        slots[i] = await buildSlotValue(canonical, addKey, existingBaseUrl);
+        slots[i] = await buildSlotValue(canonical, addKey, existingBaseUrl, overrideBaseUrl);
         store[canonical] = slots;
         writeStore(store);
         return { ok: true, index: i };
@@ -430,7 +464,7 @@ export const addProviderKey = async (provider, key, opts = {}) => {
     if (emptyIdx === -1) {
         return { ok: false, error: 'All slots full. Specify an index to overwrite.', full: true };
     }
-    slots[emptyIdx] = await buildSlotValue(canonical, addKey);
+    slots[emptyIdx] = await buildSlotValue(canonical, addKey, undefined, overrideBaseUrl);
     store[canonical] = slots;
     writeStore(store);
     return { ok: true, index: emptyIdx };

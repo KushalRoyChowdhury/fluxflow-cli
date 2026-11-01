@@ -72,11 +72,11 @@ export const write_file = async (args, context = {}) => {
 
         // Prepare a snippet for the UI/History (Top 50 / Bottom 50)
         let snippet = '';
-        if (verifiedLineCount <= 100) {
+        if (verifiedLineCount <= 690) {
             snippet = verifiedLines.join('\n');
         } else {
-            const head = verifiedLines.slice(0, 50).join('\n');
-            const tail = verifiedLines.slice(-50).join('\n');
+            const head = verifiedLines.slice(0, 300).join('\n');
+            const tail = verifiedLines.slice(-300).join('\n');
             snippet = `${head}\n\n... [${verifiedLineCount - 100} lines truncated] ...\n\n${tail}`;
         }
 
@@ -85,7 +85,7 @@ export const write_file = async (args, context = {}) => {
         const { systemSettings } = await loadSettings();
         let resultString = `File [${targetPath}] saved.\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
 
-        if (systemSettings?.compressToolResults && verifiedLineCount > 60) {
+        if (systemSettings?.compressToolResults && verifiedLineCount > 6000) {
             const contentLines = finalContent.split(/\r?\n/);
             const headMatches = contentLines.slice(0, 25).join('\n') === verifiedLines.slice(0, 25).join('\n');
             const tailMatches = contentLines.slice(-25).join('\n') === verifiedLines.slice(-25).join('\n');

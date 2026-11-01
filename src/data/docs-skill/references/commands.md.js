@@ -33,7 +33,8 @@ Trigger in chat via /command
 * /wildercard-tooling → Extended version of /wildcard-tooling
 * /key → Manage saved API keys (10-slot array per provider)
   - /key list [--provider <name>] → Show slots 1-10 (active marked); no --provider value = all-providers summary
-  - /key add <key> [--index <n>] | /key new → Add a key (alias: new)
+  - /key add <key> [--index <n>] [--url <endpoint>] | /key new → Add a key (alias: new)
+  - --url (custom provider only): endpoint ending in /v1 or /v1/chat/completions. Overrides the saved base URL for that slot.
   - /key remove [<index>|<key>|--all] → Remove by index/key/substring, or all
   - /key use <index>|<key> → Set active key    |    /key use <key> --temp → Session-only key
   - /key clean [--provider <name>] → Remove gaps between slots (no --provider = whole DB)

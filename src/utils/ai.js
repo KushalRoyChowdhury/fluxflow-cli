@@ -5021,11 +5021,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 }
 
                                                 let snippet = '';
-                                                if (verifiedLineCount <= 100) {
+                                                if (verifiedLineCount <= 690) {
                                                     snippet = verifiedLines.join('\n');
                                                 } else {
-                                                    const head = verifiedLines.slice(0, 50).join('\n');
-                                                    const tail = verifiedLines.slice(-50).join('\n');
+                                                    const head = verifiedLines.slice(0, 300).join('\n');
+                                                    const tail = verifiedLines.slice(-300).join('\n');
                                                     snippet = `${head}\n\n... [${verifiedLineCount - 100} lines truncated] ...\n\n${tail}`;
                                                 }
 
@@ -5405,7 +5405,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const lines = cleanText.split(/\r?\n/);
                                     const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
                                     const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
-                                    aiContent = `[ACTION RESULT]: ${headerPart}\n[SYSTEM NOTE]: Content verified and persisted to disk. Full preview omitted to save tokens.`;
+                                    aiContent = `[ACTION RESULT]: ${headerPart}`;
                                 } else {
                                     aiContent = `[ACTION RESULT]: ${processedResult}`;
                                 }

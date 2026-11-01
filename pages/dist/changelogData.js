@@ -1,10 +1,18 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.46.0": {
+        "note": "NOVEMBER 1",
+        "added": [
+            "Added new flag `--url` for `/key add` to save a custom url directly. *Only valid in Custom OpenAI Endpoint mode.*"
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "4.45.0": {
         "note": "NOVEMBER 1",
         "added": [
-            "Added new & advance API Key management system, with 10 key slot per provider:\n• 4 new subcommands under `/key`: `use`, `add`, `remove`, `clean`.\n• 4 new flag support: `--provider`, `--index`, `--temp`, `--all`, & `--unmask`.\n(Old keys are migrated automatically.) For more details **SEE** [Here👋](https://fluxflow-cli.onrender.com/app-commands)",
+            "Added new & advance API Key management system, with 10 key slot per provider:\n• 4 new subcommands under `/key`: `use`, `add`, `remove`, `clean`.\n• 4 new flag support: `--provider`, `--index`, `--temp`, `--all`, & `--unmask`.\n(Old keys are migrated automatically.) For more details **SEE** [here👋](https://fluxflow-cli.onrender.com/app-commands).",
             "Added support for Git Bash shell in Windows. Turn ON from `/settings` → `Miscellaneous` → `Prefer Bash`. Agent can still use native shell (aka `pwsh` or `cmd`) if it needs to."
         ],
         "changed": [],
