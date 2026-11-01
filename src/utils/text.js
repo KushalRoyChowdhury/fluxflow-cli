@@ -610,10 +610,18 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     }
 
     patch.hunks.forEach((hunk, hIdx) => {
-        // Context separation between distinct disjoint hunks
-        if (hIdx > 0) {
-            diffText += `[UI_CONTEXT] ${separatorLine}\n`;
+        let addedCount = 0;
+        let removedCount = 0;
+        for (const line of hunk.lines) {
+            if (line[0] === '+') addedCount++;
+            else if (line[0] === '-') removedCount++;
         }
+
+        const parts = [];
+        if (addedCount > 0) parts.push(`+${addedCount}`);
+        if (removedCount > 0) parts.push(`-${removedCount}`);
+        const hunkHeader = `@@ ${parts.join(' ')} @@`;
+        diffText += `[UI_CONTEXT] ${hunkHeader}\n`;
 
         let oldLineIdx = hunk.oldStart;
         let newLineIdx = hunk.newStart;

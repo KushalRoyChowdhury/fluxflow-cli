@@ -953,21 +953,12 @@ export const maskCodeSpans = (text) => {
         // Check for single backtick inline span (when not in fence)
         if (chars[i] === '`') {
             if (!inInlineBacktick) {
-                // Only enter inline backtick span if there is a matching closing backtick on the same line
-                let hasClosing = false;
-                for (let k = i + 1; k < chars.length; k++) {
-                    if (chars[k] === '\n' || chars[k] === '\r') break;
-                    if (chars[k] === '`' && (k === 0 || chars[k - 1] !== '\\')) {
-                        hasClosing = true;
-                        break;
-                    }
-                }
-                if (hasClosing) {
-                    inInlineBacktick = true;
-                    chars[i] = ' ';
-                    i++;
-                    continue;
-                }
+                // When parsing completed or streaming text, enter inline backtick span
+                // (Masks unclosed backticks up to end of line or next backtick to prevent streaming false positives)
+                inInlineBacktick = true;
+                chars[i] = ' ';
+                i++;
+                continue;
             } else {
                 inInlineBacktick = false;
                 chars[i] = ' ';
@@ -5396,10 +5387,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let aiContent;
                                 if (normToolName === 'write_file' && !processedResult.startsWith('ERROR:')) {
                                     const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
-                                    const lines = cleanText.split(/\r?\n/);
-                                    const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
-                                    const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
-                                    aiContent = `[ACTION RESULT]: ${headerPart}`;
+                                    if (/- Stats:.*\r?\nOld File contents:/s.test(cleanText)) {
+                                        // Overwrite: keep header + old content, strip Content Preview and new content
+                                        const contentPreviewIdx = cleanText.search(/^- Content Preview:/m);
+                                        const trimmed = contentPreviewIdx !== -1 ? cleanText.slice(0, contentPreviewIdx).trimEnd() : cleanText;
+                                        aiContent = `[ACTION RESULT]: ${trimmed}\n\n[Old file content for reversal reference. Replaced with new write request]`;
+                                    } else {
+                                        // New file write: just header + stats, no content echoing
+                                        const lines = cleanText.split(/\r?\n/);
+                                        const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
+                                        const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
+                                        aiContent = `[ACTION RESULT]: ${headerPart}`;
+                                    }
                                 } else if (processedResult.startsWith('[[SAME]]')) {
                                     const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
                                     const lines = cleanText.split(/\r?\n/);
@@ -5731,9 +5730,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // we finish the agent loop immediately.
             // We MUST NOT finish if a tool was executed (toolResults.length > 0) or if a continue signal is present.
             // [BUGFIX] - We also MUST NOT finish if we are in a recovery state (loop detection triggered).
+            // Only consider detectedAnyToolCalls if there are actually executable tools in this turn
+            const hasExecutableToolsInTurn = toolResults.length > 0 || (detectToolCalls(stripLeadingThinking(turnText)).length > 0);
             let isActuallyFinished = (hasFinish || toolResults.length === 0) && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
             isActuallyFinished = toolResults.length === 0 ? isActuallyFinished : false;
-            isActuallyFinished = detectedAnyToolCalls || wasToolCalledInLastLoop ? false : isActuallyFinished;
+            isActuallyFinished = (hasExecutableToolsInTurn && detectedAnyToolCalls) || wasToolCalledInLastLoop ? false : isActuallyFinished;
 
             if (turnText && turnText.trim().endsWith('")]') && toolResults.length === 0) {
                 isActuallyFinished = false;
@@ -5841,8 +5842,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             } else {
                 if (!TERMINATION_SIGNAL) {
                     const toolActionableText = turnText.replace(/(?:<think_fluxflow>|\[think_fluxflow\])[\s\S]*?(?:<\/think_fluxflow>|\[\/think_fluxflow\]|$)/i, '');
-                    const attemptedToolsCount = (toolActionableText.match(/\[(?:tool|action):/gi) || []).length;
-                    if (wasToolCalledInLastLoop || detectedAnyToolCalls || attemptedToolsCount > 0) {
+                    const scanText = maskCodeSpans(toolActionableText);
+                    const attemptedToolsCount = (scanText.match(/\[\s*(?:tool:(?:functions\.)?|action:(?:functions\.)?|action:)([a-zA-Z0-9_]+)\s*\(/gi) || []).length;
+                    if (wasToolCalledInLastLoop || (detectedAnyToolCalls && attemptedToolsCount > 0) || attemptedToolsCount > 0) {
                         const diag = diagnoseUnexecutedTools(toolActionableText);
                         const errorMsg = diag
                             ? `[system] Failed to execute ${attemptedToolsCount > 0 ? attemptedToolsCount : 1} tool call${attemptedToolsCount > 1 ? 's' : ''} due to syntax/structure issues:\n${diag} [/system]`

@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.47.0": {
+        "note": "NOVEMBER 2",
+        "added": [
+            "Added `@@ +M -N @@` style diff hunk headers."
+        ],
+        "changed": [],
+        "fixes": [
+            "Bug Fixes on tool parsing."
+        ]
+    },
     "4.46.0": {
         "note": "NOVEMBER 1",
         "added": [

@@ -18,7 +18,7 @@ import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPIKey } from './utils/secrets.js';
 import { runKeyCommand } from './utils/keyCommand.js';
 import { clearAllTempKeys, setNoticeHandler } from './utils/secrets_v2.js';
-import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary, getActiveToolContext, detectToolCalls, maskCodeSpans } from './utils/ai.js';
+import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary, getActiveToolContext, detectToolCalls, maskCodeSpans, stripTrailingFluffAfterTools } from './utils/ai.js';
 import { subagentProgress } from './utils/subagent_state.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
 import { showAgentFinishNotification, showUserActionRequiredNotification } from './utils/notifications.js';
@@ -732,12 +732,14 @@ export default function App({ args = [] }) {
             let curText = flattenString(activeStreamingMsgRef.current.text || '');
             let unclosedToolPrefix = '';
 
-            // Protect active tool call syntax from leaking into frozen UI bubbles across tool execution
+            // Protect active tool call syntax and premature hallucinatory conversational fluff from leaking into frozen UI bubbles across tool execution
             if (activeStreamingMsgRef.current.role === 'agent' && curText) {
                 const toolCtx = getActiveToolContext(curText);
                 if (toolCtx.inside && typeof toolCtx.startIndex === 'number' && toolCtx.startIndex >= 0) {
                     unclosedToolPrefix = curText.substring(toolCtx.startIndex);
                     curText = curText.substring(0, toolCtx.startIndex);
+                } else {
+                    curText = stripTrailingFluffAfterTools(curText);
                 }
             }
 
@@ -5398,7 +5400,7 @@ export default function App({ args = [] }) {
                                             continue;
                                         }
                                         if (insideOldFile) {
-                                            if (line.startsWith('- Content Preview:') || (line.trim() === '' && !/^\s*\d+\s*\|/.test(line))) {
+                                            if (line.startsWith('- Content Preview:') || line.startsWith('- Stats:')) {
                                                 insideOldFile = false;
                                             } else if (/^\s*\d+\s*\|/.test(line)) {
                                                 oldLinesCount++;

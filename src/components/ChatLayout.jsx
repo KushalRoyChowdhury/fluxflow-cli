@@ -538,6 +538,32 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
     const isContext = sanitizedLine.includes('[UI_CONTEXT]');
     const cleanLine = sanitizedLine.replace('[UI_CONTEXT]', '');
 
+    // Handle hunk header @@ +x -y @@ with distinct color badges
+    const isHunkHeader = isContext && cleanLine.trim().startsWith('@@');
+    if (isHunkHeader) {
+        const headerText = cleanLine.trim();
+        const tokens = headerText.split(/\s+/);
+        return (
+            <Box backgroundColor={colors.codeBg} paddingX={1} width={columns} marginY={0}>
+                <Box width={columns - 2} flexDirection="row">
+                    {tokens.map((tok, tIdx) => {
+                        let tokColor = colors.info || 'cyan';
+                        if (tok.startsWith('+')) {
+                            tokColor = colors.diffAdditionNum || 'green';
+                        } else if (tok.startsWith('-')) {
+                            tokColor = colors.diffRemovalNum || 'red';
+                        }
+                        return (
+                            <Text key={tIdx} color={tokColor} bold={tok.startsWith('+') || tok.startsWith('-')}>
+                                {tok}{tIdx < tokens.length - 1 ? ' ' : ''}
+                            </Text>
+                        );
+                    })}
+                </Box>
+            </Box>
+        );
+    }
+
     // Handle high-fidelity multi-patch separator
     if (isContext && cleanLine.includes('═')) {
         return (
