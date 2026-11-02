@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.48.0": {
+        "note": "NOVEMBER 3",
+        "added": [],
+        "changed": [
+            "Improved context efficiency with 'Recent Manual Codes'. Update FluxFlow Companion to v1.8+."
+        ],
+        "fixes": []
+    },
     "4.47.0": {
         "note": "NOVEMBER 2",
         "added": [

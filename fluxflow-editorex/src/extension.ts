@@ -90,7 +90,7 @@ const lastKnownStates = new Map<string, string>();
 const originalStates = new Map<string, string>();
 const virtualDocs = new Map<string, string>();
 const newFilesCreatedByBridge = new Set<string>();
-const accumulatedEdits = new Map<string, Map<number, string>>();
+const accumulatedEdits = new Map<string, Map<number, { original: string; modified: string; timestamp: number }>>();
 const manualEditBaseContents = new Map<string, string[]>();
 
 class FluxFlowDiffProvider implements vscode.TextDocumentContentProvider {
@@ -324,7 +324,7 @@ function getRecentManualChanges(
         if (lineEntries.length === 0) continue;
         const lines = lineEntries.slice(-maxLines);
         const relPath = vscode.workspace.asRelativePath(docPath);
-        const lineText = lines.map(([n, t]) => `  L${n}: ${t}`).join('\n');
+        const lineText = lines.map(([n, edit]) => `  L${n}: ${edit.modified}`).join('\n');
         parts.push(`${relPath}:\n${lineText}`);
     }
     return parts.join('\n');
@@ -1420,19 +1420,36 @@ export function activate(context: vscode.ExtensionContext) {
 
             let fileMap = accumulatedEdits.get(docPath);
             if (!fileMap) {
-                fileMap = new Map<number, string>();
+                fileMap = new Map<number, { original: string; modified: string; timestamp: number }>();
             }
 
+            const now = Date.now();
             currentLines.forEach((line, idx) => {
-                if (line !== lastLines[idx]) {
-                    const originalLine = baseLines[idx] !== undefined ? baseLines[idx] : "";
-                    if (line.trim() === originalLine.trim()) {
+                const trimmedCur = line.trim();
+                const trimmedLast = lastLines[idx] !== undefined ? lastLines[idx].trim() : "";
+                const originalLine = baseLines[idx] !== undefined ? baseLines[idx] : "";
+                const trimmedOriginal = originalLine.trim();
+
+                // If indentation changed but content is the same as previous line, do nothing
+                if (trimmedCur === trimmedLast) {
+                    // But if this line was previously marked edited and is now identical to original baseline, clear it
+                    if (trimmedCur === trimmedOriginal && fileMap!.has(idx + 1)) {
                         fileMap!.delete(idx + 1);
-                    } else {
-                        // Bubble to most-recent (Map preserves insertion order).
-                        fileMap!.delete(idx + 1);
-                        fileMap!.set(idx + 1, line.trim());
                     }
+                    return;
+                }
+
+                // If content changed back to original baseline, discard it completely
+                if (trimmedCur === trimmedOriginal) {
+                    fileMap!.delete(idx + 1);
+                } else {
+                    // Bubble to most-recent (Map preserves insertion order).
+                    fileMap!.delete(idx + 1);
+                    fileMap!.set(idx + 1, {
+                        original: trimmedOriginal,
+                        modified: trimmedCur,
+                        timestamp: now
+                    });
                 }
             });
 
@@ -1777,19 +1794,62 @@ async function getIDEContext() {
         }
 
         if (accumulatedEdits.size > 0) {
-            const manualEditsParts: string[] = [];
+            // Flatten all edits across files with timestamp to pick the most recent 20 edits
+            interface FlattenedEdit {
+                docPath: string;
+                lineNum: number;
+                original: string;
+                modified: string;
+                timestamp: number;
+            }
+
+            const allEdits: FlattenedEdit[] = [];
             accumulatedEdits.forEach((fileMap, docPath) => {
-                if (fileMap.size > 0) {
-                    const fileEdits: string[] = [];
-                    // Sort lines by line number
-                    const sortedLines = Array.from(fileMap.keys()).sort((a, b) => a - b);
-                    sortedLines.forEach(lineNum => {
-                        fileEdits.push(`    Line ${lineNum}: ${fileMap.get(lineNum)}`);
+                fileMap.forEach((edit, lineNum) => {
+                    allEdits.push({
+                        docPath,
+                        lineNum,
+                        original: edit.original,
+                        modified: edit.modified,
+                        timestamp: edit.timestamp
                     });
-                    const relPath = vscode.workspace.asRelativePath(docPath);
-                    manualEditsParts.push(`${relPath}:\n${fileEdits.join('\n')}`);
+                });
+            });
+
+            // Sort newest first, take up to 20
+            allEdits.sort((a, b) => b.timestamp - a.timestamp);
+            const recent20 = allEdits.slice(0, 20);
+
+            // Group recent edits back by file (preserving chronological or insertion order)
+            const groupedByFile = new Map<string, Array<{ lineNum: number; original: string; modified: string }>>();
+            // We can iterate through accumulatedEdits so files appear in recency order
+            accumulatedEdits.forEach((_, docPath) => {
+                const fileEdits = recent20.filter(e => e.docPath === docPath);
+                if (fileEdits.length > 0) {
+                    // Sort lines numerically for clean reading
+                    fileEdits.sort((a, b) => a.lineNum - b.lineNum);
+                    groupedByFile.set(docPath, fileEdits);
                 }
             });
+
+            const manualEditsParts: string[] = [];
+            groupedByFile.forEach((lines, docPath) => {
+                const relPath = vscode.workspace.asRelativePath(docPath);
+                if (lines.length === 1) {
+                    const l = lines[0];
+                    manualEditsParts.push(
+                        `${relPath}: L${l.lineNum}:\n  - ${l.original}\n  + ${l.modified}`
+                    );
+                } else {
+                    const lineBlocks = lines.map(l =>
+                        `  L${l.lineNum}:\n    - ${l.original}\n    + ${l.modified}`
+                    );
+                    manualEditsParts.push(
+                        `${relPath}:\n${lineBlocks.join('\n')}`
+                    );
+                }
+            });
+
             context.manual_edits = manualEditsParts.join('\n');
         }
     }

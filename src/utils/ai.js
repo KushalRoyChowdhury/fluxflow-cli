@@ -2194,124 +2194,33 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     ideBlock += `Current Selection: "${sel}"\n`;
                 }
                 if (ideCtx.manual_edits) {
-                    let edits = ideCtx.manual_edits;
-                    const lines = edits.split('\n');
-                    const files = [];
-                    let currentFile = null;
+                    const lines = ideCtx.manual_edits.split('\n');
+                    const processedLines = [];
 
-                    for (const line of lines) {
-                        if (!line.trim()) continue;
-                        if (line.startsWith('    Line ')) {
-                            if (currentFile) {
-                                currentFile.edits.push(line);
-                            }
-                        } else {
-                            const filePath = line.endsWith(':') ? line.slice(0, -1) : line;
-                            currentFile = { path: filePath, edits: [] };
-                            files.push(currentFile);
-                        }
-                    }
+                    for (let i = 0; i < lines.length; i++) {
+                        const cur = lines[i];
+                        const next = lines[i + 1];
+                        const nextNext = lines[i + 2];
 
-                    // 1. Initial per-file 80 lines cap (FIFO) & record original counts
-                    for (const file of files) {
-                        if (file.edits.length > 80) {
-                            file.edits = file.edits.slice(-80);
-                        }
-                        file.originalEditsCount = file.edits.length;
-                    }
-
-                    // 2. Adjust per-file limit dynamically to accommodate 300 total lines (min 10)
-                    const getSumForLimit = (limit, activeFiles) => {
-                        return activeFiles.reduce((sum, f) => {
-                            const isFocused = ideCtx.file_focused &&
-                                (f.path === ideCtx.file_focused ||
-                                    path.resolve(process.cwd(), f.path) === path.resolve(ideCtx.file_focused));
-                            const fileLimit = isFocused ? Math.ceil(limit * 1.2) : limit;
-                            return sum + Math.min(f.edits.length, fileLimit);
-                        }, 0);
-                    };
-
-                    let chosenLimit = 80;
-                    if (getSumForLimit(80, files) > 300) {
-                        let found = false;
-                        for (let L = 80; L >= 10; L--) {
-                            if (getSumForLimit(L, files) <= 300) {
-                                chosenLimit = L;
-                                found = true;
-                                break;
+                        // If this is a line header followed by - and + diff lines
+                        if (
+                            next !== undefined &&
+                            nextNext !== undefined &&
+                            /:\s*$/.test(cur) &&
+                            /^\s*-\s*/.test(next) &&
+                            /^\s*\+\s*/.test(nextNext)
+                        ) {
+                            if (next.length > 300 || nextNext.length > 300) {
+                                processedLines.push(cur.replace(/:\s*$/, ': [changed]'));
+                                i += 2; // skip the - and + diff lines
+                                continue;
                             }
                         }
-                        if (!found) {
-                            chosenLimit = 10;
-                        }
+
+                        processedLines.push(cur);
                     }
 
-                    let activeFiles = [...files];
-                    // If even at min limit 10, total lines > 500, remove files with minimum original line count
-                    if (chosenLimit === 10 && getSumForLimit(10, activeFiles) > 500) {
-                        while (activeFiles.length > 0 && getSumForLimit(10, activeFiles) > 500) {
-                            let minIndex = 0;
-                            let minVal = activeFiles[0].originalEditsCount;
-                            for (let i = 1; i < activeFiles.length; i++) {
-                                if (activeFiles[i].originalEditsCount < minVal) {
-                                    minVal = activeFiles[i].originalEditsCount;
-                                    minIndex = i;
-                                }
-                            }
-                            activeFiles.splice(minIndex, 1);
-                        }
-                    }
-
-                    // Apply the chosen limit to the active files (FIFO)
-                    for (const file of activeFiles) {
-                        const isFocused = ideCtx.file_focused &&
-                            (file.path === ideCtx.file_focused ||
-                                path.resolve(process.cwd(), file.path) === path.resolve(ideCtx.file_focused));
-                        const fileLimit = isFocused ? Math.ceil(chosenLimit * 1.2) : chosenLimit;
-                        if (file.edits.length > fileLimit) {
-                            file.edits = file.edits.slice(-fileLimit);
-                        }
-                    }
-
-                    // 3. Limit per-file character limit to 4 * 768 (FIFO)
-                    for (const file of activeFiles) {
-                        let fileString = `${file.path}:\n${file.edits.join('\n')}`;
-                        while (file.edits.length > 0 && fileString.length > 4 * 768) {
-                            file.edits.shift();
-                            fileString = `${file.path}:\n${file.edits.join('\n')}`;
-                        }
-                        if (fileString.length > 4 * 768) {
-                            file.stringRepresentation = '... ' + fileString.slice(-(4 * 768 - 4));
-                        } else {
-                            file.stringRepresentation = fileString;
-                        }
-                    }
-
-                    // 4. Limit total character limit to 4 * 2048 (FIFO)
-                    let finalEdits = activeFiles.map(f => f.stringRepresentation).join('\n');
-                    while (activeFiles.length > 0 && finalEdits.length > 4 * 2048) {
-                        if (activeFiles[0].edits.length > 0) {
-                            activeFiles[0].edits.shift();
-                        } else {
-                            activeFiles.shift();
-                        }
-                        // Re-calculate representations
-                        for (const file of activeFiles) {
-                            let fileString = `${file.path}:\n${file.edits.join('\n')}`;
-                            if (fileString.length > 4 * 768) {
-                                file.stringRepresentation = '... ' + fileString.slice(-(4 * 768 - 4));
-                            } else {
-                                file.stringRepresentation = fileString;
-                            }
-                        }
-                        finalEdits = activeFiles.map(f => f.stringRepresentation).join('\n');
-                    }
-
-                    if (finalEdits.length > 4 * 2048) {
-                        finalEdits = '... ' + finalEdits.slice(-(4 * 2048 - 4));
-                    }
-
-                    ideBlock += `Recent Manual Edits:\n${finalEdits}\n`;
+                    ideBlock += `Recent Manual Edits:\n${processedLines.join('\n')}\n`;
                 }
                 if (relOpened.length > 0) ideBlock += `All Opened Editors: ${relOpened.join(', ')}`;
 
