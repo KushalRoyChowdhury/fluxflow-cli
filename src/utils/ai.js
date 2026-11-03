@@ -4488,104 +4488,144 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             const { command } = parseArgs(toolCall.args);
                                             const cmdTrimmed = (command || '').trim();
 
+                                            const splitChainedCommands = (cmdString) => {
+                                                const commands = [];
+                                                let current = '';
+                                                let inQuote = null;
+                                                for (let i = 0; i < cmdString.length; i++) {
+                                                    const char = cmdString[i];
+                                                    if (inQuote) {
+                                                        if (char === inQuote) inQuote = null;
+                                                        current += char;
+                                                    } else {
+                                                        if (char === '"' || char === "'") {
+                                                            inQuote = char;
+                                                            current += char;
+                                                        } else if (
+                                                            (char === '&' && cmdString[i + 1] === '&') ||
+                                                            (char === '|' && cmdString[i + 1] === '|')
+                                                        ) {
+                                                            if (current.trim()) {
+                                                                commands.push(current.trim());
+                                                                current = '';
+                                                            }
+                                                            i++;
+                                                        } else if (char === ';' || char === '|' || char === '&') {
+                                                            if (current.trim()) {
+                                                                commands.push(current.trim());
+                                                                current = '';
+                                                            }
+                                                        } else {
+                                                            current += char;
+                                                        }
+                                                    }
+                                                }
+                                                if (current.trim()) {
+                                                    commands.push(current.trim());
+                                                }
+                                                return commands.length > 0 ? commands : [cmdString];
+                                            };
+
+                                            const subCommands = splitChainedCommands(cmdTrimmed);
+
                                             const matchesList = (cmd, csv) => {
                                                 if (!csv) return false;
                                                 const list = csv.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
                                                 const lowerCmd = cmd.toLowerCase();
-                                                return list.some(item => lowerCmd.startsWith(item));
+                                                return list.some(item => {
+                                                    if (lowerCmd === item) return true;
+                                                    if (lowerCmd.startsWith(item)) {
+                                                        const nextChar = lowerCmd.charAt(item.length);
+                                                        return /\s|[;&|/]/.test(nextChar);
+                                                    }
+                                                    return false;
+                                                });
                                             };
 
-                                            const askMatch = matchesList(cmdTrimmed, systemSettings.alwaysAskCommands);
-                                            const approveMatch = matchesList(cmdTrimmed, systemSettings.autoApproveCommands);
-                                            disallowMatch = matchesList(cmdTrimmed, systemSettings.autoDisallowCommands);
+                                            const askMatch = subCommands.some(c => matchesList(c, systemSettings.alwaysAskCommands));
+                                            const disallowMatch = subCommands.some(c => matchesList(c, systemSettings.autoDisallowCommands));
+                                            const approveMatch = subCommands.length > 0 && subCommands.every(c => matchesList(c, systemSettings.autoApproveCommands) || (systemSettings.autoApproveGit && /^git\s+commit\b/i.test(c)));
 
-                                            // 1. Always Ask (HIGHEST PRIORITY)
-                                            if (askMatch) {
+                                            // Waterfall: deny > ask > auto-approve > auto_exec
+                                            // 1. Auto Disallow / Prohibited (HIGHEST PRIORITY)
+                                            if (disallowMatch) {
+                                                decision = 'deny';
+                                            }
+                                            // Network access check (part of deny priority)
+                                            else if (systemSettings.networkAccess === false) {
+                                                let normalized = cmdTrimmed
+                                                    .trim()
+                                                    .replace(/\s+/g, ' ')
+                                                    .replace(/^['"]+|['"]+$/g, '')
+                                                    .toLowerCase();
+
+                                                const tokens = normalized.split(' ');
+                                                const rawCmd = tokens[0];
+                                                const cmd = rawCmd
+                                                    .split('/')
+                                                    .pop()
+                                                    .split('\\')
+                                                    .pop()
+                                                    .replace(/\.exe$/, '');
+
+                                                const blockedCommands = new Set([
+                                                    'curl', 'wget', 'httpie', 'xh', 'ssh', 'scp', 'sftp', 'rsync',
+                                                    'ftp', 'lftp', 'tftp', 'telnet', 'nc', 'netcat', 'socat',
+                                                    'ping', 'traceroute', 'tracert', 'dig', 'nslookup', 'host', 'whois', 'nmap',
+                                                    'docker', 'podman', 'kubectl', 'helm', 'gcloud', 'aws', 'az',
+                                                    'terraform', 'ansible-playbook', 'nix', 'nix-env',
+                                                    'apt', 'apt-get', 'dpkg', 'yum', 'dnf', 'pacman', 'zypper', 'brew', 'apk',
+                                                    'choco', 'scoop', 'conda', 'mamba', 'aria2c', 'axel', 'smbclient',
+                                                    'lynx', 'w3m', 'links', 'elinks', 'heroku', 'netlify', 'vercel',
+                                                    'firebase', 'supabase', 'wrangler', 'flyctl', 'powershell', 'pwsh',
+                                                    'certutil', 'bitsadmin', 'cloudflared', 'ngrok', 'tailscale', 'zerotier', 'rclone'
+                                                ]);
+
+                                                let deny = false;
+                                                if (blockedCommands.has(cmd)) {
+                                                    deny = true;
+                                                }
+
+                                                const hasSubcmd = (list) => tokens.slice(1).some(token => list.includes(token));
+                                                const shouldDenyPkgManager = (dangerCommands) => {
+                                                    const dangerIdx = tokens.findIndex(t => dangerCommands.includes(t));
+                                                    const safeIdx = tokens.findIndex(t => ['run', 'exec', 'test'].includes(t));
+                                                    return dangerIdx !== -1 && !(safeIdx !== -1 && safeIdx < dangerIdx);
+                                                };
+
+                                                if (cmd === 'git' && hasSubcmd(['clone', 'pull', 'push', 'fetch'])) deny = true;
+                                                if (cmd === 'go' && hasSubcmd(['get', 'install'])) deny = true;
+                                                if (cmd === 'npm' && shouldDenyPkgManager(['install', 'i', 'update', 'add'])) deny = true;
+                                                if (cmd === 'yarn' && shouldDenyPkgManager(['add', 'install', 'upgrade'])) deny = true;
+                                                if (cmd === 'pnpm' && shouldDenyPkgManager(['add', 'install', 'update'])) deny = true;
+                                                if (cmd === 'bun' && shouldDenyPkgManager(['add', 'install', 'update'])) deny = true;
+                                                if (cmd === 'deno' && hasSubcmd(['install', 'add'])) deny = true;
+                                                if (cmd === 'pip' && hasSubcmd(['install', 'download'])) deny = true;
+                                                if (cmd === 'pip3' && hasSubcmd(['install', 'download'])) deny = true;
+                                                if (cmd === 'cargo' && hasSubcmd(['install', 'add'])) deny = true;
+                                                if (['bash', 'sh', 'zsh', 'fish'].includes(cmd) && hasSubcmd(['-c'])) deny = true;
+                                                if (cmd === 'cmd' && hasSubcmd(['/c'])) deny = true;
+
+                                                if (deny) {
+                                                    decision = 'deny';
+                                                    isNetworkDeny = true;
+                                                }
+                                            }
+
+                                            // 2. Always Ask
+                                            if (!decision && askMatch) {
                                                 forcePrompt = true;
                                             }
-                                            // 2. Auto Approve
-                                            else if (approveMatch) {
-                                                decision = 'allow';
-                                            }
-                                            // 3. Git commit approve
-                                            else if (systemSettings.autoApproveGit && /^git\s+commit\b/i.test(cmdTrimmed)) {
-                                                decision = 'allow';
-                                            }
-
-                                            if (!forcePrompt && !decision) {
-                                                // Network access check
-                                                if (systemSettings.networkAccess === false) {
-                                                    let normalized = cmdTrimmed
-                                                        .trim()
-                                                        .replace(/\s+/g, ' ')
-                                                        .replace(/^['"]+|['"]+$/g, '')
-                                                        .toLowerCase();
-
-                                                    const tokens = normalized.split(' ');
-
-                                                    // 1. Extract just the executable name (handles /usr/bin/curl or .\curl)
-                                                    const rawCmd = tokens[0];
-                                                    const cmd = rawCmd
-                                                        .split('/')
-                                                        .pop()
-                                                        .split('\\')
-                                                        .pop()
-                                                        .replace(/\.exe$/, '');
-
-                                                    const blockedCommands = new Set([
-                                                        'curl', 'wget', 'httpie', 'xh', 'ssh', 'scp', 'sftp', 'rsync',
-                                                        'ftp', 'lftp', 'tftp', 'telnet', 'nc', 'netcat', 'socat',
-                                                        'ping', 'traceroute', 'tracert', 'dig', 'nslookup', 'host', 'whois', 'nmap',
-                                                        'docker', 'podman', 'kubectl', 'helm', 'gcloud', 'aws', 'az',
-                                                        'terraform', 'ansible-playbook', 'nix', 'nix-env',
-                                                        'apt', 'apt-get', 'dpkg', 'yum', 'dnf', 'pacman', 'zypper', 'brew', 'apk',
-                                                        'choco', 'scoop', 'conda', 'mamba', 'aria2c', 'axel', 'smbclient',
-                                                        'lynx', 'w3m', 'links', 'elinks', 'heroku', 'netlify', 'vercel',
-                                                        'firebase', 'supabase', 'wrangler', 'flyctl', 'powershell', 'pwsh',
-                                                        'certutil', 'bitsadmin', 'cloudflared', 'ngrok', 'tailscale', 'zerotier', 'rclone'
-                                                    ]);
-
-                                                    let deny = false;
-
-                                                    if (blockedCommands.has(cmd)) {
-                                                        deny = true;
-                                                    }
-
-                                                    // 2. Helper to check if a subcommand exists ANYWHERE after the command (ignores flags!)
-                                                    const hasSubcmd = (list) => tokens.slice(1).some(token => list.includes(token));
-                                                    const shouldDenyPkgManager = (dangerCommands) => {
-                                                        const dangerIdx = tokens.findIndex(t => dangerCommands.includes(t));
-                                                        const safeIdx = tokens.findIndex(t => ['run', 'exec', 'test'].includes(t));
-
-                                                        return dangerIdx !== -1 && !(safeIdx !== -1 && safeIdx < dangerIdx);
-                                                    };
-
-                                                    if (cmd === 'git' && hasSubcmd(['clone', 'pull', 'push', 'fetch'])) deny = true;
-                                                    if (cmd === 'go' && hasSubcmd(['get', 'install'])) deny = true;
-                                                    if (cmd === 'npm' && shouldDenyPkgManager(['install', 'i', 'update', 'add'])) deny = true;
-                                                    if (cmd === 'yarn' && shouldDenyPkgManager(['add', 'install', 'upgrade'])) deny = true;
-                                                    if (cmd === 'pnpm' && shouldDenyPkgManager(['add', 'install', 'update'])) deny = true;
-                                                    if (cmd === 'bun' && shouldDenyPkgManager(['add', 'install', 'update'])) deny = true;
-                                                    if (cmd === 'deno' && hasSubcmd(['install', 'add'])) deny = true;
-                                                    if (cmd === 'pip' && hasSubcmd(['install', 'download'])) deny = true;
-                                                    if (cmd === 'pip3' && hasSubcmd(['install', 'download'])) deny = true;
-                                                    if (cmd === 'cargo' && hasSubcmd(['install', 'add'])) deny = true;
-                                                    if (['bash', 'sh', 'zsh', 'fish'].includes(cmd) && hasSubcmd(['-c'])) deny = true;
-                                                    if (cmd === 'cmd' && hasSubcmd(['/c'])) deny = true;
-
-                                                    if (deny) {
-                                                        decision = 'deny';
-                                                        isNetworkDeny = true;
-                                                    }
-                                                }
-
-                                                // 4. Auto Disallow
-                                                if (!decision && disallowMatch) {
-                                                    decision = 'deny';
+                                            // 3. Auto Approve
+                                            else if (!decision && !forcePrompt) {
+                                                if (approveMatch) {
+                                                    decision = 'allow';
+                                                } else if (systemSettings.autoApproveGit && /^git\s+commit\b/i.test(cmdTrimmed)) {
+                                                    decision = 'allow';
                                                 }
                                             }
 
-                                            // 5. Auto Execute Fallback
+                                            // 4. Auto Execute Fallback (only if unhandled by deny, ask, auto-approve)
                                             if (!forcePrompt && !decision && autoExec) {
                                                 decision = 'allow';
                                             }

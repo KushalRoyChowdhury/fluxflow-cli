@@ -4967,6 +4967,80 @@ export default function App({ args = [] }) {
                                     const rawCmd = (command || '').trim();
                                     const safeRegex = /^(echo|ls|dir|pwd|cd|git status|git log|git diff|type|cat|help)\b/i;
 
+                                    const splitChainedCommands = (cmdString) => {
+                                        const commands = [];
+                                        let current = '';
+                                        let inQuote = null;
+                                        for (let i = 0; i < cmdString.length; i++) {
+                                            const char = cmdString[i];
+                                            if (inQuote) {
+                                                if (char === inQuote) inQuote = null;
+                                                current += char;
+                                            } else {
+                                                if (char === '"' || char === "'") {
+                                                    inQuote = char;
+                                                    current += char;
+                                                } else if (
+                                                    (char === '&' && cmdString[i + 1] === '&') ||
+                                                    (char === '|' && cmdString[i + 1] === '|')
+                                                ) {
+                                                    if (current.trim()) {
+                                                        commands.push(current.trim());
+                                                        current = '';
+                                                    }
+                                                    i++;
+                                                } else if (char === ';' || char === '|' || char === '&') {
+                                                    if (current.trim()) {
+                                                        commands.push(current.trim());
+                                                        current = '';
+                                                    }
+                                                } else {
+                                                    current += char;
+                                                }
+                                            }
+                                        }
+                                        if (current.trim()) {
+                                            commands.push(current.trim());
+                                        }
+                                        return commands.length > 0 ? commands : [cmdString];
+                                    };
+
+                                    const subCommands = splitChainedCommands(rawCmd);
+
+                                    const matchesCmdList = (cmd, csv) => {
+                                        if (!csv) return false;
+                                        const list = csv.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                                        const lower = cmd.toLowerCase();
+                                        return list.some(item => {
+                                            if (lower === item) return true;
+                                            if (lower.startsWith(item)) {
+                                                const nextChar = lower.charAt(item.length);
+                                                return /\s|[;&|/]/.test(nextChar);
+                                            }
+                                            return false;
+                                        });
+                                    };
+
+                                    const isDisallowed = subCommands.some(c => matchesCmdList(c, systemSettings?.autoDisallowCommands));
+                                    const isAlwaysAsk = subCommands.some(c => matchesCmdList(c, systemSettings?.alwaysAskCommands));
+                                    const isAutoApproved = subCommands.length > 0 && subCommands.every(c => matchesCmdList(c, systemSettings?.autoApproveCommands) || (systemSettings?.autoApproveGit && /^git\s+commit\b/i.test(c)));
+
+                                    // Waterfall: deny > ask > auto-approve > auto_exec
+                                    if (isDisallowed) {
+                                        return 'deny';
+                                    }
+                                    if (isAlwaysAsk) {
+                                        if (options.checkOnly) return null;
+                                        return new Promise((resolve) => {
+                                            showUserActionRequiredNotification();
+                                            setPendingApproval({ tool, args, resolve });
+                                            setActiveView('terminalApproval');
+                                        });
+                                    }
+                                    if (isAutoApproved || (systemSettings?.autoApproveGit && /^git\s+commit\b/i.test(rawCmd))) {
+                                        return 'allow';
+                                    }
+
                                     if (systemSettings.autoExec || autoAcceptWrites || approvedCommandsRef.current.has(rawCmd) || (rawCmd && safeRegex.test(rawCmd))) return 'allow';
 
                                     if (options.checkOnly) return null;
