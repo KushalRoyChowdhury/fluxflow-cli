@@ -1,4 +1,4 @@
-import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes, SETTINGS_FILE, matchesPathPattern } from './paths.js';
+import { DATA_DIR, LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes, SETTINGS_FILE, matchesPathPattern } from './paths.js';
 
 // NOTE: dotenv is already fully initialised by src/cli.jsx (all 14 env paths, in
 // the same order) before this module is ever reached, so the duplicate block was
@@ -2448,6 +2448,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let lastUsage = null;
         let MAX_LOOPS = mode === 'Flux' ? 50 : 15;
         MAX_LOOPS = mode.toLowerCase().includes('cu') ? 75 : MAX_LOOPS;
+
+        // Apply user-configured loop limit policy (Settings > Security > Other > Loop Limits)
+        const loopLimitMode = (systemSettings?.loopLimits || 'Default').toLowerCase();
+        if (loopLimitMode === 'extended') {
+            MAX_LOOPS = Math.floor(MAX_LOOPS * 3);
+        } else if (loopLimitMode === 'env') {
+            const envMaxLoops = parseInt(process.env.FLUXFLOW_MAX_LOOPS || process.env.MAX_LOOPS || '', 10);
+            if (Number.isFinite(envMaxLoops) && envMaxLoops > 0) {
+                MAX_LOOPS = envMaxLoops;
+            }
+        }
+
         const LOOP_INCREMENT = Math.floor(MAX_LOOPS / 2);
         let lastPromptedThreshold = 0;
         const MAX_RETRIES = 16;
@@ -4466,6 +4478,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         let forcePrompt = false;
                                         let disallowMatch = false;
                                         let isNetworkDeny = false;
+                                        let isOverwritePrompt = false;
 
                                         if (isAlwaysAskFile) {
                                             // Always prompt user permission for reading sensitive/alwaysAskFiles regardless of autoExec
@@ -4579,7 +4592,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                             // For file writes/updates (write_file, update_file)
                                             // File tools should not get affected by sandbox auto approve or disallow, only fallback to autoExec
-                                            if (autoExec) {
+                                            let requiresOverwriteApproval = false;
+                                            if (normToolName === 'write_file' && systemSettings.overwriteProtection !== false && autoExec) {
+                                                try {
+                                                    const { path: owPath } = parseArgs(toolCall.args);
+                                                    if (owPath && fs.existsSync(path.resolve(process.cwd(), owPath))) {
+                                                        requiresOverwriteApproval = true;
+                                                        isOverwritePrompt = true;
+                                                    }
+                                                } catch (e) { }
+                                            }
+                                            if (autoExec && !requiresOverwriteApproval) {
                                                 decision = 'allow';
                                             }
                                         }
@@ -4605,7 +4628,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (!approval && settings.onToolApproval) {
                                             try {
                                                 const preCheck = await settings.onToolApproval(normToolName, toolCall.args, { checkOnly: true });
-                                                if (preCheck === 'allow' || preCheck === 'deny') {
+                                                // Overwrite protection must always surface a prompt; ignore session auto-allow
+                                                if (isOverwritePrompt && preCheck === 'allow') {
+                                                    // fall through to prompt
+                                                } else if (preCheck === 'allow' || preCheck === 'deny') {
                                                     approval = preCheck;
                                                     if (approval === 'deny') denyReason = 'user';
                                                 }
@@ -4613,7 +4639,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         }
 
                                         if (!approval) {
-                                            if (normToolName === 'write_file' || normToolName === 'update_file') {
+                                            if (!isOverwritePrompt && (normToolName === 'write_file' || normToolName === 'update_file')) {
                                                 try {
                                                     const toolArgs = parseArgs(toolCall.args);
                                                     const { path: filePath } = toolArgs;
@@ -4744,7 +4770,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     }
                                                 }, 100);
                                                 try {
-                                                    const res = await originalApproval(normToolName, toolCall.args);
+                                                    const res = await originalApproval(normToolName, toolCall.args, { isOverwritePrompt });
                                                     clearInterval(pollInterval);
                                                     resolve(res);
                                                 } catch (e) {
@@ -4915,9 +4941,28 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 const verifiedSize = Buffer.byteLength(finalContent, 'utf8');
 
                                                 let ancestry = '';
+                                                const overwriteProtectionOn = systemSettings?.overwriteProtection !== false;
                                                 if (originalContentForReporting) {
                                                     const oldLines = originalContentForReporting.split(/\r?\n/);
-                                                    ancestry = `Old File contents:\n${oldLines.map((l, i) => `${i + 1} | ${l}`).join('\n')}\n\n`;
+                                                    if (!overwriteProtectionOn) {
+                                                        ancestry = '';
+                                                    } else if (oldLines.length <= 50) {
+                                                        ancestry = `Old File contents:\n${oldLines.map((l, i) => `${i + 1} | ${l}`).join('\n')}\n\n`;
+                                                    } else {
+                                                        const parsedPath = path.parse(absPath);
+                                                        const bakDir = path.join(DATA_DIR, 'OverwriteBackups');
+                                                        if (!fs.existsSync(bakDir)) {
+                                                            try {
+                                                                fs.mkdirSync(bakDir, { recursive: true });
+                                                            } catch (e) { }
+                                                        }
+                                                        const bakName = `${parsedPath.name}-old-${Date.now()}${parsedPath.ext}.bak`;
+                                                        const bakPath = path.join(bakDir, bakName);
+                                                        try {
+                                                            fs.writeFileSync(bakPath, originalContentForReporting, 'utf8');
+                                                        } catch (e) { }
+                                                        ancestry = `Old File contents:\n- Renamed old file as ${bakPath} and written requested content in ${filePath}. For reversal use Run\n\n`;
+                                                    }
                                                 }
 
                                                 let snippet = '';
@@ -4964,10 +5009,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             let aiContent;
                                             if (normToolName === 'write_file' && !processedResult.startsWith('ERROR:')) {
                                                 const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
-                                                const lines = cleanText.split(/\r?\n/);
-                                                const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
-                                                const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
-                                                aiContent = `[ACTION RESULT]: ${headerPart}`;
+                                                if (/- Stats:.*\r?\nOld File contents:/s.test(cleanText)) {
+                                                    // Overwrite: keep header + old content, strip Content Preview and new content
+                                                    const contentPreviewIdx = cleanText.search(/^- Content Preview:/m);
+                                                    const trimmed = contentPreviewIdx !== -1 ? cleanText.slice(0, contentPreviewIdx).trimEnd() : cleanText;
+                                                    aiContent = `[ACTION RESULT]: ${trimmed}\n\n[Old file content for reversal reference. Replaced with new write request]`;
+                                                } else {
+                                                    // New file write: just header + stats, no content echoing
+                                                    const lines = cleanText.split(/\r?\n/);
+                                                    const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
+                                                    const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
+                                                    aiContent = `[ACTION RESULT]: ${headerPart}`;
+                                                }
                                             } else if (processedResult.startsWith('[[SAME]]')) {
                                                 const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
                                                 const lines = cleanText.split(/\r?\n/);
@@ -4992,6 +5045,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             if (isAlwaysAskFile) {
                                                 const targetName = path.basename(askFilePath || '.env');
                                                 denyMsg = `User denied reading ${targetName}`;
+                                            } else if (isOverwritePrompt && denyReason === 'user') {
+                                                denyMsg = 'User rejected file over-write. If needed AskUser how to proceed';
                                             } else if (denyReason === 'user') {
                                                 denyMsg = 'Permission Denied by User';
                                             } else if (denyReason === 'settings') {
@@ -5049,11 +5104,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         terminalWidth = process.stdout.columns - 5 || 120;
                                     }
 
-                                    let hint = await steeringCallback();
+                                    // let hint = await steeringCallback();
                                     let hasHint = false;
-                                    if (hint) {
-                                        hasHint = hint.trim().length > 0;
-                                    }
+                                    // if (hint) {
+                                    //     hasHint = hint.trim().length > 0;
+                                    // }
                                     const boxWidth = Math.min(label.length + 4, terminalWidth);
                                     const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                     yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}${label.includes('✔') && (label.includes('Created') || label.includes('Edited')) ? '' : `${hasHint ? '' : '\n'}`}`) };
@@ -5184,11 +5239,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             terminalWidth = process.stdout.columns - 5 || 120;
                                         }
 
-                                        let hint = await steeringCallback();
+                                        // let hint = await steeringCallback();
                                         let hasHint = false;
-                                        if (hint) {
-                                            hasHint = hint.trim().length > 0;
-                                        }
+                                        // if (hint) {
+                                        //     hasHint = hint.trim().length > 0;
+                                        // }
 
                                         const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                                         const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
@@ -5255,11 +5310,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         ].join('\n');
 
 
-                                        let hint = await steeringCallback();
+                                        // let hint = await steeringCallback();
                                         let hasHint = false;
-                                        if (hint) {
-                                            hasHint = hint.trim().length > 0;
-                                        }
+                                        // if (hint) {
+                                        //     hasHint = hint.trim().length > 0;
+                                        // }
 
                                         yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${output}${hasHint ? '' : '\n'}`) };
                                         thisIsFirstToolFeedback = false;
@@ -5834,9 +5889,22 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     yield { type: 'status', content: null };
 };
 
-export const runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 50, logCallback = null, isAsync = false) => {
+export const runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = null, logCallback = null, isAsync = false) => {
     const savedSettings = await loadSettings();
     const mergedSettings = { ...savedSettings, ...settings };
+
+    // Resolve subagent turn cap from Settings > Security > Other > Loop Limits
+    let SUBAGENT_MAX_TURNS = typeof maxTurns === 'number' && maxTurns > 0 ? maxTurns : 50;
+    const subagentLoopLimitMode = (mergedSettings?.systemSettings?.loopLimits || 'Default').toLowerCase();
+    if (subagentLoopLimitMode === 'extended') {
+        SUBAGENT_MAX_TURNS = Math.floor(SUBAGENT_MAX_TURNS * 3);
+    } else if (subagentLoopLimitMode === 'env') {
+        const envSubagentTurns = parseInt(process.env.FLUXFLOW_SUBAGENT_MAX_TURNS || process.env.SUBAGENT_MAX_TURNS || process.env.FLUXFLOW_MAX_LOOPS || process.env.MAX_LOOPS || '', 10);
+        if (Number.isFinite(envSubagentTurns) && envSubagentTurns > 0) {
+            SUBAGENT_MAX_TURNS = envSubagentTurns;
+        }
+    }
+    maxTurns = SUBAGENT_MAX_TURNS;
     const envSubagentModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
     const envSubagentProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 

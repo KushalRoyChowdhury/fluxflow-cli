@@ -69,7 +69,9 @@ const DEFAULT_SETTINGS = {
         preferBash: false,
         clipboardContext: false,
         cacheCalculateMode: 'Session',
-        alwaysAskFiles: '.env, .env.*, *.env'
+        alwaysAskFiles: '.env, .env.*, *.env',
+        loopLimits: 'Default',
+        overwriteProtection: true
     },
     profileData: {
         preset: 'Default',

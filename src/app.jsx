@@ -4952,7 +4952,10 @@ export default function App({ args = [] }) {
                                 const normalizedFilePath = filePath ? path.resolve(filePath).toLowerCase() : '';
                                 const fileExt = filePath ? path.extname(filePath).toLowerCase() : '';
 
-                                const isAuto = !isSensitiveFile && (
+                                const isOverwriteTarget = tool === 'write_file' && systemSettings.overwriteProtection !== false && filePath && fs.existsSync(path.resolve(process.cwd(), filePath));
+                                const shouldForceOverwritePrompt = isOverwriteTarget && (systemSettings.autoExec || autoAcceptWrites || (fileExt && approvedExtensionsRef.current.has(fileExt)));
+
+                                const isAuto = !isSensitiveFile && !shouldForceOverwritePrompt && (
                                     systemSettings.autoExec ||
                                     autoAcceptWrites ||
                                     (tool === 'write_file' && fileExt && approvedExtensionsRef.current.has(fileExt)) ||
@@ -4981,7 +4984,7 @@ export default function App({ args = [] }) {
 
                                 return new Promise((resolve) => {
                                     showUserActionRequiredNotification();
-                                    setPendingApproval({ tool, args, resolve });
+                                    setPendingApproval({ tool, args, resolve, isOverwrite: Boolean(options.isOverwritePrompt || shouldForceOverwritePrompt) });
                                     setActiveView('approval');
                                 });
                             },
@@ -7640,6 +7643,36 @@ export default function App({ args = [] }) {
                     </Box>
                 );
             case 'approval':
+                const isOverwriteModal = Boolean(pendingApproval?.isOverwrite);
+                const approvalParsedArgs = parseArgs(pendingApproval?.args || '{}');
+                const approvalFilePath = approvalParsedArgs.path || approvalParsedArgs.targetPath || approvalParsedArgs.file || '';
+
+                if (isOverwriteModal) {
+                    return (
+                        <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1} width="100%">
+                            <Text color="white" bold underline>OVERWRITE PROTECTION</Text>
+                            <Text marginTop={1}>Agent wants to rewrite <Text color="cyan" bold>{approvalFilePath || 'file'}</Text>. This will overwrite the existing file content completely.</Text>
+
+                            <Box marginTop={1}>
+                                <CommandMenu
+                                    title="Action Required"
+                                    items={[
+                                        { label: 'Accept', value: 'allow' },
+                                        { label: 'Deny', value: 'deny' }
+                                    ]}
+                                    onSelect={(item) => {
+                                        const decision = item.value === 'deny' ? 'deny' : 'allow';
+                                        pendingApproval.resolve(decision);
+                                        setPendingApproval(null);
+                                        setActiveView('chat');
+                                    }}
+                                    theme={systemSettings.theme}
+                                />
+                            </Box>
+                        </Box>
+                    );
+                }
+
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1} width="100%">
                         <Text color="white" bold underline>{pendingApproval?.tool === 'view_file' ? 'FILE READ PERMISSION' : 'FILE WRITE PERMISSION'}</Text>

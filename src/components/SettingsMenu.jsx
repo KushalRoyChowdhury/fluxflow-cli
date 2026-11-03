@@ -35,7 +35,8 @@ const getActivePreset = (settings) => {
         approve === '' &&
         disallow === 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c' &&
         alwaysAsk === 'killall, pkill, taskkill, shutdown, reboot, init 0, init 6, Stop-Process, Stop-Service, mv /*, move c:\\*, chmod 000, chmod -R 777, chown, icacls, netsh advfirewall, iptables -F, ufw disable, git reset --hard, git clean -fd, npm r, npm uninstall' &&
-        settings.autoApproveGit === false;
+        settings.autoApproveGit === false &&
+        settings.overwriteProtection !== false;
 
     const isBalanced =
         settings.autoExec === true &&
@@ -44,7 +45,8 @@ const getActivePreset = (settings) => {
         approve === 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, git branch, git show, help, mkdir, touch, md, whoami, hostname, ps, Get-Process, date, time, mkdir' &&
         disallow === 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c' &&
         alwaysAsk === 'killall, pkill, taskkill, Stop-Process, mv /*, move c:\\*, chmod 000, chmod -R 777, chown, icacls, shutdown, reboot, init 0, init 6, git reset --hard, git clean -fd, npm r, npm uninstall' &&
-        settings.autoApproveGit === false;
+        settings.autoApproveGit === false &&
+        settings.overwriteProtection !== false;
 
     const isAutonomous =
         settings.autoExec === true &&
@@ -53,7 +55,8 @@ const getActivePreset = (settings) => {
         approve === 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, git branch, git show, help, mkdir, touch, md, whoami, hostname, ps, Get-Process, date, time, mkdir' &&
         disallow === '' &&
         alwaysAsk === 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c' &&
-        settings.autoApproveGit === true;
+        settings.autoApproveGit === true &&
+        settings.overwriteProtection === false;
 
     if (isStrict) return 'Strict';
     if (isBalanced) return 'Balanced';
@@ -331,11 +334,13 @@ export default function SettingsMenu({
                     { label: 'Always Ask Files/Paths', value: 'alwaysAskFiles', status: truncateCSV(systemSettings.alwaysAskFiles || '.env, .env.*, *.env'), section: 'Sandbox' },
                     { label: 'Auto Approve Commands', value: 'autoApprove', status: truncateCSV(systemSettings.autoApproveCommands), section: 'Sandbox' },
                     { label: 'Auto Disapprove Commands', value: 'autoDisallow', status: truncateCSV(systemSettings.autoDisallowCommands), section: 'Sandbox' },
-                    { label: 'Auto Approve Git Commits', value: 'autoApproveGit', status: systemSettings.autoApproveGit ? 'ON' : 'OFF', section: 'Sandbox' },
+            { label: 'Auto Approve Git Commits', value: 'autoApproveGit', status: systemSettings.autoApproveGit ? 'ON' : 'OFF', section: 'Sandbox' },
+            { label: 'Overwrite Protection', value: 'overwriteProtection', status: systemSettings.overwriteProtection !== false ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'Advanced Recovery [EXPERIMENTAL]', value: 'advanceRollback', status: systemSettings.advanceRollback ? 'ON' : 'OFF', section: 'Other' },
                     { label: 'Auto-Delete History', value: 'autoDelete', status: systemSettings.autoDeleteHistory || '30d', section: 'Other' },
                     { label: 'Save AppData Externally', value: 'externalData', status: systemSettings.useExternalData ? 'ON' : 'OFF', section: 'Other' },
-                    { label: 'Agent Clipboard Context', value: 'clipboardContext', status: systemSettings.clipboardContext ? 'ON' : 'OFF', section: 'Other' }
+                    { label: 'Agent Clipboard Context', value: 'clipboardContext', status: systemSettings.clipboardContext ? 'ON' : 'OFF', section: 'Other' },
+                    { label: 'Loop Limits', value: 'loopLimits', status: systemSettings.loopLimits || 'Default', section: 'Other' }
                 ];
                 return allSecItems.filter(item => item.section.toLowerCase() === securityTab.toLowerCase());
             }
@@ -566,6 +571,7 @@ export default function SettingsMenu({
                     updated.autoDisallowCommands = 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c';
                     updated.alwaysAskCommands = 'killall, pkill, taskkill, shutdown, reboot, init 0, init 6, Stop-Process, Stop-Service, mv /*, move c:\\*, chmod 000, chmod -R 777, chown, icacls, netsh advfirewall, iptables -F, ufw disable, git reset --hard, git clean -fd, npm r, npm uninstall';
                     updated.autoApproveGit = false;
+                    updated.overwriteProtection = true;
                 } else if (nextPreset === 'Balanced') {
                     updated.autoExec = true;
                     updated.allowExternalAccess = false;
@@ -574,6 +580,7 @@ export default function SettingsMenu({
                     updated.autoDisallowCommands = 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c';
                     updated.alwaysAskCommands = 'killall, pkill, taskkill, Stop-Process, mv /*, move c:\\*, chmod 000, chmod -R 777, chown, icacls, shutdown, reboot, init 0, init 6, git reset --hard, git clean -fd, npm r, npm uninstall';
                     updated.autoApproveGit = false;
+                    updated.overwriteProtection = true;
                 } else if (nextPreset === 'Autonomous') {
                     updated.autoExec = true;
                     updated.allowExternalAccess = true;
@@ -582,6 +589,7 @@ export default function SettingsMenu({
                     updated.autoDisallowCommands = '';
                     updated.alwaysAskCommands = 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c';
                     updated.autoApproveGit = true;
+                    updated.overwriteProtection = false;
                 }
                 return updated;
             });
@@ -621,6 +629,8 @@ export default function SettingsMenu({
             setEditValue(systemSettings.autoDisallowCommands || '');
         } else if (item.value === 'autoApproveGit') {
             setSystemSettings(s => ({ ...s, autoApproveGit: !s.autoApproveGit, sandboxPreset: 'Custom' }));
+        } else if (item.value === 'overwriteProtection') {
+            setSystemSettings(s => ({ ...s, overwriteProtection: s.overwriteProtection === false, sandboxPreset: 'Custom' }));
         } else if (item.value === 'customOpenAIBaseUrl') {
             setEditingItem('customOpenAIBaseUrl');
             setEditValue(systemSettings.customOpenAIBaseUrl || '');
@@ -697,6 +707,15 @@ export default function SettingsMenu({
         } else if (item.value === 'agentFinishSound') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, agentFinishSound: !s.agentFinishSound };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'loopLimits') {
+            const options = ['Default', 'Extended', 'ENV'];
+            const currentIndex = options.indexOf(systemSettings.loopLimits || 'Default');
+            const nextIndex = (currentIndex + 1) % options.length;
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, loopLimits: options[nextIndex] };
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });

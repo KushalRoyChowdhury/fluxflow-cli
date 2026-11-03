@@ -140,7 +140,7 @@ export const invoke = async (args, context = {}) => {
             }
         }
     };
-    runSubagent(task, subagentContext, model, allowedTools, 50, (logMessage) => {
+    runSubagent(task, subagentContext, model, allowedTools, null, (logMessage) => {
         if (taskEntry.status === 'cancelled') return;
 
         if (logMessage.startsWith('[Subagent Turn')) {

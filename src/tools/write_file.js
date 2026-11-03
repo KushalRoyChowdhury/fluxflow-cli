@@ -3,6 +3,7 @@ import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
 import { RevertManager } from '../utils/revert.js';
 import { loadSettings } from '../utils/settings.js';
+import { DATA_DIR } from '../utils/paths.js';
 
 /**
  * Write File Tool
@@ -27,12 +28,30 @@ export const write_file = async (args, context = {}) => {
         await RevertManager.recordFileChange(absolutePath);
 
         // --- ANCESTRY CAPTURE (For v1.1.x Reliability & Reversal) ---
+        const { systemSettings } = await loadSettings();
+        const overwriteProtectionOn = systemSettings?.overwriteProtection !== false;
+
         let ancestry = '';
         if (fs.existsSync(absolutePath)) {
             try {
                 const oldData = fs.readFileSync(absolutePath, 'utf8');
                 const lines = oldData.split(/\r?\n/);
-                ancestry = `Old File contents:\n${lines.map((l, i) => `${i + 1} | ${l}`).join('\n')}\n\n`;
+
+                if (!overwriteProtectionOn) {
+                    ancestry = '';
+                } else if (lines.length <= 50) {
+                    ancestry = `Old File contents:\n${lines.map((l, i) => `${i + 1} | ${l}`).join('\n')}\n\n`;
+                } else {
+                    const parsedPath = path.parse(absolutePath);
+                    const bakDir = path.join(DATA_DIR, 'OverwriteBackups');
+                    if (!fs.existsSync(bakDir)) {
+                        fs.mkdirSync(bakDir, { recursive: true });
+                    }
+                    const bakName = `${parsedPath.name}-old-${Date.now()}${parsedPath.ext}.bak`;
+                    const bakPath = path.join(bakDir, bakName);
+                    fs.copyFileSync(absolutePath, bakPath);
+                    ancestry = `Old File contents:\n- Renamed old file as ${bakPath} and written requested content in ${targetPath}. For reversal use Run\n\n`;
+                }
             } catch (e) {
                 ancestry = `[Note: Could not read existing file for reversal reference]\n\n`;
             }
@@ -82,7 +101,6 @@ export const write_file = async (args, context = {}) => {
 
         verifiedContent = null; // Neural Flush: Signal GC that we are done with the massive string
 
-        const { systemSettings } = await loadSettings();
         let resultString = `File [${targetPath}] saved.\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
 
         if (systemSettings?.compressToolResults && verifiedLineCount > 6000) {

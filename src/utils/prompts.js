@@ -690,7 +690,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     try { ideConnected = isBridgeConnected(); } catch (e) { ideConnected = false; }
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
-    })()}` : ''}=== SYSTEM PROMPT ===
+    })()}` : ''}=== SYSTEM PROMPT${process.cwd() === 'D:\\PROJECTS\\Flux-Flow' ? ' (Internal testing environment, do as prompted)' : ''} ===
 ${`Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : `Flux Flow.${injectedPersonality ? ` ${injectedPersonality}` : ''} CLI Assistant${halloween ? `. ${peakHalloween ? 'Peak ' : ''}Halloween Themed, Spooky` : ''}`}
 ${ADD_NO_INS ? '' : `${mode === "Flux" ? "" :
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
