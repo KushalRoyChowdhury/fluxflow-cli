@@ -5,7 +5,7 @@ export const changelogData = {
         "note": "NOVEMBER 3",
         "added": [],
         "changed": [
-            "Improved context efficiency with 'Recent Manual Codes'. Update FluxFlow Companion to v1.8+."
+            "Improved context efficiency & accuracy for 'Recent Manual Changes' awarness. Update FluxFlow Companion to v1.8+."
         ],
         "fixes": []
     },
