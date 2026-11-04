@@ -2003,7 +2003,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         });
 
         // Truncation & Context Limits
-        const hc = process.env.HIGH_CONTEXT;
+        // const hc = process.env.HIGH_CONTEXT; [DEPRICATED]
         const gemma_nonsense = process.env.GOOGLE_GEMMA_NONSENSE === 'true' || process.env.GOOGLE_GEMMA_NONSENSE === true || false;
 
         const CONTEXT_MAP = {
@@ -2018,18 +2018,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const settingContext = CONTEXT_MAP[systemSettings?.contextLength] || 256000;
         let contextTruncationCount = settingContext;
 
-        if (hc && hc !== 'false') {
-            const val = parseInt(hc, 10);
-            if (!isNaN(val) && val >= 0 && val <= 1000000) {
-                contextTruncationCount = val;
-            }
-        }
+        // if (hc && hc !== 'false') {
+        //     const val = parseInt(hc, 10);
+        //     if (!isNaN(val) && val >= 0 && val <= 1000000) {
+        //         contextTruncationCount = val;
+        //     }
+        // }
 
         // ~128k fixed cap for limited-context models; all others use ~256k default (set above),
         // with HIGH_CONTEXT optionally extending beyond 256k.
-        if ((aiProvider === 'NVIDIA' && (modelName?.includes('gpt') || modelName?.includes('qwen') || modelName?.includes('medium') || modelName.includes('muse'))) || aiProvider === 'Mistral') {
-            contextTruncationCount = 126000;
-        }
+        // if ((aiProvider === 'NVIDIA' && (modelName?.includes('gpt') || modelName?.includes('qwen') || modelName?.includes('medium') || modelName.includes('muse'))) || aiProvider === 'Mistral') {
+        //     contextTruncationCount = 126000;
+        // }
+        
         if (aiProvider === 'Google' && modelName?.includes('gemma') && gemma_nonsense) {
             contextTruncationCount = 16000;
         }

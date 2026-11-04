@@ -1,5 +1,6 @@
 # Flux Flow - Digital Perimeter
 node_modules/
+GEMINI.md
 logs/
 secret/
 settings.json

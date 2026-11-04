@@ -1,6 +1,19 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.49.0": {
+        "note": "NOVEMBER 4",
+        "added": [
+            "Added Overwrite Protection feature (`/settings` → `Security` → `Overwrite Protection`).",
+            "Added Configurable loop limits (`/settings` → `Security` → `Others` → `Loop Limits`)."
+        ],
+        "changed": [
+            "Removed support for `HIGH_CONTEXT` env flag."
+        ],
+        "fixes": [
+            "Fixed security command validation."
+        ]
+    },
     "4.48.0": {
         "note": "NOVEMBER 3",
         "added": [],

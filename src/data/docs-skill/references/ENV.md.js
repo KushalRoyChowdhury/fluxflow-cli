@@ -14,18 +14,19 @@ export const ENV_MD = `# Env Variables
 * NVIDIA_API_KEY → API key for NVIDIA NIM
 * OLLAMA_HOST → If different from default
 * SHELL → Terminal shell executable
-* HIGH_CONTEXT → Context window override (false or integer 32k..1M) [Deprecated! Will stop working from next major version]
 * ADJUST_WINDOWS_COMMAND - If true, Flux Flow will adjust commands for windows if model mistakenly use UNIX all time.
 * ENABLE_9ROUTER → Enables 9Router provider. Can use OAuth subscription like Codex, Claude Code, GitHub Copilot etc. or use providers not natively in Fluxflow. Set ENV ENABLE_9ROUTER=true, needs 9router package installed (via npm/npx etc) & running
 * NINEROUTER_URL → If different from default, Any OpenAI Compatible
 * NINEROUTER_KEY → if any
+* MAX_LOOPS - ENV control for number of max turns for main agent
+* SUBAGENT_MAX_TURNS
 
 ## Diagnostic & Optimization Flags
 * SHOW_DEBUG_GRID → (true|false, default: false) Coordinate grid overlay for Computer Use tooling
 * DEBUG_OCR → (true|false, default: false) Enables verbose OCR diagnostic logs
 * EXPERIMENTAL_MEMORY_MANAGER → (true|false, default: false) Reduces app memory footprint, slower boot times
 
-* NO_DEV → (true|false, default: false) Token optimization flag; strips developer metadata and docs to maximize context headroom
+* NO_DEV → (true|false, default: false) Token optimization flag; strips developer metadata and docs
 
 * I_HAVE_TOO_MUCH_MONEY → (true|false, default: false) Fun Flag; inserts random padding in system prompt to break provider caching. Not intended for paid APIs unless user hate money
 * GOOGLE_GEMMA_NONSENSE → (true|false, default: false) for the 16k TPM nonsense of gemma models on gemini API. False defaults to 256k

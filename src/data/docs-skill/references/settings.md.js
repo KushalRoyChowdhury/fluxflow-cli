@@ -3,68 +3,74 @@ export const SETTINGS_MD = `# FluxFlow In-App Settings Reference
 
 Open in chat via /settings
 
-## Settings Categories & Options
-
 ### 1. Providers & Tips → references/PROVIDERS.md
 - Custom OpenAI Endpoint?
     * Base URL: .../v1
-    * API Key: optional
+    * API Key: optional → references/COMMANDS.md
 
 ### 2. Appearance
-* Theme → UI theme (Dark | Light | Cyberpunk | Forest | Sunset | Matrix | Dracula | Nord | Monokai | Mystery/Chaos)
+* Theme → UI theme
 * Loading Phrases → Humorous status phrases during thinking
-* Progressive Rendering [Experimental] → Smooth streaming token rendering. May have few glitches
+* Progressive Rendering [Experimental] → Smooth streaming token rendering. May have glitches
 * Show TPM Estimate → Real-time Tokens Throughput speed estimate
-* Verbose Thinking → Show reasoning blocks in the UI. Keeps UI clean when disabled. And reasoning transparent when enabled
+* Verbose Thinking → Show reasoning blocks in the UI
 
 ### 3. Personalization
 * Base Personality → Pick base personality for agent
 * Nickname → What agent should call user
 * Custom Instruction → Custom user preferences
-* Toggle Memory → Persistent cross-session memory learning (Not available for some providers)
+* Toggle Memory, Depricated → Persistent cross-session memory learning
 
-### 4. Security & Sandbox
-* Sandbox Preset:
-  * Strict → YOLO: OFF | External Access: OFF | Network Access: OFF | destructive commands blocked | strict HITL
-  * Balanced → YOLO: ON (safe commands) | External Access: OFF | Network Access: ON | destructive commands blocked | manual git approval
-  * Autonomous → YOLO: ON | External Access: ON | Network Access: ON | auto-approve git commits | prompt high-risk commands
+### 4. Security Sandbox
+* Sandbox Preset: Strict | Balanced | Autonomous
 
-* YOLO Mode → Autonomous command execution without confirmation
+* YOLO → Autonomous tool execution without confirmation
 * External Workspace Access → Read/write access outside CWD
 * Network Access (Internal Shell) → Outbound network access for shell commands
 * Command Policies:
-  * Always Ask Commands → Commands requiring explicit confirmation
+  * Always Ask Commands → Commands requiring explicit confirmation. Overrides YOLO
   * Auto Approve Commands → Safe commands allowed to execute automatically
   * Auto Disapprove Commands → Blacklisted commands automatically rejected
   * Always Ask File/Paths → System auto prompts user before resolving the read req to user specified files/paths in
-
 * Auto Approve Git Commits → Auto-confirm git commit operations
+* Overwrite Protection → Prompts user if agent tries to overwrite a file, and auto-backs up before writing. Manual truncation of tool results will lose protection
+
+### 4.1. Other Security
 * Advanced Recovery [EXPERIMENTAL] → Enhanced rollback if agent corrupt codebase
 * Auto-Delete History → Chat log retention period
 * Save AppData Externally → Saves chats/apikeys to user provided path
+* Agent Clipboard Context → Opt-in setting. Shares latest copied clipboard entry with agent
+* Loop Limits → Control safety loop limits before prompting user resolution. Default (50, 75 for Computer Use), Extended (3x of Default), ENV (int → references/ENV.md)
 
 ### 5. Updater
 * Auto-Update → Check for new releases on boot
 * Preferred Package Manager → npm | pnpm | yarn | bun | custom
 
-### 6. Miscellaneous
-* Sub-Agents → Enable sub-agent delegation
+### 6. Secondary Models
+* Sub-Agents → Enable sub-agents
 * Sub-Agent Model → Dedicated model/provider for sub-agents
-* Directory Tree Design → Directory visual styling. Modern (Saves Tokens) | Legacy (More Tokens, No extra benefit)
+* Auto Completion in IDE → Toggle
+* Completion Model
+
+### 7. Miscellaneous
+* Directory Tree Design → Modern (Saves Tokens) | Legacy (More Tokens, No extra benefit)
 * Compact Large Tool Results → Compress large tool outputs to save tokens (model might miss subtle indentation/syntax errors)
 * Context Length → Set usable context window size in FluxFlow. 16k, 32k, 64k, 128k, 256k, 512k, 1M. After Limit reached: Start new chat
 * Auto Truncate Results → Auto-truncate tool results after task finished to save token and improve caching
-* Image History for CU → Number of images to keep in context for Computer Use. Low (3 images, Low Context Accuracy, Token Efficient) / Standard (5 images, Better Accuracy, Higher Token Usage) / Extended (10 images, Better for complex tasks, Highest Token Usage) / Max (999 images, Full history kept, Maximum Accuracy, Highest Token Usage)
-* Keep Reasoning Content → Keeps the exact reasoning of model in context for next turns. Uses more tokens. Might improve planning accuracy for very few models
+* Image History for CU → Number of images to keep in context for Computer Use. Low / Standard / Extended
+* Keep Reasoning Content → Keeps the exact reasoning of model in context. More tokens. Might improve planning accuracy for few models
 * Auto Exclude Metadata → Removes Metadata Block when no external Metadata is needed. Will effect agent's Temporal Reasoning Capabilities. Might save Cache Hit & Tokens in specific cases
 * Disable Todo → Disables Todo/Goal tool for Agent. Doesnt necessarily affect modern models
 
--- Recomended Settings Preset --
-- Best for Cost Saving: Subagents (off), directory tree design (modern), compact large results (on), auto exclue metadata (on), Image History (Low), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (on), Memory (off), No FluxFlow IDE Companion
-
-- Best for General Use: Subagents (on), compact large results (off), auto exclue metadata (off), Image History (Standard), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (on), Memory (off), FluxFlow IDE Companion
-
-- Best for Luxurious Experience: Subagents (on), compact large results (off), auto exclue metadata (off), Image History (Max), Keep reasoning content (on), Emergency Recovery (on), Auto truncate results (off), Memory (on), Security Preset (Autonomous), FluxFlow IDE Companion
-
-- Max Cache Hit: Subagents (off), compact large results (on), auto exclue metadata (on), Image History (Low), Keep reasoning content (off), Emergency Recovery (off), Auto truncate results (off), Memory (off), No FluxFlow IDE Companion
+-- Recomended Preset --
+| Feature | Cost Saving | General Use |
+| --- | --- | --- |
+| Subagents | Off | On |
+| Compact Large Results | On | Off |
+| Auto Exclude Metadata | On | Off |
+| Image History | Low | Standard |
+| Keep Reasoning Content | Off | Off |
+| Emergency Recovery | Off | Off |
+| Auto Truncate Results | On | On |
+| Memory | Off | Off |
 `;
