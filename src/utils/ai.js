@@ -984,6 +984,27 @@ export const maskCodeSpans = (text) => {
     return chars.join('');
 };
 
+export const maskExecutedTools = (text, executedTools = null) => {
+    if (!text || typeof text !== 'string') return text;
+    const tools = executedTools || detectToolCalls(text);
+    if (!tools || tools.length === 0) return text;
+    const chars = text.split('');
+    for (const tool of tools) {
+        if (!tool.fullMatch) continue;
+        let start = 0;
+        while ((start = text.indexOf(tool.fullMatch, start)) !== -1) {
+            // Mask the contents inside this tool call with spaces, preserving newlines
+            for (let i = start; i < start + tool.fullMatch.length; i++) {
+                if (chars[i] !== '\n' && chars[i] !== '\r') {
+                    chars[i] = ' ';
+                }
+            }
+            start += tool.fullMatch.length;
+        }
+    }
+    return chars.join('');
+};
+
 export const getActiveToolContext = (text) => {
     // Strip leading thinking block ONLY so live tool sniffing ignores tool syntax drafted inside thinking
     const cleanText = stripLeadingThinking(text);
@@ -5811,10 +5832,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (toolResults.length > 0) {
                     let combinedText = toolResults.map(tr => tr.text).join('\n\n');
                     const toolActionableText = stripLeadingThinking(turnText);
-                    const scanText = maskCodeSpans(toolActionableText);
                     const executedTools = detectToolCalls(toolActionableText);
+                    const maskedToolText = maskExecutedTools(toolActionableText, executedTools);
+                    const scanText = maskCodeSpans(maskedToolText);
 
-                    // Find all attempted tool triggers outside code spans
+                    // Find all attempted tool triggers outside code spans and outside valid executed tools
                     const triggerRegex = /\[\s*(?:tool:(?:functions\.)?|action:(?:functions\.)?|action:)([a-zA-Z0-9_]+)\s*\(/gi;
                     const unclosedSegments = [];
                     const triggerIndices = [];
@@ -5847,7 +5869,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             } else {
                 if (!TERMINATION_SIGNAL) {
                     const toolActionableText = turnText.replace(/(?:<think_fluxflow>|\[think_fluxflow\])[\s\S]*?(?:<\/think_fluxflow>|\[\/think_fluxflow\]|$)/i, '');
-                    const scanText = maskCodeSpans(toolActionableText);
+                    const executedTools = detectToolCalls(toolActionableText);
+                    const maskedToolText = maskExecutedTools(toolActionableText, executedTools);
+                    const scanText = maskCodeSpans(maskedToolText);
                     const attemptedToolsCount = (scanText.match(/\[\s*(?:tool:(?:functions\.)?|action:(?:functions\.)?|action:)([a-zA-Z0-9_]+)\s*\(/gi) || []).length;
                     if (wasToolCalledInLastLoop || (detectedAnyToolCalls && attemptedToolsCount > 0) || attemptedToolsCount > 0) {
                         const diag = diagnoseUnexecutedTools(toolActionableText);
