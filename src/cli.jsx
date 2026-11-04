@@ -521,8 +521,15 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
             }
             return null;
         };
-        const provider = getFlag(['--provider']) || baseSettings.aiProvider || 'Google';
-        const model = getFlag(['--model']) || baseSettings.activeModel || getDefaultModel(provider, baseSettings.apiTier) || getDefaultModel(provider, 'paid');
+        const configuredCommitModel = isCommitFlag && baseSettings.systemSettings?.commitMessageModel && baseSettings.systemSettings.commitMessageModel !== 'Default'
+            ? baseSettings.systemSettings.commitMessageModel
+            : null;
+        const configuredCommitProvider = isCommitFlag && configuredCommitModel && baseSettings.systemSettings?.commitMessageProvider
+            ? baseSettings.systemSettings.commitMessageProvider
+            : null;
+
+        const provider = getFlag(['--provider']) || configuredCommitProvider || baseSettings.aiProvider || 'Google';
+        const model = getFlag(['--model']) || configuredCommitModel || baseSettings.activeModel || getDefaultModel(provider, baseSettings.apiTier) || getDefaultModel(provider, 'paid');
         const apiKey = getFlag(['--key']) || await getProviderAPIKey(provider);
 
         if (!apiKey && !(provider === 'c_openai' && baseSettings.systemSettings?.customOpenAIBaseUrl)) {

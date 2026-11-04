@@ -354,7 +354,8 @@ export default function SettingsMenu({
                     { label: 'Sub-Agents', value: 'subAgents', status: systemSettings.subAgents !== false ? 'ON' : 'OFF' },
                     { label: 'Sub-Agent Model', value: 'subAgentModel', status: (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default' },
                     { label: 'Enable Auto-Completion', value: 'autoCompletionEnabled', status: autoCompletion?.enabled ? 'ON' : 'OFF' },
-                    { label: 'Auto-Completion Model', value: 'autoCompletionModel', status: (autoCompletion?.model && autoCompletion.model !== 'Default') ? autoCompletion.model : 'Default' }
+                    { label: 'Auto-Completion Model', value: 'autoCompletionModel', status: (autoCompletion?.model && autoCompletion.model !== 'Default') ? autoCompletion.model : 'Default' },
+                    { label: 'Commit Message Model', value: 'commitMessageModel', status: (systemSettings.commitMessageModel && systemSettings.commitMessageModel !== 'Default') ? systemSettings.commitMessageModel : 'Default' }
                 ];
             case 'other':
                 return [
@@ -436,6 +437,16 @@ export default function SettingsMenu({
                             };
                             saveSettings({ autoCompletion: next, apiTier, quotas });
                             return next;
+                        });
+                    } else if (modelPickerTarget === 'commitMessage') {
+                        setSystemSettings(s => {
+                            const newSysSettings = {
+                                ...s,
+                                commitMessageModel: isDefault ? 'Default' : selectedOpt.value,
+                                commitMessageProvider: isDefault ? '' : (selectedOpt.provider || '')
+                            };
+                            saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                            return newSysSettings;
                         });
                     } else {
                         setSystemSettings(s => {
@@ -801,6 +812,12 @@ export default function SettingsMenu({
             setSubAgentModelIndex(curIdx >= 0 ? curIdx : 0);
             setModelPickerTarget('autoCompletion');
             setIsSelectingSubAgentModel(true);
+        } else if (item.value === 'commitMessageModel') {
+            const currentModel = systemSettings.commitMessageModel || 'Default';
+            const curIdx = availableModels.findIndex(m => m.value === currentModel);
+            setSubAgentModelIndex(curIdx >= 0 ? curIdx : 0);
+            setModelPickerTarget('commitMessage');
+            setIsSelectingSubAgentModel(true);
         } else if (item.value === 'preserveThinking') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, preserveThinking: s.preserveThinking === false ? true : false };
@@ -840,7 +857,9 @@ export default function SettingsMenu({
     if (isSelectingSubAgentModel) {
         const currentSavedModel = modelPickerTarget === 'autoCompletion'
             ? (autoCompletion?.model || 'Default')
-            : ((systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default');
+            : modelPickerTarget === 'commitMessage'
+                ? (systemSettings.commitMessageModel || 'Default')
+                : ((systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default');
 
         // Proper Viewport Scroll Logic:
         // Keep window fixed while cursor moves inside [offset, offset + VISIBLE_COUNT - 1]
@@ -864,7 +883,11 @@ export default function SettingsMenu({
                 {/* Title */}
                 <Box marginBottom={1} flexDirection="row" justifyContent="space-between">
                     <Text color={colors.text} bold underline>
-                        {modelPickerTarget === 'autoCompletion' ? 'Select Auto-Completion Model:' : 'Select Sub-Agent Model:'}
+                        {modelPickerTarget === 'autoCompletion'
+                            ? 'Select Auto-Completion Model:'
+                            : modelPickerTarget === 'commitMessage'
+                                ? 'Select Commit Message Model:'
+                                : 'Select Sub-Agent Model:'}
                     </Text>
                     {availableModels.length > 0 && (
                         <Text color="gray">

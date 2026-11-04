@@ -51,6 +51,7 @@ Open in chat via /settings
 * Sub-Agent Model → Dedicated model/provider for sub-agents
 * Auto Completion in IDE → Toggle
 * Completion Model
+* Commit Msg Model
 
 ### 7. Miscellaneous
 * Directory Tree Design → Modern (Saves Tokens) | Legacy (More Tokens, No extra benefit)

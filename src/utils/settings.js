@@ -55,6 +55,8 @@ const DEFAULT_SETTINGS = {
         CustomSubAgent: false,
         SubAgentModel: 'Default',
         SubAgentProvider: '',
+        commitMessageModel: 'Default',
+        commitMessageProvider: '',
         dynamicDirAwareness: false,
         indentationTree: true,
         ollamaEndpoint: 'Cloud',
