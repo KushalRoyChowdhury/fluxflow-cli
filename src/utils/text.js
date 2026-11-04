@@ -1409,7 +1409,18 @@ export const cleanSignals = (text, role = 'agent') => {
     }
 
     // Consolidated regex pass eliminates string allocations scaling linearly with replace rules
-    result = result.replace(REGEX_CLEAN_SIGNALS, '');
+    const isToolOrActionResultRole = role === 'tool_result' || role === 'tool' || role === 'action' || role === 'action_result';
+    result = result.replace(REGEX_CLEAN_SIGNALS, (match, _p1, offset, str) => {
+        // If this is an ACTION / TOOL RESULT signal and it's inside backticks, code fences, or the message itself is a tool result, don't hide it
+        if (/^\[(?:TOOL|ACTION) RESULTS?\]:?\s*/i.test(match) || /^\[\s*(?:TOOL|ACTION).*?$/i.test(match)) {
+            if (isToolOrActionResultRole || isInsideBacktick(str, offset)) {
+                return match;
+            }
+        } else if (isInsideBacktick(str, offset)) {
+            return match;
+        }
+        return '';
+    });
 
     // Single pass for all formatting arrows
     result = result.replace(REGEX_ARROWS_ALL, (match) => {
