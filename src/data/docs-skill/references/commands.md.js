@@ -14,7 +14,7 @@ Trigger in chat via /command
 * /reset → Wipe fluxflow appdata, sessions, and cache
 
 ## Context & History Management
-* /compress → Summarize chat history to reclaim context headroom
+
 * /truncate → Truncate large tool results in history
 * /btw question → Send side-inquiry mid-turn without breaking active flow
 * /export chat | logs → Export chat transcript or error logs

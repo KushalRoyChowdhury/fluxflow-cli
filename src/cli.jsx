@@ -181,7 +181,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /help                                    Show help menu
   /clear                                   Clear terminal screen
   /resume                                  Load previous session
-  /compress                                Summarize and compress chat history
+  
   /truncate                                Truncate tool results in chat history
   /revert                                  Revert codebase back to a checkpoint
   /save                                    Force save current chat

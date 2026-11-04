@@ -234,7 +234,10 @@ export const search_keyword = async (args) => {
     } else {
         // If regex is not explicitly false (default or explicit true), search both regex & normal whole-word unless regex fails
         try {
-            regexPattern = new RegExp(keyword, 'i');
+            // Auto mode: collapse '||' (JS/SQL-style OR) into single '|' regex alternation.
+            // Explicit regex:true keeps '||' verbatim — model asked for raw regex.
+            const regexSource = regexExplicitlyTrue ? keyword : keyword.replace(/\|\|/g, '|');
+            regexPattern = new RegExp(regexSource, 'i');
         } catch (e) {
             if (regexExplicitlyTrue) {
                 return `ERROR: Invalid regex pattern "${keyword}": ${e.message}`;

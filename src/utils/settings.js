@@ -40,7 +40,6 @@ const DEFAULT_SETTINGS = {
         customOpenAIBaseUrl: '',
         memory: false,
         theme: 'Dark',
-        compression: 0.0,
         autoExec: true,
         allowExternalAccess: false,
         advanceRollback: false,

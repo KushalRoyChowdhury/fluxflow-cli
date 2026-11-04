@@ -1352,7 +1352,7 @@ export default function App({ args = [] }) {
     const [pbsSelected, setPbsSelected] = useState({}); // providerBudgetSelect checkbox state
     const [pbfFormState, setPbfFormState] = useState({}); // providerBudgetFlow form values
     const [pbfFieldIndex, setPbfFieldIndex] = useState(0); // providerBudgetFlow active field cursor
-    const [systemSettings, setSystemSettings] = useState({ memory: true, theme: 'Dark', compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '', clipboardContext: false });
+    const [systemSettings, setSystemSettings] = useState({ memory: true, theme: 'Dark', autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '', clipboardContext: false });
     const colors = useMemo(() => getThemeColors(systemSettings.theme), [systemSettings.theme]);
     const [profileData, setProfileData] = useState({ preset: 'Default', name: null, nickname: null, instructions: null });
     const [imageSettings, setImageSettings] = useState({ keyType: 'Default', quality: 'Low-High', apiKey: '' });
@@ -2443,7 +2443,6 @@ export default function App({ args = [] }) {
             setQuotas(saved.quotas || { limitMode: 'Daily', agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0, providerBudgets: {} });
             const freshSettings = {
                 memory: true,
-                compression: 0.0,
                 autoExec: false,
                 autoDeleteHistory: '7d',
                 autoUpdate: false,
@@ -2946,7 +2945,7 @@ export default function App({ args = [] }) {
         ...(parsedArgs.playground ? [{ cmd: '/move', desc: 'Move playground directory to original CWD/playground-export' }] : []),
         { cmd: '/resume', desc: 'Load previous session' },
         { cmd: '/clear', desc: 'Clear terminal screen' },
-        { cmd: '/compress', desc: 'Summarize and compress chat history' },
+
         { cmd: '/truncate', desc: 'Truncate tool results in chat history' },
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
         { cmd: '/gemini', desc: 'Get a happy message from Gemini CLI' },
@@ -4437,73 +4436,7 @@ export default function App({ args = [] }) {
                     setInput('');
                     break;
                 }
-                case '/compress': {
-                    setInput('');
-                    const cleanCount = messages.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
-                    const tokens = sessionStats?.tokens || 0;
-                    if (cleanCount < 64 || tokens < 16384) {
-                        const s = emojiSpace(2);
-                        setMessages(prev => {
-                            setCompletedIndex(prev.length + 1);
-                            return [...prev, {
-                                id: Date.now(),
-                                role: 'system',
-                                text: `✦ Compression skipped\n⠀⠀\x1b[2m└─\x1b[22m History requires at least 64 messages and 16k tokens\n⠀⠀  └─ Current: ${cleanCount}/64 msgs, ${tokens}/16384 tokens.\n⠀`,
-                                isMeta: true
-                            }];
-                        });
-                        break;
-                    }
-                    const runCompress = async () => {
-                        setIsCompressing(true);
-                        const s = emojiSpace(2);
-                        setMessages(prev => {
-                            setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Compacting session history...`, isMeta: true }];
-                        });
 
-                        try {
-                            const config = {
-                                chatId,
-                                aiProvider,
-                                apiKey,
-                                thinkingLevel,
-                                mode,
-                                janitorModel,
-                                systemSettings,
-                                sessionStats
-                            };
-                            const summary = await compressHistory(config, messages);
-                            if (summary) {
-                                const s = emojiSpace(2);
-                                setMessages(prev => {
-                                    const finalMsgs = [...prev, {
-                                        id: Date.now(),
-                                        role: 'system',
-                                        text: `⠀⠀\x1b[2m└─\x1b[22m Chat History compacted saving tokens.\n⠀`,
-                                        isMeta: true
-                                    }];
-                                    setCompletedIndex(finalMsgs.length);
-                                    return finalMsgs;
-                                });
-                            } else {
-                                setMessages(prev => {
-                                    setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: Date.now(), role: 'system', text: '⠀⠀\x1b[2m└─\x1b[22m Compaction failed.\n⠀', isMeta: true }];
-                                });
-                            }
-                        } catch (err) {
-                            setMessages(prev => {
-                                setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `⠀⠀\x1b[2m└─\x1b[22m Error during compaction: ${err.message}\n⠀`, isMeta: true }];
-                            });
-                        } finally {
-                            setIsCompressing(false);
-                        }
-                    };
-                    runCompress();
-                    break;
-                }
                 case '/truncate': {
                     setInput('');
                     let truncatedCount = 0;
@@ -7197,14 +7130,9 @@ export default function App({ args = [] }) {
                                                         '1M': 1000000
                                                     };
                                                     let maxLimit = CONTEXT_MAP[systemSettings?.contextLength] || 256000;
-                                                    const hc = process.env.HIGH_CONTEXT;
+
                                                     const gemma_nonsense = process.env.GOOGLE_GEMMA_NONSENSE === 'true' || process.env.GOOGLE_GEMMA_NONSENSE === true || false;
-                                                    if (hc && hc !== 'false') {
-                                                        const val = parseInt(hc, 10);
-                                                        if (!isNaN(val) && val >= 0 && val <= 1000000) {
-                                                            maxLimit = val;
-                                                        }
-                                                    }
+
                                                     if ((aiProvider === 'NVIDIA' && (activeModel?.includes('gpt') || activeModel?.includes('qwen') || activeModel?.includes('medium') || activeModel.includes('muse'))) || aiProvider === 'Mistral') {
                                                         maxLimit = 126000;
                                                     }

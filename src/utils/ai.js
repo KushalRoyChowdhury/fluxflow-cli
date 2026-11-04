@@ -434,6 +434,7 @@ export const getGoogleClient = (apiKey) => {
 };
 
 export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, callbacks = {}) => {
+    return; // [DISABLED] Janitor pipeline removed
     // if (process.stdout.isTTY) {
     //     process.stdout.write(`\x1b]0;Finalizing...\x07`);
     //     process.stdout.write(`\x1b]633;P;TerminalTitle=Finalizing...\x07`);
@@ -2070,8 +2071,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // 1. Calculate total memories across all chats in L1
             const totalMemoriesCount = Object.values(tempStorage).flat().length;
             if (totalMemoriesCount > 5) {
-                yield { type: 'status', content: 'Condensing past chat memories' };
-                await consolidatePastMemories(chatId, settings, tempStorage);
+
+        // [DISABLED] await consolidatePastMemories(chatId, settings, tempStorage);
             }
         }
         // --------------------------------------------------
@@ -2629,9 +2630,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
             }
             didRecaptureInLastTurn = false;
-            if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
-                modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
-            }
+
             if (loop > 0) {
                 yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Haunting' : 'Working' };
             } else {

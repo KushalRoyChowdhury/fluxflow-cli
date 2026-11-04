@@ -321,7 +321,7 @@ export default function SettingsMenu({
                     { label: 'Base Personality', value: 'profilePreset', status: profileData?.preset || 'Default' },
                     { label: 'Nickname', value: 'profileNickname', status: profileData?.nickname || 'None' },
                     { label: 'Custom Instructions', value: 'profileInstructions', status: truncateCSV(profileData?.instructions) },
-                    { label: 'Toggle Memory [Legacy]', value: 'memory', status: systemSettings.memory ? 'ON' : 'OFF' }
+
                 ];
             case 'security': {
                 const activePreset = getActivePreset(systemSettings);
