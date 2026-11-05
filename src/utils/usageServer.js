@@ -1234,7 +1234,6 @@ function generateDashboardHtml() {
 
             const totalReq = agentRequests + bgRequests + searchRequests;
             document.getElementById('m-total-requests').textContent = totalReq.toLocaleString();
-            document.getElementById('m-requests-sub').textContent = \`\${agentRequests} Agent / \${bgRequests} Background\`;
 
             const totalTools = toolSuccess + toolFailure + toolDenied;
             const toolRate = totalTools > 0 ? ((toolSuccess / totalTools) * 100).toFixed(1) : 100;

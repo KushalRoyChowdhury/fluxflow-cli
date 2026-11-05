@@ -4458,13 +4458,13 @@ export default function App({ args = [] }) {
                             if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || fullTextStr.includes('...Success result truncated to save tokens')) {
+                            if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || fullTextStr.includes('...Old result truncated to save tokens')) {
                                 return m;
                             }
                             truncatedCount++;
                             return {
                                 ...m,
-                                fullText: '[ACTION RESULT]: ...Success result truncated to save tokens'
+                                fullText: '[ACTION RESULT]: ...Old result truncated to save tokens'
                             };
                         });
 
@@ -5253,12 +5253,12 @@ export default function App({ args = [] }) {
                                         if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('...Success result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || /^\[ACTION RESULT\]: File \[.*?\] saved/s.test(fullTextStr)) {
+                                        if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('...Old result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || /^\[ACTION RESULT\]: File \[.*?\] saved/s.test(fullTextStr)) {
                                             return m;
                                         }
                                         return {
                                             ...m,
-                                            fullText: '[ACTION RESULT]: ...Success result truncated to save tokens'
+                                            fullText: '[ACTION RESULT]: ...Old result truncated to save tokens'
                                         };
                                     });
                                     saveChat(chatId, null, updatedMessages);
