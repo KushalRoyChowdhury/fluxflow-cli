@@ -4,6 +4,7 @@ import { parseArgs } from '../utils/arg_parser.js';
 import { RevertManager } from '../utils/revert.js';
 import { loadSettings } from '../utils/settings.js';
 import { DATA_DIR } from '../utils/paths.js';
+import { recordCodeChange } from '../utils/usage.js';
 
 /**
  * Write File Tool
@@ -32,10 +33,12 @@ export const write_file = async (args, context = {}) => {
         const overwriteProtectionOn = systemSettings?.overwriteProtection !== false;
 
         let ancestry = '';
+        let oldLineCount = 0;
         if (fs.existsSync(absolutePath)) {
             try {
                 const oldData = fs.readFileSync(absolutePath, 'utf8');
                 const lines = oldData.split(/\r?\n/);
+                oldLineCount = lines.length;
 
                 if (!overwriteProtectionOn) {
                     ancestry = '';
@@ -100,6 +103,9 @@ export const write_file = async (args, context = {}) => {
         }
 
         verifiedContent = null; // Neural Flush: Signal GC that we are done with the massive string
+
+        // Record structured line changes directly from tool execution
+        await recordCodeChange({ added: verifiedLineCount, removed: oldLineCount, file: targetPath });
 
         let resultString = `File [${targetPath}] saved.\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
 

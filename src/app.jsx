@@ -38,7 +38,7 @@ let _spookyLines = null;
 
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
-import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession, sendUsageHeartbeat, sendUsageFinalize } from './utils/usage.js';
+import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession, sendUsageHeartbeat, sendUsageFinalize, onCodeChange } from './utils/usage.js';
 import { getModels, getDefaultModel, getFallbackValue, setCustomMultimodal, setOllamaMultimodal, isModelMultimodal, saveModelToProvider, removeModelFromProvider, renameModelInProvider, setDefaultModelForProvider, setModelMultimodalInProvider, updateModelInfoInProvider, getModelPricing } from './data/model_config.js';
 import { setThinkingLevelMapping, getMappedThinkingLevel, removeThinkingLevelMapping } from './data/thinking_config.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
@@ -1373,6 +1373,18 @@ export default function App({ args = [] }) {
     const [chatPromptTokens, setChatPromptTokens] = useState(0);
     const chatSessionPromptStartRef = useRef(0);
     const [sessionTotalPromptTokens, setSessionTotalPromptTokens] = useState(0);
+
+    const [sessionLinesAdded, setSessionLinesAdded] = useState(0);
+    const [sessionLinesRemoved, setSessionLinesRemoved] = useState(0);
+
+    // Sync React state directly with structured tool events
+    useEffect(() => {
+        const unsubscribe = onCodeChange(({ added, removed }) => {
+            if (added > 0) setSessionLinesAdded(prev => prev + added);
+            if (removed > 0) setSessionLinesRemoved(prev => prev + removed);
+        });
+        return unsubscribe;
+    }, []);
 
     const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState(0);
     const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState(0);
@@ -5369,59 +5381,6 @@ export default function App({ args = [] }) {
                             if (activeStreamingMsgRef.current) {
                                 currentAgentId = activeStreamingMsgRef.current.id;
                                 inToolCall = true;
-                            }
-
-                            // Track code changes
-                            if (packet.toolName === 'update_file' && packet.aiContent) {
-                                const diffLines = packet.aiContent.split('\n');
-                                let added = 0;
-                                let removed = 0;
-                                let insideDiff = false;
-                                for (const line of diffLines) {
-                                    if (line.includes('[DIFF_START]')) {
-                                        insideDiff = true;
-                                        continue;
-                                    }
-                                    if (line.includes('[DIFF_END]')) {
-                                        insideDiff = false;
-                                        continue;
-                                    }
-                                    if (insideDiff) {
-                                        if (/^\+\s*\d+/.test(line)) {
-                                            added++;
-                                        } else if (/^\-\s*\d+/.test(line)) {
-                                            removed++;
-                                        }
-                                    }
-                                }
-                                addToUsage('linesAdded', added);
-                                addToUsage('linesRemoved', removed);
-                            } else if (packet.toolName === 'write_file' && packet.aiContent) {
-                                const statsMatch = packet.aiContent.match(/- Stats: \[(\d+) lines/);
-                                const verifiedLinesCount = statsMatch ? parseInt(statsMatch[1]) : 0;
-
-                                let oldLinesCount = 0;
-                                if (packet.aiContent.includes('Old File contents:')) {
-                                    const ancestryLines = packet.aiContent.split('\n');
-                                    let insideOldFile = false;
-                                    for (const line of ancestryLines) {
-                                        if (line.includes('Old File contents:')) {
-                                            insideOldFile = true;
-                                            continue;
-                                        }
-                                        if (insideOldFile) {
-                                            if (line.startsWith('- Content Preview:') || line.startsWith('- Stats:')) {
-                                                insideOldFile = false;
-                                            } else if (/^\s*\d+\s*\|/.test(line)) {
-                                                oldLinesCount++;
-                                            }
-                                        }
-                                    }
-                                }
-                                if (verifiedLinesCount > 0 || oldLinesCount > 0) {
-                                    addToUsage('linesAdded', verifiedLinesCount);
-                                    addToUsage('linesRemoved', oldLinesCount);
-                                }
                             }
 
                             continue;

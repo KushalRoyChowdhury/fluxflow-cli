@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import fs from 'fs';
 import { Box, Text } from 'ink';
 import { TerminalBox } from './TerminalBox.jsx';
-import { wrapText, cleanSignals, parseLineInfo, getSimilarity, alignChangeGroup, flattenString } from '../utils/text.js';
+import { wrapText, cleanSignals, parseLineInfo, getSimilarity, alignChangeGroup, flattenString, isInsideBacktick } from '../utils/text.js';
 import { emojiSpace, getFluxLogo } from '../utils/terminal.js';
 import { diffWordsWithSpace } from 'diff';
 import { isAbsolute } from 'path';
@@ -907,7 +907,9 @@ export const CodeRenderer = React.memo(({ text, columns = 80, theme = 'Dark' }) 
     }
 
     // SCENARIO 1: Surgical Diff [DIFF_START]
-    if (text.includes('[DIFF_START]')) {
+    const diffIndex = text.indexOf('[DIFF_START]');
+    const isDiffMarkerActive = diffIndex !== -1 && !isInsideBacktick(text, diffIndex) && !text.includes('- Content Preview:');
+    if (isDiffMarkerActive) {
         return <DiffBlock text={text} columns={columns} extension={extension} theme={theme} />;
     }
 
@@ -1057,9 +1059,11 @@ const formatThinkingDuration = (ms) => {
 export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, aiProvider, version, theme = 'Dark' }) => {
     const colors = getThemeColors(theme);
     // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START] or Content Preview
-    const isDiffResult = msg.role === 'system' && (msg.text?.includes('[DIFF_START]') || msg.text?.includes('- Content Preview:'));
+    const rawDiffIndex = msg.text ? msg.text.indexOf('[DIFF_START]') : -1;
+    const hasActiveDiff = rawDiffIndex !== -1 && !isInsideBacktick(msg.text, rawDiffIndex) && !msg.text.includes('- Content Preview:');
+    const isDiffResult = msg.role === 'system' && (hasActiveDiff || msg.text?.includes('- Content Preview:'));
     const isPatchError = msg.role === 'system' && (msg.text?.includes('[ACTION RESULT]: ERROR:') || msg.text?.includes('[TOOL RESULT]: ERROR:')) &&
-        !msg.text?.includes('[DIFF_START]') &&
+        !hasActiveDiff &&
         (msg.toolName === 'update_file' || msg.text?.includes('Could not find exact match'));
     const isTerminalRecord = msg.isTerminalRecord;
     const isHomeWarning = msg.isHomeWarning;

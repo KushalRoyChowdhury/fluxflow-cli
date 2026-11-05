@@ -2,8 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
 import { RevertManager } from '../utils/revert.js';
-import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from '../utils/text.js';
+import { applyPatches, generateHighFidelityDiff, parsePatchPairs, computeStructuredPatchStats } from '../utils/text.js';
 import { loadSettings } from '../utils/settings.js';
+import { recordCodeChange } from '../utils/usage.js';
 
 /**
  * Update File Tool (Smart Patching)
@@ -56,6 +57,12 @@ export const update_file = async (args, context = {}) => {
         // --- REPORTING ---
         const { systemSettings } = await loadSettings();
         const diffText = generateHighFidelityDiff(originalContent, finalContent, results, 12, systemSettings?.compressToolResults);
+
+        // Record structured line changes directly from the structured patch
+        const { added, removed } = computeStructuredPatchStats(originalContent, finalContent);
+        if (added > 0 || removed > 0) {
+            await recordCodeChange({ added, removed, file: targetPath });
+        }
         if (failures.length > 0) {
             return `File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.\n\nFailures:\n${failures.map(f => `  • ${f.error}`).join('\n')}\n\n${diffText}`;
         }

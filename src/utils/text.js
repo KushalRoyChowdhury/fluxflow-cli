@@ -406,10 +406,10 @@ export const applyPatches = (content, patches, options = {}) => {
         const rawReplace = (pair.replace || '').trim();
         const content_to_add = strip(pair.new || '');
 
-        // --- LINE-ANCHORED PATCH SUPPORT (^LINE:startLine..endLine$) ---
+        // --- LINE-ANCHORED PATCH SUPPORT (^LINE:startLine..endLine$ or ^LINE:startLine-endLine$) ---
         if (rawReplace.startsWith('^LINE:') && rawReplace.endsWith('$')) {
             const body = rawReplace.slice(6, -1).trim();
-            const parts = body.split('..');
+            const parts = body.includes('..') ? body.split('..') : body.split('-');
             const startLine = parseInt(parts[0]);
             const endLine = parts[1] !== undefined ? parseInt(parts[1]) : startLine;
 
@@ -587,6 +587,26 @@ export const applyPatches = (content, patches, options = {}) => {
     }
 
     return { content: finalContent, results };
+};
+
+/**
+ * Computes structured line stats (+added, -removed) directly from structured patch hunks
+ */
+export const computeStructuredPatchStats = (originalContent, finalContent) => {
+    if (originalContent === finalContent) return { added: 0, removed: 0 };
+    const patch = structuredPatch('', '', originalContent || '', finalContent || '', '', '', { context: 3 });
+    if (!patch || !patch.hunks || patch.hunks.length === 0) {
+        return { added: 0, removed: 0 };
+    }
+    let added = 0;
+    let removed = 0;
+    for (const hunk of patch.hunks) {
+        for (const line of hunk.lines) {
+            if (line[0] === '+') added++;
+            else if (line[0] === '-') removed++;
+        }
+    }
+    return { added, removed };
 };
 
 export const generateHighFidelityDiff = (originalContent, finalContent, patchResults, threshold = 8, compressToolResults = false) => {
@@ -914,7 +934,12 @@ export const parseMessageToBlocks = (msg, columns) => {
         return { completed: completedBlocks, active: activeBlock ? [activeBlock] : [] };
     }
 
-    if (text.includes('[DIFF_START]')) {
+    // SCENARIO: Surgical Diff [DIFF_START]
+    // If [DIFF_START] is wrapped in backticks/code fences or inside a tool's result preview, treat it as standard text.
+    const diffIndex = text.indexOf('[DIFF_START]');
+    const isDiffMarkerActive = diffIndex !== -1 && !isInsideBacktick(text, diffIndex) && !text.includes('- Content Preview:');
+
+    if (isDiffMarkerActive) {
         const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
         const diffBody = match ? match[1].trim() : '';
         const diffLines = diffBody.split('\n').map(l => l.replace(/\r$/, ''));
@@ -1212,7 +1237,7 @@ export const TOOL_LABELS = {
 // ============================================================================
 const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:(?:functions\.)?|tool\.functions|action:(?:functions\.)?|action:|action\.functions|\s*turn\s*:))/gi;
 // Helper: returns true when `idx` in `str` falls inside a backtick code block or inline code span
-const isInsideBacktick = (str, idx) => {
+export const isInsideBacktick = (str, idx) => {
     let inFence = false;
     let inInlineCode = false;
     let i = 0;

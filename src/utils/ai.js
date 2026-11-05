@@ -7,7 +7,7 @@ import { DATA_DIR, LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, P
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';
 import { getTruncatedHistory, loadHistory } from './history.js';
-import { checkQuota, checkQuotaDetailed, incrementUsage, addToUsage, recordTimedUsage } from './usage.js';
+import { checkQuota, checkQuotaDetailed, incrementUsage, addToUsage, recordTimedUsage, recordCodeChange } from './usage.js';
 import { dispatchTool, isKnownTool } from './tools.js';
 import { readEncryptedJson, writeEncryptedJson, readAesEncryptedJson } from './crypto.js';
 import { parseArgs } from './arg_parser.js';
@@ -17,7 +17,7 @@ import fs from 'fs';
 import { execSync } from 'child_process';
 import { view_file } from '../tools/view_file.js';
 import { emojiSpace } from './terminal.js';
-import { applyPatches, generateHighFidelityDiff, parsePatchPairs, estimateTokenCount } from './text.js';
+import { applyPatches, generateHighFidelityDiff, parsePatchPairs, estimateTokenCount, computeStructuredPatchStats } from './text.js';
 import { structuredPatch } from 'diff';
 import { loadSettings } from './settings.js';
 import { subagentProgress } from './subagent_state.js';
@@ -4995,6 +4995,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                                 const failureSection = blockNotes.length > 0 ? `\n\nUser Review Details:\n${blockNotes.join('\n')}` : '';
                                                 result = `File [${filePath}] updated via IDE Companion. ${statusSummary}.${failureSection}\n\n${diffReport}`;
+
+                                                const { added, removed } = computeStructuredPatchStats(originalContentForReporting, finalContent);
+                                                if (added > 0 || removed > 0) {
+                                                    await recordCodeChange({ added, removed, file: filePath });
+                                                }
                                             } else {
                                                 // write_file reporting style
                                                 const verifiedLines = finalContent.split(/\r?\n/);
@@ -5037,6 +5042,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                                 result = `File [${filePath}] saved via IDE Companion (May have user edits).\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
                                                 // console.log(result);
+
+                                                const oldLinesCount = originalContentForReporting ? originalContentForReporting.split(/\r?\n/).length : 0;
+                                                await recordCodeChange({ added: verifiedLineCount, removed: oldLinesCount, file: filePath });
                                             }
 
                                             // Restore UI feedback
@@ -6344,49 +6352,6 @@ Current Time: ${time}
                 if (logCallback) logCallback(`[Action Result]\n${result}\n`);
                 toolResultsStr += `[ACTION RESULT for ${toolCall.toolName}]: ${result}\n\n`;
                 await incrementUsage('toolSuccess');
-
-                // Track code changes made by the subagent (mirrors the main agent's tracking in app.jsx)
-                if (normalizedToolName === 'patchfile' || normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patch_file') {
-                    if (result) {
-                        const diffLines = result.split('\n');
-                        let added = 0, removed = 0, insideDiff = false;
-                        for (const line of diffLines) {
-                            if (line.includes('[DIFF_START]')) { insideDiff = true; continue; }
-                            if (line.includes('[DIFF_END]')) { insideDiff = false; continue; }
-                            if (insideDiff) {
-                                if (/^\+\s*\d+/.test(line)) added++;
-                                else if (/^\-\s*\d+/.test(line)) removed++;
-                            }
-                        }
-                        if (added > 0 || removed > 0) {
-                            await addToUsage('linesAdded', added);
-                            await addToUsage('linesRemoved', removed);
-                        }
-                    }
-                } else if (normalizedToolName === 'writefile' || normalizedToolName === 'write_file') {
-                    if (result) {
-                        const statsMatch = result.match(/- Stats: \[(\d+) lines/);
-                        const verifiedLinesCount = statsMatch ? parseInt(statsMatch[1]) : 0;
-                        let oldLinesCount = 0;
-                        if (result.includes('Old File contents:')) {
-                            let insideOldFile = false;
-                            for (const line of result.split('\n')) {
-                                if (line.includes('Old File contents:')) { insideOldFile = true; continue; }
-                                if (insideOldFile) {
-                                    if (line.startsWith('- Content Preview:') || (line.trim() === '' && !/^\s*\d+\s*\|/.test(line))) {
-                                        insideOldFile = false;
-                                    } else if (/^\s*\d+\s*\|/.test(line)) {
-                                        oldLinesCount++;
-                                    }
-                                }
-                            }
-                        }
-                        if (verifiedLinesCount > 0 || oldLinesCount > 0) {
-                            await addToUsage('linesAdded', verifiedLinesCount);
-                            await addToUsage('linesRemoved', oldLinesCount);
-                        }
-                    }
-                }
             } catch (e) {
                 const errorMsg = `ERROR: Execution failed for [${toolCall.toolName}]: ${e.message}`;
                 if (logCallback) logCallback(`[Tool Error] ${errorMsg}\n`);

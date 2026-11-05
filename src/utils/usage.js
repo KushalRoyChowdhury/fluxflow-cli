@@ -525,6 +525,41 @@ export const runtimeSession = {
     cost: 0
 };
 
+const codeChangeListeners = new Set();
+
+/**
+ * Register a listener for code changes (used by UI / app.jsx state)
+ */
+export const onCodeChange = (listener) => {
+    codeChangeListeners.add(listener);
+    return () => codeChangeListeners.delete(listener);
+};
+
+/**
+ * Records structured code changes directly from tools (replaces regex scraping)
+ */
+export const recordCodeChange = async ({ added = 0, removed = 0, file = '' } = {}) => {
+    const numAdded = Math.max(0, Math.floor(Number(added) || 0));
+    const numRemoved = Math.max(0, Math.floor(Number(removed) || 0));
+
+    if (numAdded > 0) {
+        await addToUsage('linesAdded', numAdded);
+    }
+    if (numRemoved > 0) {
+        await addToUsage('linesRemoved', numRemoved);
+    }
+
+    if (numAdded > 0 || numRemoved > 0) {
+        for (const listener of codeChangeListeners) {
+            try {
+                listener({ added: numAdded, removed: numRemoved, file });
+            } catch (err) {
+                // listener error guard
+            }
+        }
+    }
+};
+
 /**
  * Adds a specific amount to a usage key in memory and forwards to daemon
  */

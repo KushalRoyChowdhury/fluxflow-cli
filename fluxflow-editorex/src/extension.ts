@@ -1470,8 +1470,8 @@ export function activate(context: vscode.ExtensionContext) {
             const links: (vscode.TerminalLink & { path: string, line?: number, startLine?: number, endLine?: number })[] = [];
 
             // Match paths like src/app.js:42, a range src/app.js:42-58, src/app.js:42:58,
-            // or src/app.js:42..58 (VSCode-style), or a bare path src/app.js.
-            const regex = /((?:[a-zA-Z]:[\\/]|[\\/]|[a-zA-Z0-9_.\-]+[\\/])[^ \n\r\t:"']+\.[a-zA-Z0-9]+)(?::(\d+)(?:[-:]|\.\.)(\d+))?/g;
+            // src/app.js:42..58 (VSCode-style), or a bare path src/app.js.
+            const regex = /((?:[a-zA-Z]:[\\/]|[\\/]|[a-zA-Z0-9_.\-]+[\\/])[^ \n\r\t:"']+\.[a-zA-Z0-9]+)(?::(\d+)(?:(?:[-:]|\.\.)(\d+))?)?/g;
 
             let match;
             while ((match = regex.exec(context.line)) !== null) {
