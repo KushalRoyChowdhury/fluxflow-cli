@@ -5264,7 +5264,23 @@ export default function App({ args = [] }) {
                                 });
                             }
 
-                            // runJanitorTask(
+                            if (process.stdout.isTTY) {
+                                (async () => {
+                                    try {
+                                        process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
+                                        process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
+                                        // const historyIndex = await loadHistory();
+                                        // const chatData = historyIndex[chatId];
+                                        // const promptTitle = (chatData?.prompt || '').replace(/\[\/?(?:STEERING HINT|QUESTION)(?::\s*\w+)?\]/gi, '').trim();
+                                        // const title = promptTitle || 'FluxFlow | Idle';
+                                        // process.stdout.write(`\x1b]0;${title}\x07`);
+                                        // process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
+                                    } catch (e) {
+                                        process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
+                                        process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
+                                    }
+                                })();
+                            }
                             //     { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider, apiKey },
                             //     packet.data.agentText,
                             //     packet.data.fullAgentTextRaw,
