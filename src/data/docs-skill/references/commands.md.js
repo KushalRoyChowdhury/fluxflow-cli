@@ -42,6 +42,7 @@ Trigger in chat via /command
 * /budget → Set/view token budget limits
 * /stats → Session token usage telemetry
 * /usage → Open graphical browser analytics dashboard
+* /memory → View or Migrate old memories to new system
 
 ## Documentation & Updates
 * /docs → Online documentation

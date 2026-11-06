@@ -1,6 +1,22 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.0.0": {
+        "note": "NOVEMBER 7. **Nothing Massive**. `v4` went patch version too high *(4.50)*, so welcome to `v5`.",
+        "added": [
+            "Use VS Code source control commit box text as prompt hints or instructions *(Write your messy commit message, and FluxFlow will polish it, OR use `={...}` to give instruction for generation)*.",
+            "Added support for Mistral4 models on NVIDIA API."
+        ],
+        "changed": [
+            "Removed chat compression and the `/compress` command. Use `/truncate` & `Auto-Truncation` instead.",
+            "Removed background user memory manager.",
+            "Removed legacy memory system."
+        ],
+        "fixes": [
+            "Fixed state management with System Tokens to reduce false triggers.",
+            "Fixed real-time code change tracking accuracy."
+        ]
+    },
     "4.50.0": {
         "note": "NOVEMBER 5",
         "added": [
