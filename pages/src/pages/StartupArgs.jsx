@@ -46,16 +46,12 @@ export default function StartupArgs() {
                     Programmatically resume a previous chat session using its unique ID.
                 </li>
                 <li>
-                    <strong><code>--memory &lt;on|off&gt;</code></strong><br />
-                    Toggle persistent long-term agent memory for the current session.
-                </li>
-                <li>
                     <strong><code>--auto-del &lt;1d|7d|30d&gt;</code></strong><br />
                     Set the automated chat log deletion schedule.
                 </li>
                 <li>
                     <strong><code>--playground</code></strong><br />
-                    Start FluxFlow in an isolated playground/experimentation session. Pins the CWD to a dedicated playground directory and forces external workspace access and memory OFF.
+                    Start FluxFlow in an isolated playground/experimentation session. Pins the CWD to a dedicated playground directory and forces external workspace access OFF.
                 </li>
             </ul>
 
@@ -95,7 +91,7 @@ export default function StartupArgs() {
                 </li>
                 <li>
                     <strong><code>--external-data &lt;path&gt;</code></strong><br />
-                    Anchor and pivot external data sanctuary operations (logs, history, encrypted memories) to a specified custom directory path upon startup.
+                    Anchor and pivot external data sanctuary operations (logs, history) to a specified custom directory path upon startup.
                 </li>
             </ul>
 

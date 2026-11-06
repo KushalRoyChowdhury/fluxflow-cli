@@ -8,7 +8,7 @@ const headings = [
     { id: 'steering-resolution', text: 'Real-Time Steering & Resolution', level: 2 },
     { id: 'thinking-visualization', text: 'Thinking Levels & Reasoning', level: 2 },
     { id: 'agentic-loop', text: 'The Agentic Loop & Status Bar', level: 2 },
-    { id: 'dual-model-system', text: 'Dual-Model System', level: 2 },
+    { id: 'dual-model-system', text: 'Streaming & Tool Protocol', level: 2 },
     { id: 'subagent-system', text: 'The Subagent System', level: 2 },
     { id: 'emergency-rollback', text: 'Emergency Rollback System', level: 2 },
     { id: 'self-healing', text: 'System Integrity & Self-Healing', level: 2 },
@@ -25,7 +25,7 @@ export default function Architecture() {
             <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 FluxFlow is built on a modern, reactive stack that brings web-like development
                 paradigms to the terminal. It utilizes a custom agentic loop for reasoning,
-                human-in-the-loop controls, interactive sub-terminals, and a unique dual-model system.
+                human-in-the-loop controls, and interactive sub-terminals.
             </p>
 
             <h2 id="ui-layer">UI Layer: React & Ink</h2>
@@ -167,14 +167,10 @@ description: Purpose and overview of the skill
                 The dynamic status bar presents real-time state: Active Mode (Flux/Flow), Thinking Level, Token Usage, Agentic Loop Counters, and API Execution status.
             </p>
 
-            <h2 id="dual-model-system">Dual-Model System</h2>
+            <h2 id="dual-model-system">Streaming & Tool Protocol</h2>
             <p>
-                To maintain a snappy UI while performing complex management, FluxFlow employs two separate AI models:
+                The agent streams model output directly to the UI while dispatching tool calls and re-prompting with tool results until the goal is complete.
             </p>
-            <ul>
-                <li><strong>The Main Agent</strong> — Handles direct interaction, reasoning, and tool execution.</li>
-                <li><strong>The Memory Agent</strong> — A silent background process responsible for system maintenance, memory extraction, and chat summarization.</li>
-            </ul>
 
             <h2 id="subagent-system">The Subagent System</h2>
             <p>
@@ -246,8 +242,8 @@ description: Purpose and overview of the skill
 
             <h2 id="persistence-safety">Persistence, Data Sanctuary &amp; Safety</h2>
             <ul>
-                <li><strong>External Data Sanctuary (Redirection)</strong> — Allows anchoring session state, logs, and encrypted memories to an external drive or VeraCrypt volume via <code>externalDataPath</code>.</li>
-                <li><strong>High-Fidelity Lock & Encryption</strong> — Promise-based <code>WRITE_LOCK</code> prevents state race conditions while secrets and memories remain encrypted at rest.</li>
+                <li><strong>External Data Sanctuary (Redirection)</strong> — Allows anchoring session state and logs to an external drive or VeraCrypt volume via <code>externalDataPath</code>.</li>
+                <li><strong>High-Fidelity Lock & Encryption</strong> — Promise-based <code>WRITE_LOCK</code> prevents state race conditions while secrets remain encrypted at rest.</li>
             </ul>
         </DocPage>
     )

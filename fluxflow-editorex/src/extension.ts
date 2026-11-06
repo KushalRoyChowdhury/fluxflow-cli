@@ -86,6 +86,17 @@ function debounceWait(ms: number, token: vscode.CancellationToken): Promise<void
 }
 let fluxFlowTerminal: vscode.Terminal | undefined;
 
+/**
+ * Ensures terminal focus is preserved/restored whenever files or diffs are opened by the companion.
+ */
+function restoreTerminalFocus(): void {
+    if (fluxFlowTerminal) {
+        fluxFlowTerminal.show(false);
+    } else {
+        vscode.commands.executeCommand('workbench.action.terminal.focus').then(undefined, () => { /* no-op if no terminal */ });
+    }
+}
+
 const lastKnownStates = new Map<string, string>();
 const originalStates = new Map<string, string>();
 const virtualDocs = new Map<string, string>();
@@ -1528,7 +1539,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
 
                 // Belt & braces: some VS Code versions still shift focus on reveal — actively restore the terminal.
-                vscode.commands.executeCommand('workbench.action.terminal.focus').then(undefined, () => { /* no-op if no terminal */ });
+                restoreTerminalFocus();
             } else {
                 vscode.window.showErrorMessage(`Could not find file: ${link.path}`);
             }
@@ -1880,11 +1891,13 @@ async function handleMessage(message: any, ws?: WebSocket) {
             const doc = await vscode.workspace.openTextDocument(uri);
             await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
             lastKnownStates.set(doc.fileName, doc.getText());
+            restoreTerminalFocus();
         }
         else if (command === 'diff') {
             lastDiffTimestamp = Date.now();
             const doc = await vscode.workspace.openTextDocument(uri);
             await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
+            restoreTerminalFocus();
         }
         else if (command === 'showDiff') {
             // Handle new file creation placeholder
@@ -1932,6 +1945,8 @@ async function handleMessage(message: any, ws?: WebSocket) {
             if (isSideBySide) {
                 await vscode.commands.executeCommand('toggle.diff.renderSideBySide');
             }
+
+            restoreTerminalFocus();
         }
         else if (command === 'save') {
             const doc = await vscode.workspace.openTextDocument(uri);

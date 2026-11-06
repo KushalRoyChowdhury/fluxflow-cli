@@ -18,7 +18,7 @@ import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPIKey } from './utils/secrets.js';
 import { runKeyCommand } from './utils/keyCommand.js';
 import { clearAllTempKeys, setNoticeHandler } from './utils/secrets_v2.js';
-import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary, getActiveToolContext, detectToolCalls, maskCodeSpans, stripTrailingFluffAfterTools } from './utils/ai.js';
+import { initAI, getAIStream, signalTermination, getActiveToolContext, detectToolCalls, maskCodeSpans, stripTrailingFluffAfterTools } from './utils/ai.js';
 import { subagentProgress } from './utils/subagent_state.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
 import { showAgentFinishNotification, showUserActionRequiredNotification } from './utils/notifications.js';
@@ -1075,9 +1075,6 @@ export default function App({ args = [] }) {
             }
             if (arg === '--model' && args[i + 1]) {
                 parsed.model = args[i + 1];
-                i++;
-            } else if (arg === '--memory' && args[i + 1]) {
-                parsed.memory = args[i + 1].toLowerCase();
                 i++;
             } else if (arg === '--resume' && args[i + 1]) {
                 parsed.resume = args[i + 1];
@@ -5267,20 +5264,20 @@ export default function App({ args = [] }) {
                                 });
                             }
 
-                            runJanitorTask(
-                                { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider, apiKey },
-                                packet.data.agentText,
-                                packet.data.fullAgentTextRaw,
-                                packet.data.history,
-                                {
-                                    onMemoryUpdated: () => setMessages(prev => {
-                                        const newMsgs = [...prev];
-                                        if (newMsgs.length > 0) newMsgs[newMsgs.length - 1].memoryUpdated = true;
-                                        return newMsgs;
-                                    }),
-                                    onBackgroundIncrement: () => setSessionBackgroundCalls(prev => prev + 1)
-                                }
-                            );
+                            // runJanitorTask(
+                            //     { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider, apiKey },
+                            //     packet.data.agentText,
+                            //     packet.data.fullAgentTextRaw,
+                            //     packet.data.history,
+                            //     {
+                            //         onMemoryUpdated: () => setMessages(prev => {
+                            //             const newMsgs = [...prev];
+                            //             if (newMsgs.length > 0) newMsgs[newMsgs.length - 1].memoryUpdated = true;
+                            //             return newMsgs;
+                            //         }),
+                            //         onBackgroundIncrement: () => setSessionBackgroundCalls(prev => prev + 1)
+                            //     }
+                            // );
 
                             // if (global.gc) {
                             //     try {
@@ -7418,7 +7415,7 @@ export default function App({ args = [] }) {
                                     const result = await RevertManager.rollbackToBefore(txId);
                                     if (result.success) {
                                         const { targetPrompt } = result;
-                                        deleteChatSummary(chatId);
+                                        // deleteChatSummary(chatId);
 
                                         setClearKey(prev => prev + 1);
                                         clearBlocksCache();

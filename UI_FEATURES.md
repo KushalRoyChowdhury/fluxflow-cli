@@ -16,14 +16,13 @@ You can control the application using `/` commands directly in the chat input:
 - **/settings**: Access the system configuration menu.
 - **/profile**: Update your name, nickname, and custom instructions.
 - **/update**: Update Flux Flow to the latest version.
-- **/memory**: View and manage the persistent memories extracted by the Janitor.
 - **/resume <chat-id>**: Switch back to a previous conversation.
 - **/changelog**: Open the project's changelog in your default browser.
 - **/help**: List all available commands.
 
 ## 📁 External Data Sanctuary (Redirection)
 
-Flux Flow allows you to "Anchor" your data outside of the default user directory. This is perfect for users who want to keep their logs, chat history, and encrypted memories on an external drive, a VeraCrypt volume, or a specific project folder.
+Flux Flow allows you to "Anchor" your data outside of the default user directory. This is perfect for users who want to keep their logs and chat history on an external drive, a VeraCrypt volume, or a specific project folder.
 
 - **How to Enable**: Open `/settings` and toggle **Use External Data**.
 - **Portability**: Once set, the application will synchronously "pivot" all data operations to your specified `externalDataPath` upon startup.

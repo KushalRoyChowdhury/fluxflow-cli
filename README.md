@@ -13,7 +13,7 @@
 
 📖 **[Official Documentation](https://fluxflow-cli.onrender.com/)**
 
-Flux Flow is an advanced, fully autonomous AI agent that lives directly in your terminal. Built with Node.js and [Ink](https://github.com/vadimdemedes/ink) (React for interactive command-line apps), it provides a highly responsive, component-based UI powered by a sophisticated dual-model AI architecture.
+Flux Flow is an advanced, fully autonomous AI agent that lives directly in your terminal. Built with Node.js and [Ink](https://github.com/vadimdemedes/ink) (React for interactive command-line apps), it provides a highly responsive, component-based UI powered by a sophisticated AI architecture.
 
 Whether you need a conversational partner or an autonomous developer that can write code, run shell commands, and read your project files, Flux Flow adapts to your needs.
 
@@ -54,15 +54,14 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **Instant Rollback**: Revert your workspace files (source code, generated documents, images) to their exact state prior to any selected prompt in the history.
   - **Double-ESC Shortcut**: Press `ESC` twice while idle to pop open a sleek selection modal.
   - **`/revert` Command**: Run the `/revert` command directly in the chat to open the checkpoint viewer.
-- **External Data Sanctuary**: Redirect your logs, history, and memories to any external path for maximum portability and privacy.
+- **External Data Sanctuary**: Redirect your logs and history to any external path for maximum portability and privacy.
 - **Responsive Terminal UI**: A gorgeous, reactive interface built with React and Ink, featuring multi-line input, status bars, modals, and diff views.
-- **Dual-Model Architecture**: A primary agent interacts with you and executes tasks, while a silent background "Janitor" model handles chat summarization and long-term memory extraction without blocking the main UI.
-- **Two Operating Modes**:
+- **Four Operating Modes**:
   - **Flux (Dev Mode)**: Full system access. The agent can read/write files, execute shell commands, and run autonomous agentic loops, subagents, safety tools to solve complex coding tasks.
   - **Flow (Chat Mode)**: Focused on conversation and web research, with limited agentic loops for faster response times.
   - **Computer Use (GUI Automation)**: Agents can control computer GUI, with mouse and keyboard.
   - **FluxCU/Omni (Automated Workflow Engine)**: Agents can control computer GUI for automated workflows and tasks, with mouse and keyboard.
-- **Advanced Memory System**: Features both temporary session context and persistent, cross-session user memories encrypted locally on your machine.
+
 - **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and high-fidelity Office document generation (PDF/DOCX).
 - **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `fluxflow.md` for high-fidelity coding standards and complex workflows.
 - **Customizable "Thinking" Levels**: Adjust the depth of the model's reasoning process (from Fast to xHigh).
@@ -105,7 +104,7 @@ fluxflow
 
 To keep this README concise, detailed information about specific components of Flux Flow has been split into separate documents:
 
-- **[Architecture & Design](./ARCHITECTURE.md)**: Deep dive into the React/Ink rendering, the Agentic Loop, and the Janitor background process.
+- **[Architecture & Design](./ARCHITECTURE.md)**: Deep dive into the React/Ink rendering, the Agentic Loop.
 - **[Agent Tools & Capabilities](./TOOLS.md)**: A comprehensive list of the tools available to the agent (e.g., File I/O, Execution, Web tools).
 - **[UI & Interaction Features](./UI_FEATURES.md)**: Details on commands, thinking levels, and human-in-the-loop verification.
 
@@ -121,7 +120,6 @@ fluxflow [options]
 - `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.7-flash`). Keeps settings file untouched.
  - `--cwd <path>`: Set the working directory for the session (relative or absolute path).
  - `--path <path>`: Alias for `--cwd`. Set the working directory for the session.
- - `--memory <on | off>`: Toggle persistent long-term agent memory for the session. [Legacy. Deprecated]
  - `--resume <session-id>`: Resume a previous chat session programmatically.
  - `--update <check | latest>`: Manually run an update check (`check`) or execute latest update setup (`latest`).
  - `--package <npm | pnpm | yarn | bun>`: Override default package manager to run core application updates.
@@ -150,7 +148,7 @@ fluxflow [options]
 Flux Flow runs entirely locally on your machine.
 - **Sandbox Presets**: Choose from **Strict**, **Balanced**, **Autonomous**, or **Custom** profiles to fine-tune agent autonomy out of the box.
 - **Granular Command Policies**: Configure Auto-Approve, Auto-Disallow, Network Access toggle, and Auto-Approve Git Commits independently.
-- **Global Storage**: All history, memories, and API keys are stored securely in your home directory at `~/.fluxflow`.
+- **Global Storage**: All history and API keys are stored securely in your home directory at `~/.fluxflow`.
 - **Nuclear Reset**: Use the `/reset` command to instantly purge all logs, secrets, and settings from the global storage directory.
 - **Configurable Boundaries**: In Flux mode, file access can be strictly confined to the Current Working Directory, or expanded globally via settings.
 - **API Keys**: You supply your own API keys for your preferred provider: Google GenAI, DeepSeek, OpenRouter, Nvidia, Ollama, or Mistral.

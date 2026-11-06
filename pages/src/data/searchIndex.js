@@ -71,8 +71,8 @@ export const searchIndex = [
         title: 'Core Settings Flags',
         path: '/startup-args',
         section: 'core-settings',
-        keywords: ['mode', 'resume', 'memory', 'deletion'],
-        description: 'CLI flags for mode, session resumption, and memory.'
+        keywords: ['mode', 'resume', 'deletion'],
+        description: 'CLI flags for mode, session resumption, and log deletion.'
     },
     {
         title: 'Security Permissions Flags',
@@ -94,7 +94,7 @@ export const searchIndex = [
         title: 'Session Management Commands',
         path: '/app-commands',
         section: 'session-management',
-        keywords: ['clear', 'save', 'resume', 'chats', 'export', 'compress', 'revert'],
+        keywords: ['clear', 'save', 'resume', 'chats', 'export', 'revert'],
         description: 'Commands for managing chat history and codebase state.'
     },
     {

@@ -440,479 +440,479 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     //     process.stdout.write(`\x1b]633;P;TerminalTitle=Finalizing...\x07`);
     // }
 
-    const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
-    const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
+//     const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
+//     const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
 
-    const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
-    const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs' || aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') ? false : systemSettings?.memory !== false;
+//     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
+//     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
+//     const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs' || aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') ? false : systemSettings?.memory !== false;
 
-    // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
-    const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
-    const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
+//     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
+//     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
+//     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
-    const janitorContents = history.slice(0, -1)
-        .filter(msg => msg.text && !msg.text.includes('[ACTION RESULT]') && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:') && !msg.text.startsWith('[TERMINAL_RECORD]') && !msg.isTerminalRecord && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
-        .slice(-14)
-        .map(msg => {
-            let processedText = stripLeadingThinking(stripAnsi(msg.text))
-                .replace(/\[(?:tool|action):(?:functions\.)?.*?\]/g, '')
-                .replace(/\[Prompted on:.*?\]/g, '')
-                .replace(/\[METADATA \(PRIORITY: DYNAMIC\)\] Time: ([^|\n]+)/g, (match, p1) => {
-                    return `[METADATA (PRIORITY: DYNAMIC)] Time: ${p1.replace(/:\d{2}/g, '')}`;
-                })
-                .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
-                .replace(/\[\[END\]\]/g, '')
-                .replace(/\[\[(?:TOOL|ACTION) RESULTS\]\]/gi, '')
-                .replace(/\[(?:TOOL|ACTION) RESULTS?\]/gi, '')
-                .replace(/\[(?:tool|action) results\]/gi, '')
-                .replace(/\r?\n\r?\n/g, '\n')
-                .replace(/\n\n/g, '\n')
-                .replace(/\\n\\n/g, '')
-                .trim();
+//     const janitorContents = history.slice(0, -1)
+//         .filter(msg => msg.text && !msg.text.includes('[ACTION RESULT]') && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:') && !msg.text.startsWith('[TERMINAL_RECORD]') && !msg.isTerminalRecord && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
+//         .slice(-14)
+//         .map(msg => {
+//             let processedText = stripLeadingThinking(stripAnsi(msg.text))
+//                 .replace(/\[(?:tool|action):(?:functions\.)?.*?\]/g, '')
+//                 .replace(/\[Prompted on:.*?\]/g, '')
+//                 .replace(/\[METADATA \(PRIORITY: DYNAMIC\)\] Time: ([^|\n]+)/g, (match, p1) => {
+//                     return `[METADATA (PRIORITY: DYNAMIC)] Time: ${p1.replace(/:\d{2}/g, '')}`;
+//                 })
+//                 .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
+//                 .replace(/\[\[END\]\]/g, '')
+//                 .replace(/\[\[(?:TOOL|ACTION) RESULTS\]\]/gi, '')
+//                 .replace(/\[(?:TOOL|ACTION) RESULTS?\]/gi, '')
+//                 .replace(/\[(?:tool|action) results\]/gi, '')
+//                 .replace(/\r?\n\r?\n/g, '\n')
+//                 .replace(/\n\n/g, '\n')
+//                 .replace(/\\n\\n/g, '')
+//                 .trim();
 
-            const limit = msg.role === 'user' ? USER_CONTEXT_LENGTH : AGENT_CONTEXT_LENGTH;
-            let truncatedText = processedText.substring(0, limit);
-            if (processedText.length > limit) {
-                truncatedText += '\n... (truncated) ...';
-            }
+//             const limit = msg.role === 'user' ? USER_CONTEXT_LENGTH : AGENT_CONTEXT_LENGTH;
+//             let truncatedText = processedText.substring(0, limit);
+//             if (processedText.length > limit) {
+//                 truncatedText += '\n... (truncated) ...';
+//             }
 
-            const prefix = msg.role === 'user'
-                ? (truncatedText.startsWith('[USER]') ? '' : '[USER]: ')
-                : (truncatedText.startsWith('[AGENT]') ? '' : '[AGENT]: ');
+//             const prefix = msg.role === 'user'
+//                 ? (truncatedText.startsWith('[USER]') ? '' : '[USER]: ')
+//                 : (truncatedText.startsWith('[AGENT]') ? '' : '[AGENT]: ');
 
-            return {
-                role: msg.role === 'user' ? 'user' : 'model',
-                parts: [{ text: `${prefix}${truncatedText}` }]
-            };
-        });
+//             return {
+//                 role: msg.role === 'user' ? 'user' : 'model',
+//                 parts: [{ text: `${prefix}${truncatedText}` }]
+//             };
+//         });
 
-    const isFirstPrompt = history.filter(m => m.role === 'user').length === 1;
-    const hasTitleSignal = agentText.includes('[TITLE-UPDATE]');
-    const thisHas80pChanceOfBeingTrue = Math.random() < 0.8;
-    const needTitle = isFirstPrompt || hasTitleSignal || thisHas80pChanceOfBeingTrue;
+//     const isFirstPrompt = history.filter(m => m.role === 'user').length === 1;
+//     const hasTitleSignal = agentText.includes('[TITLE-UPDATE]');
+//     const thisHas80pChanceOfBeingTrue = Math.random() < 0.8;
+//     const needTitle = isFirstPrompt || hasTitleSignal || thisHas80pChanceOfBeingTrue;
 
-    const cleanedFullResponse = stripLeadingThinking(fullAgentTextRaw).trim();
-    const janitorPrompt = getJanitorInstruction(
-        janitorUserMemories,
-        isMemoryEnabled,
-        needTitle
-    );
+//     const cleanedFullResponse = stripLeadingThinking(fullAgentTextRaw).trim();
+//     const janitorPrompt = getJanitorInstruction(
+//         janitorUserMemories,
+//         isMemoryEnabled,
+//         needTitle
+//     );
 
-    let agentRes = `${cleanedFullResponse.replace(/\[(?:tool|action):(?:functions\.)?.*?\]/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '').replace(/\[\[END\]\]/g, '').replace(/\[\[(?:TOOL|ACTION) RESULTS\]\]/gi, '').replace(/\[(?:TOOL|ACTION) RESULTS?\]/gi, '').replace(/\[(?:tool|action) results\]/gi, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
-    if (agentRes.length > AGENT_CONTEXT_LENGTH) {
-        agentRes += '\n... (truncated) ...';
-    }
-    // replace the [Prompted on: ...] from user prompt
-    let originalTextProcessed = agentText.replace(/\[Prompted on:.*?\]/g, '').trim();
-    // fs.writeFileSync('test.txt', originalTextProcessed);
-    // replace the consecutive newlines and literal escaped \n\n with clean formatting
-    agentRes = agentRes.replace(/\r?\n\r?\n/g, '\n').replace(/\n\n/g, '\n').replace(/\\n\\n/g, '').trim();
-    const now1223 = new Date();
-    const dateTimeStr1223 = `${now1223.getFullYear()}-${now1223.toLocaleString('en-US', { month: 'short' }).toUpperCase()}-${String(now1223.getDate()).padStart(2, '0')}, ${now1223.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`;
-    let userPrompt = `[METADATA] Current date and Time: ${dateTimeStr1223}
+//     let agentRes = `${cleanedFullResponse.replace(/\[(?:tool|action):(?:functions\.)?.*?\]/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '').replace(/\[\[END\]\]/g, '').replace(/\[\[(?:TOOL|ACTION) RESULTS\]\]/gi, '').replace(/\[(?:TOOL|ACTION) RESULTS?\]/gi, '').replace(/\[(?:tool|action) results\]/gi, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
+//     if (agentRes.length > AGENT_CONTEXT_LENGTH) {
+//         agentRes += '\n... (truncated) ...';
+//     }
+//     // replace the [Prompted on: ...] from user prompt
+//     let originalTextProcessed = agentText.replace(/\[Prompted on:.*?\]/g, '').trim();
+//     // fs.writeFileSync('test.txt', originalTextProcessed);
+//     // replace the consecutive newlines and literal escaped \n\n with clean formatting
+//     agentRes = agentRes.replace(/\r?\n\r?\n/g, '\n').replace(/\n\n/g, '\n').replace(/\\n\\n/g, '').trim();
+//     const now1223 = new Date();
+//     const dateTimeStr1223 = `${now1223.getFullYear()}-${now1223.toLocaleString('en-US', { month: 'short' }).toUpperCase()}-${String(now1223.getDate()).padStart(2, '0')}, ${now1223.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+//     let userPrompt = `[METADATA] Current date and Time: ${dateTimeStr1223}
 
-[USER]: ${originalTextProcessed.substring(0, USER_CONTEXT_LENGTH)}\n${originalTextProcessed.length > USER_CONTEXT_LENGTH ? '... (truncated) ...\n\n' : ''}
-[AGENT (current turn)]: ${agentRes}`
+// [USER]: ${originalTextProcessed.substring(0, USER_CONTEXT_LENGTH)}\n${originalTextProcessed.length > USER_CONTEXT_LENGTH ? '... (truncated) ...\n\n' : ''}
+// [AGENT (current turn)]: ${agentRes}`
 
-    janitorContents.push({ role: 'user', parts: [{ text: userPrompt }] });
+//     janitorContents.push({ role: 'user', parts: [{ text: userPrompt }] });
 
-    // fs.writeFileSync('janitorContents.txt', `${janitorPrompt}\n\n${userPrompt}`);
+//     // fs.writeFileSync('janitorContents.txt', `${janitorPrompt}\n\n${userPrompt}`);
 
-    const nvidiaApiKey = await getProviderAPIKey('NVIDIA');
-    const fullSettings = await loadSettings();
-    const isNvidiaFree = fullSettings.quotas?.providerTiers?.NVIDIA === 'Free';
+//     const nvidiaApiKey = await getProviderAPIKey('NVIDIA');
+//     const fullSettings = await loadSettings();
+//     const isNvidiaFree = fullSettings.quotas?.providerTiers?.NVIDIA === 'Free';
 
-    let finalSynthesis = '';
-    let attempts = 0;
-    const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
+//     let finalSynthesis = '';
+//     let attempts = 0;
+//     const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
 
-    // console.log("Before Loop"); // [DEBUGGING POINT]
+//     // console.log("Before Loop"); // [DEBUGGING POINT]
 
-    while (attempts <= MAX_JANITOR_RETRIES) {
-        try {
-            if (!(await checkQuota('background', settings))) {
-                return;
-            }
+//     while (attempts <= MAX_JANITOR_RETRIES) {
+//         try {
+//             if (!(await checkQuota('background', settings))) {
+//                 return;
+//             }
 
-            let fullContent = '';
-            let lastUsage = null;
-            let useNvidiaFallback = false;
-            let effectiveProvider = aiProvider;
+//             let fullContent = '';
+//             let lastUsage = null;
+//             let useNvidiaFallback = false;
+//             let effectiveProvider = aiProvider;
 
-            try {
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 10000)
-                );
+//             try {
+//                 const timeoutPromise = new Promise((_, reject) =>
+//                     setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 10000)
+//                 );
 
-                // console.log("WE ARE HERE!"); // [DEBUGGING POINT]
+//                 // console.log("WE ARE HERE!"); // [DEBUGGING POINT]
 
-                const useNvidiaFallbackForGoogle = aiProvider === 'Google' && attempts >= 0 && attempts < 6 && nvidiaApiKey && isNvidiaFree;
-                const useNvidiaFallbackForDeepSeek = aiProvider === 'DeepSeek' && attempts < 4 && nvidiaApiKey && isNvidiaFree;
-                useNvidiaFallback = useNvidiaFallbackForGoogle || useNvidiaFallbackForDeepSeek;
-                effectiveProvider = useNvidiaFallback ? 'NVIDIA' : aiProvider;
-                // console.log(effectiveProvider); // [DEBUGGING POINT]
+//                 const useNvidiaFallbackForGoogle = aiProvider === 'Google' && attempts >= 0 && attempts < 6 && nvidiaApiKey && isNvidiaFree;
+//                 const useNvidiaFallbackForDeepSeek = aiProvider === 'DeepSeek' && attempts < 4 && nvidiaApiKey && isNvidiaFree;
+//                 useNvidiaFallback = useNvidiaFallbackForGoogle || useNvidiaFallbackForDeepSeek;
+//                 effectiveProvider = useNvidiaFallback ? 'NVIDIA' : aiProvider;
+//                 // console.log(effectiveProvider); // [DEBUGGING POINT]
 
-                const janitorReqStart = Date.now();
-                let janitorTtft = null;
+//                 const janitorReqStart = Date.now();
+//                 let janitorTtft = null;
 
-                const streamPromise = (async () => {
-                    if (aiProvider === 'OpenRouter') {
-                        const janitorOpenRouterModel = getFallbackValue('janitor_open_router');
-                        const stream = (await loadProvider('OpenRouter'))(
-                            apiKey,
-                            janitorOpenRouterModel,
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast', // Janitor always minimal
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else if (aiProvider === 'DeepSeek' && !useNvidiaFallback) {
-                        const stream = (await loadProvider('DeepSeek'))(
-                            apiKey,
-                            getFallbackValue('deepseek_fast_fallback'),
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast', // Janitor always minimal
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else if (aiProvider === 'Mistral' && !useNvidiaFallback) {
-                        const stream = (await loadProvider('Mistral'))(
-                            apiKey,
-                            getFallbackValue('mistral_janitor_fallback'),
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast', // Janitor always minimal
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else if (aiProvider === 'NVIDIA' || useNvidiaFallback) {
-                        const stream = (await loadProvider('NVIDIA'))(
-                            useNvidiaFallback ? nvidiaApiKey : apiKey,
-                            getFallbackValue('nvidia_janitor_fallback'),
-                            // "mistralai/mistral-nemotron", // [DEBUGGING POINT]
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast', // Janitor always minimal
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else if (aiProvider === 'InferX') {
-                        const stream = (await loadProvider('InferX'))(
-                            apiKey,
-                            targetModel || getFallbackValue('inferx_fallback') || 'deepseek-v4-flash',
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast',
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else if (aiProvider === 'SenseNova') {
-                        const stream = (await loadProvider('SenseNova'))(
-                            apiKey,
-                            targetModel || getFallbackValue('sensenova_fallback') || 'sensenova-6.8-flash-lite',
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast',
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else if (aiProvider === 'AIHubMix') {
-                        const stream = (await loadProvider('AIHubMix'))(
-                            apiKey,
-                            targetModel || getFallbackValue('aihubmix_fallback') || 'gpt-4o-mini',
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast',
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else if (aiProvider === 'Poolside') {
-                        const stream = (await loadProvider('Poolside'))(
-                            apiKey,
-                            targetModel || getFallbackValue('poolside_fallback') || 'poolside/laguna-s-2.1',
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast',
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else if (aiProvider === '9router' || aiProvider === '9Router') {
-                        const stream = (await loadProvider('NineRouter'))(
-                            apiKey,
-                            targetModel || getFallbackValue('9router_fallback') || 'z-ai/glm-5.3-flash',
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast',
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
-                        const stream = (await loadProvider('ExpLabs'))(
-                            apiKey,
-                            targetModel || getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813',
-                            janitorContents,
-                            janitorPrompt,
-                            'Fast',
-                            mode,
-                            false,
-                            null,
-                            0.7
-                        );
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    } else {
-                        const googleClient = getGoogleClient(apiKey);
-                        const stream = await googleClient.models.generateContentStream({
-                            model: janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google')),
-                            contents: janitorContents,
-                            config: {
-                                systemInstruction: janitorPrompt,
-                                temperature: 0.7,
-                                safetySettings: [
-                                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                ],
-                                thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }, // Janitor always minimal
-                                serviceTier: 'flex' // Janitor always uses flex tier
-                            }
-                        });
-                        // console.log("MEMORY REQ SENT"); // [DEBUGGING POINT]
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    }
-                })();
+//                 const streamPromise = (async () => {
+//                     if (aiProvider === 'OpenRouter') {
+//                         const janitorOpenRouterModel = getFallbackValue('janitor_open_router');
+//                         const stream = (await loadProvider('OpenRouter'))(
+//                             apiKey,
+//                             janitorOpenRouterModel,
+//                             janitorContents,
+//                             janitorPrompt,
+//                             'Fast', // Janitor always minimal
+//                             mode,
+//                             false,
+//                             null,
+//                             0.7
+//                         );
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     } else if (aiProvider === 'DeepSeek' && !useNvidiaFallback) {
+//                         const stream = (await loadProvider('DeepSeek'))(
+//                             apiKey,
+//                             getFallbackValue('deepseek_fast_fallback'),
+//                             janitorContents,
+//                             janitorPrompt,
+//                             'Fast', // Janitor always minimal
+//                             mode,
+//                             false,
+//                             null,
+//                             0.7
+//                         );
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     } else if (aiProvider === 'Mistral' && !useNvidiaFallback) {
+//                         const stream = (await loadProvider('Mistral'))(
+//                             apiKey,
+//                             getFallbackValue('mistral_janitor_fallback'),
+//                             janitorContents,
+//                             janitorPrompt,
+//                             'Fast', // Janitor always minimal
+//                             mode,
+//                             false,
+//                             null,
+//                             0.7
+//                         );
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     } else if (aiProvider === 'NVIDIA' || useNvidiaFallback) {
+//                         const stream = (await loadProvider('NVIDIA'))(
+//                             useNvidiaFallback ? nvidiaApiKey : apiKey,
+//                             getFallbackValue('nvidia_janitor_fallback'),
+//                             // "mistralai/mistral-nemotron", // [DEBUGGING POINT]
+//                             janitorContents,
+//                             janitorPrompt,
+//                             'Fast', // Janitor always minimal
+//                             mode,
+//                             false,
+//                             null,
+//                             0.7
+//                         );
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     } else if (aiProvider === 'InferX') {
+//                         const stream = (await loadProvider('InferX'))(
+//                             apiKey,
+//                             targetModel || getFallbackValue('inferx_fallback') || 'deepseek-v4-flash',
+//                             janitorContents,
+//                             janitorPrompt,
+//                             'Fast',
+//                             mode,
+//                             false,
+//                             null,
+//                             0.7
+//                         );
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     } else if (aiProvider === 'SenseNova') {
+//                         const stream = (await loadProvider('SenseNova'))(
+//                             apiKey,
+//                             targetModel || getFallbackValue('sensenova_fallback') || 'sensenova-6.8-flash-lite',
+//                             janitorContents,
+//                             janitorPrompt,
+//                             'Fast',
+//                             mode,
+//                             false,
+//                             null,
+//                             0.7
+//                         );
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     } else if (aiProvider === 'AIHubMix') {
+//                         const stream = (await loadProvider('AIHubMix'))(
+//                             apiKey,
+//                             targetModel || getFallbackValue('aihubmix_fallback') || 'gpt-4o-mini',
+//                             janitorContents,
+//                             janitorPrompt,
+//                             'Fast',
+//                             mode,
+//                             false,
+//                             null,
+//                             0.7
+//                         );
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     } else if (aiProvider === 'Poolside') {
+//                         const stream = (await loadProvider('Poolside'))(
+//                             apiKey,
+//                             targetModel || getFallbackValue('poolside_fallback') || 'poolside/laguna-s-2.1',
+//                             janitorContents,
+//                             janitorPrompt,
+//                             'Fast',
+//                             mode,
+//                             false,
+//                             null,
+//                             0.7
+//                         );
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     } else if (aiProvider === '9router' || aiProvider === '9Router') {
+//                         const stream = (await loadProvider('NineRouter'))(
+//                             apiKey,
+//                             targetModel || getFallbackValue('9router_fallback') || 'z-ai/glm-5.3-flash',
+//                             janitorContents,
+//                             janitorPrompt,
+//                             'Fast',
+//                             mode,
+//                             false,
+//                             null,
+//                             0.7
+//                         );
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
+//                         const stream = (await loadProvider('ExpLabs'))(
+//                             apiKey,
+//                             targetModel || getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813',
+//                             janitorContents,
+//                             janitorPrompt,
+//                             'Fast',
+//                             mode,
+//                             false,
+//                             null,
+//                             0.7
+//                         );
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     } else {
+//                         const googleClient = getGoogleClient(apiKey);
+//                         const stream = await googleClient.models.generateContentStream({
+//                             model: janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google')),
+//                             contents: janitorContents,
+//                             config: {
+//                                 systemInstruction: janitorPrompt,
+//                                 temperature: 0.7,
+//                                 safetySettings: [
+//                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+//                                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+//                                     { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+//                                     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+//                                 ],
+//                                 thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }, // Janitor always minimal
+//                                 serviceTier: 'flex' // Janitor always uses flex tier
+//                             }
+//                         });
+//                         // console.log("MEMORY REQ SENT"); // [DEBUGGING POINT]
+//                         const iterator = stream[Symbol.asyncIterator]();
+//                         const firstResult = await iterator.next();
+//                         return { iterator, firstResult };
+//                     }
+//                 })();
 
-                if (process.stdout.isTTY) {
-                    const historyIndex = await loadHistory();
-                    const chatData = historyIndex[chatId];
-                    const chatName = chatData?.name || '';
-                    const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Idle';
-                    process.stdout.write(`\x1b]0;${title}\x07`);
-                    process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
-                }
+//                 if (process.stdout.isTTY) {
+//                     const historyIndex = await loadHistory();
+//                     const chatData = historyIndex[chatId];
+//                     const chatName = chatData?.name || '';
+//                     const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Idle';
+//                     process.stdout.write(`\x1b]0;${title}\x07`);
+//                     process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
+//                 }
 
-                const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
-                janitorTtft = Date.now() - janitorReqStart;
-                let { value: firstChunk, done: firstDone } = firstResult;
+//                 const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
+//                 janitorTtft = Date.now() - janitorReqStart;
+//                 let { value: firstChunk, done: firstDone } = firstResult;
 
-                if (!firstDone && firstChunk) {
-                    const parts = firstChunk.candidates?.[0]?.content?.parts;
-                    const chunkText = parts ? (effectiveProvider === 'Google' ? (parts[1]?.text || parts[0]?.text || '') : parts.filter(p => p.text && !p.thought).map(p => p.text).join('')) : (typeof firstChunk.text === 'function' ? firstChunk.text() : '');
-                    if (chunkText) {
-                        fullContent += chunkText;
-                    }
-                    lastUsage = firstChunk.usageMetadata;
+//                 if (!firstDone && firstChunk) {
+//                     const parts = firstChunk.candidates?.[0]?.content?.parts;
+//                     const chunkText = parts ? (effectiveProvider === 'Google' ? (parts[1]?.text || parts[0]?.text || '') : parts.filter(p => p.text && !p.thought).map(p => p.text).join('')) : (typeof firstChunk.text === 'function' ? firstChunk.text() : '');
+//                     if (chunkText) {
+//                         fullContent += chunkText;
+//                     }
+//                     lastUsage = firstChunk.usageMetadata;
 
-                    for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
-                        const p = chunk.candidates?.[0]?.content?.parts;
-                        const t = p ? (effectiveProvider === 'Google' ? (p[1]?.text || p[0]?.text || '') : p.filter(part => part.text && !part.thought).map(part => part.text).join('')) : (typeof chunk.text === 'function' ? chunk.text() : '');
-                        if (t) fullContent += t;
-                        lastUsage = chunk.usageMetadata;
-                        // console.log(useNvidiaFallback, " : ", fullContent); // [DEBUGGING POINT]
-                    }
-                }
-            } catch (e) {
-                // console.log("ERROR: " + e); // [DEBUGGING POINT]
-                throw e;
-            }
+//                     for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
+//                         const p = chunk.candidates?.[0]?.content?.parts;
+//                         const t = p ? (effectiveProvider === 'Google' ? (p[1]?.text || p[0]?.text || '') : p.filter(part => part.text && !part.thought).map(part => part.text).join('')) : (typeof chunk.text === 'function' ? chunk.text() : '');
+//                         if (t) fullContent += t;
+//                         lastUsage = chunk.usageMetadata;
+//                         // console.log(useNvidiaFallback, " : ", fullContent); // [DEBUGGING POINT]
+//                     }
+//                 }
+//             } catch (e) {
+//                 // console.log("ERROR: " + e); // [DEBUGGING POINT]
+//                 throw e;
+//             }
 
-            if (fullContent) {
-                finalSynthesis = fullContent;
-                // console.log(`Fallback: ${useNvidiaFallback};  Provider: ${effectiveProvider}; Final Synthesis: ${finalSynthesis}`); // [DEBUGGING POINT]
-                if (lastUsage) {
-                    const total = lastUsage.totalTokenCount || 0;
-                    const cached = lastUsage.cachedContentTokenCount || 0;
-                    // [SCHEMA] Gemini adds thoughts outside candidates; OpenAI-style nests reasoning inside completion.
-                    const candidates = (lastUsage.candidatesTokenCount || 0) + (effectiveProvider === 'Google' ? (lastUsage.thoughtsTokenCount || 0) : 0);
-                    const jModel = useNvidiaFallback
-                        ? getFallbackValue('nvidia_janitor_fallback')
-                        : (effectiveProvider === 'DeepSeek'
-                            ? getFallbackValue('deepseek_fast_fallback')
-                            : (effectiveProvider === 'ExpLabs' || effectiveProvider === 'ExperientialLabs'
-                                ? (getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813')
-                                : (effectiveProvider === 'OpenRouter'
-                                    ? getFallbackValue('janitor_open_router')
-                                    : (janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google'))))));
-                    await addToUsage('tokens', total, effectiveProvider, jModel);
-                    if (cached > 0) {
-                        await addToUsage('cachedTokens', cached, effectiveProvider, jModel);
-                    }
-                    if (candidates > 0) {
-                        await addToUsage('candidateTokens', candidates, effectiveProvider, jModel);
-                    }
-                    if (janitorTtft !== null && janitorTtft > 0) {
-                        await addToUsage('ttft', janitorTtft, effectiveProvider, jModel);
-                    }
-                    recordTimedUsage({ provider: effectiveProvider, model: jModel, prompt: lastUsage.promptTokenCount || 0, cached, output: candidates, reasoning: lastUsage.thoughtsTokenCount || 0, ttft: janitorTtft });
-                }
+//             if (fullContent) {
+//                 finalSynthesis = fullContent;
+//                 // console.log(`Fallback: ${useNvidiaFallback};  Provider: ${effectiveProvider}; Final Synthesis: ${finalSynthesis}`); // [DEBUGGING POINT]
+//                 if (lastUsage) {
+//                     const total = lastUsage.totalTokenCount || 0;
+//                     const cached = lastUsage.cachedContentTokenCount || 0;
+//                     // [SCHEMA] Gemini adds thoughts outside candidates; OpenAI-style nests reasoning inside completion.
+//                     const candidates = (lastUsage.candidatesTokenCount || 0) + (effectiveProvider === 'Google' ? (lastUsage.thoughtsTokenCount || 0) : 0);
+//                     const jModel = useNvidiaFallback
+//                         ? getFallbackValue('nvidia_janitor_fallback')
+//                         : (effectiveProvider === 'DeepSeek'
+//                             ? getFallbackValue('deepseek_fast_fallback')
+//                             : (effectiveProvider === 'ExpLabs' || effectiveProvider === 'ExperientialLabs'
+//                                 ? (getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813')
+//                                 : (effectiveProvider === 'OpenRouter'
+//                                     ? getFallbackValue('janitor_open_router')
+//                                     : (janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google'))))));
+//                     await addToUsage('tokens', total, effectiveProvider, jModel);
+//                     if (cached > 0) {
+//                         await addToUsage('cachedTokens', cached, effectiveProvider, jModel);
+//                     }
+//                     if (candidates > 0) {
+//                         await addToUsage('candidateTokens', candidates, effectiveProvider, jModel);
+//                     }
+//                     if (janitorTtft !== null && janitorTtft > 0) {
+//                         await addToUsage('ttft', janitorTtft, effectiveProvider, jModel);
+//                     }
+//                     recordTimedUsage({ provider: effectiveProvider, model: jModel, prompt: lastUsage.promptTokenCount || 0, cached, output: candidates, reasoning: lastUsage.thoughtsTokenCount || 0, ttft: janitorTtft });
+//                 }
 
-                // const date = new Date().toLocaleString();
-                // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-                // if (!fs.existsSync(janitorLogDir)) fs.mkdirSync(janitorLogDir, { recursive: true });
-                // fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `\n\n---------------------------------------------------\n\n\nDEBUG [${date}]: ${finalSynthesis}\n\n`);
+//                 // const date = new Date().toLocaleString();
+//                 // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
+//                 // if (!fs.existsSync(janitorLogDir)) fs.mkdirSync(janitorLogDir, { recursive: true });
+//                 // fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `\n\n---------------------------------------------------\n\n\nDEBUG [${date}]: ${finalSynthesis}\n\n`);
 
-                // fs.writeFileSync('debug.log', `${finalSynthesis}`);
-                // fs.writeFileSync('janitorContentsChatHistory.json', `${JSON.stringify(janitorContents, null, 2)}`);
-                // fs.writeFileSync('janitorPrompt.log', `${janitorPrompt}`);
+//                 // fs.writeFileSync('debug.log', `${finalSynthesis}`);
+//                 // fs.writeFileSync('janitorContentsChatHistory.json', `${JSON.stringify(janitorContents, null, 2)}`);
+//                 // fs.writeFileSync('janitorPrompt.log', `${janitorPrompt}`);
 
-            } else {
-                throw new Error("No synthesis generated by Janitor.");
-            }
+//             } else {
+//                 throw new Error("No synthesis generated by Janitor.");
+//             }
 
-            if (onBackgroundIncrement) {
-                onBackgroundIncrement();
-                await incrementUsage('background');
-            }
+//             if (onBackgroundIncrement) {
+//                 onBackgroundIncrement();
+//                 await incrementUsage('background');
+//             }
 
-            const janitorToolCalls = detectToolCalls(finalSynthesis);
-            let scoreToolCalled = false;
-            for (const janitorToolCall of janitorToolCalls) {
-                const toolName = janitorToolCall.toolName;
-                if (['addMemScore', 'add_mem_score', 'AddMemScore', 'addMemoryScore', 'AddMemoryScore'].includes(toolName)) {
-                    scoreToolCalled = true;
-                }
-                const toolContext = { chatId: chatId, sessionId: chatId, history };
-                const result = await dispatchTool(toolName, janitorToolCall.args, toolContext);
+//             const janitorToolCalls = detectToolCalls(finalSynthesis);
+//             let scoreToolCalled = false;
+//             for (const janitorToolCall of janitorToolCalls) {
+//                 const toolName = janitorToolCall.toolName;
+//                 if (['addMemScore', 'add_mem_score', 'AddMemScore', 'addMemoryScore', 'AddMemoryScore'].includes(toolName)) {
+//                     scoreToolCalled = true;
+//                 }
+//                 const toolContext = { chatId: chatId, sessionId: chatId, history };
+//                 const result = await dispatchTool(toolName, janitorToolCall.args, toolContext);
 
-                // const date = new Date().toLocaleString();
-                // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-                // fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${toolName}]: ${result}\n`);
+//                 // const date = new Date().toLocaleString();
+//                 // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
+//                 // fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${toolName}]: ${result}\n`);
 
-                if (toolName.toLowerCase() === 'memory') {
-                    const isUserAction = janitorToolCall.args.includes("action='user'") || janitorToolCall.args.includes('action="user"');
-                    if (isUserAction && !result.startsWith("ERROR")) {
-                        if (onMemoryUpdated) onMemoryUpdated();
-                        if (process.stdout.isTTY) {
-                            process.stdout.write(`\x1b]0;Memory Updated\x07`);
-                            process.stdout.write(`\x1b]633;P;TerminalTitle=Memory Updated\x07`);
-                        }
-                        await new Promise(resolve => setTimeout(resolve, 3000));
-                    }
-                }
-            }
+//                 if (toolName.toLowerCase() === 'memory') {
+//                     const isUserAction = janitorToolCall.args.includes("action='user'") || janitorToolCall.args.includes('action="user"');
+//                     if (isUserAction && !result.startsWith("ERROR")) {
+//                         if (onMemoryUpdated) onMemoryUpdated();
+//                         if (process.stdout.isTTY) {
+//                             process.stdout.write(`\x1b]0;Memory Updated\x07`);
+//                             process.stdout.write(`\x1b]633;P;TerminalTitle=Memory Updated\x07`);
+//                         }
+//                         await new Promise(resolve => setTimeout(resolve, 3000));
+//                     }
+//                 }
+//             }
 
-            // Apply 0.05% global geometric decay if no memory was referenced/scored this turn
-            if (!scoreToolCalled) {
-                try {
-                    const memories = readEncryptedJson(MEMORIES_FILE, []);
-                    if (memories.length > 0) {
-                        const updatedMemories = [];
-                        for (const mem of memories) {
-                            if (mem.score === undefined) {
-                                mem.score = 0.5;
-                            }
-                            mem.score *= 0.99995; // 0.005% decay when no memory is referenced
-                            if (mem.score < 0.05) mem.score = 0.0; // Cutoff cliff edge
+//             // Apply 0.05% global geometric decay if no memory was referenced/scored this turn
+//             if (!scoreToolCalled) {
+//                 try {
+//                     const memories = readEncryptedJson(MEMORIES_FILE, []);
+//                     if (memories.length > 0) {
+//                         const updatedMemories = [];
+//                         for (const mem of memories) {
+//                             if (mem.score === undefined) {
+//                                 mem.score = 0.5;
+//                             }
+//                             mem.score *= 0.99995; // 0.005% decay when no memory is referenced
+//                             if (mem.score < 0.05) mem.score = 0.0; // Cutoff cliff edge
 
-                            mem.score = Math.round(mem.score * 100000) / 100000;
-                            if (mem.score > 0) {
-                                updatedMemories.push(mem);
-                            }
-                        }
-                        writeEncryptedJson(MEMORIES_FILE, updatedMemories);
-                    }
-                } catch (decayErr) {
-                    // Silently ignore or log background decay failure
-                }
-            }
+//                             mem.score = Math.round(mem.score * 100000) / 100000;
+//                             if (mem.score > 0) {
+//                                 updatedMemories.push(mem);
+//                             }
+//                         }
+//                         writeEncryptedJson(MEMORIES_FILE, updatedMemories);
+//                     }
+//                 } catch (decayErr) {
+//                     // Silently ignore or log background decay failure
+//                 }
+//             }
 
-            break; // Success! Break retry loop.
-        } catch (err) {
-            attempts++;
-            const date = new Date().toLocaleString();
-            // if (process.stdout.isTTY) {
-            //     process.stdout.write(`\u001b]0;Finalizing Error\u0007`);
-            // }
-            const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            const janitorErrDir = path.join(LOGS_DIR, 'janitor');
-            if (!fs.existsSync(janitorErrDir)) fs.mkdirSync(janitorErrDir, { recursive: true });
-            fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}\n\n`);
+//             break; // Success! Break retry loop.
+//         } catch (err) {
+//             attempts++;
+//             const date = new Date().toLocaleString();
+//             // if (process.stdout.isTTY) {
+//             //     process.stdout.write(`\u001b]0;Finalizing Error\u0007`);
+//             // }
+//             const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);
+//             await new Promise(resolve => setTimeout(resolve, 1000));
+//             const janitorErrDir = path.join(LOGS_DIR, 'janitor');
+//             if (!fs.existsSync(janitorErrDir)) fs.mkdirSync(janitorErrDir, { recursive: true });
+//             fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}\n\n`);
 
-            if (attempts > MAX_JANITOR_RETRIES) break;
+//             if (attempts > MAX_JANITOR_RETRIES) break;
 
-            const backoff = Math.min(750 * Math.pow(2, attempts - 1), 5000);
-            await new Promise(resolve => setTimeout(resolve, backoff));
-        }
-    }
-    if (attempts) {
-        const janitorErrDir = path.join(LOGS_DIR, 'janitor');
-        fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `-----------------------------------------------------------------------------\n\n`)
+//             const backoff = Math.min(750 * Math.pow(2, attempts - 1), 5000);
+//             await new Promise(resolve => setTimeout(resolve, backoff));
+//         }
+//     }
+//     if (attempts) {
+//         const janitorErrDir = path.join(LOGS_DIR, 'janitor');
+//         fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `-----------------------------------------------------------------------------\n\n`)
 
-        // if (attempts >= MAX_JANITOR_RETRIES) {
-        //     if (process.stdout.isTTY) {
-        //         process.stdout.write(`\u001b]0;${isMemoryEnabled ? 'Finalizing Error' : 'Finalizing Skipped'}\u0007`);
-        //     }
-        //     await new Promise(resolve => setTimeout(resolve, 3000));
-        // }
-    }
+//         // if (attempts >= MAX_JANITOR_RETRIES) {
+//         //     if (process.stdout.isTTY) {
+//         //         process.stdout.write(`\u001b]0;${isMemoryEnabled ? 'Finalizing Error' : 'Finalizing Skipped'}\u0007`);
+//         //     }
+//         //     await new Promise(resolve => setTimeout(resolve, 3000));
+//         // }
+//     }
 
-    // Restore title based on chat name when janitor finishes
-    if (process.stdout.isTTY) {
-        try {
-            const historyIndex = await loadHistory();
-            const chatData = historyIndex[chatId];
-            const chatName = chatData?.name || '';
-            const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Idle';
-            process.stdout.write(`\x1b]0;${title}\x07`);
-            process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
-        } catch (e) {
-            process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
-            process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
-        }
-    }
+//     // Restore title based on chat name when janitor finishes
+//     if (process.stdout.isTTY) {
+//         try {
+//             const historyIndex = await loadHistory();
+//             const chatData = historyIndex[chatId];
+//             const chatName = chatData?.name || '';
+//             const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Idle';
+//             process.stdout.write(`\x1b]0;${title}\x07`);
+//             process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
+//         } catch (e) {
+//             process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
+//             process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
+//         }
+//     }
 };
 
 export const maskCodeSpans = (text) => {
@@ -1710,234 +1710,234 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
 
  * into an on-device L2 cache file using stacked tool calls, and purges them from L1.
  */
-const consolidatePastMemories = async (currentChatId, settings, tempStorage = null) => {
-    tempStorage = tempStorage || readEncryptedJson(TEMP_MEM_FILE, {});
-    try {
-        const { aiProvider = 'Google' } = settings;
+// const consolidatePastMemories = async (currentChatId, settings, tempStorage = null) => {
+//     tempStorage = tempStorage || readEncryptedJson(TEMP_MEM_FILE, {});
+//     try {
+//         const { aiProvider = 'Google' } = settings;
 
-        // 1. Calculate total memories across all chats in L1
-        const totalMemoriesCount = Object.values(tempStorage).flat().length;
-        if (totalMemoriesCount <= 5) return;
+//         // 1. Calculate total memories across all chats in L1
+//         const totalMemoriesCount = Object.values(tempStorage).flat().length;
+//         if (totalMemoriesCount <= 5) return;
 
-        // 2. Identify past chats that have more than 2 individual memories in L1
-        const chatsToSummarize = Object.keys(tempStorage).filter(id => {
-            return id !== currentChatId && Array.isArray(tempStorage[id]) && tempStorage[id].length > 2;
-        });
+//         // 2. Identify past chats that have more than 2 individual memories in L1
+//         const chatsToSummarize = Object.keys(tempStorage).filter(id => {
+//             return id !== currentChatId && Array.isArray(tempStorage[id]) && tempStorage[id].length > 2;
+//         });
 
-        if (chatsToSummarize.length === 0) return;
+//         if (chatsToSummarize.length === 0) return;
 
-        // 3. Construct a single batch prompt for the model
-        let prompt = `You are a silent background process for the FluxFlow CLI Agent.
-Your task is to summarize or merge temporary context memories from one or more past conversation sessions.
-For each Chat ID provided, you must output a tool call to save the consolidated summary.
+//         // 3. Construct a single batch prompt for the model
+//         let prompt = `You are a silent background process for the FluxFlow CLI Agent.
+// Your task is to summarize or merge temporary context memories from one or more past conversation sessions.
+// For each Chat ID provided, you must output a tool call to save the consolidated summary.
 
-The tool call format MUST be:
-[tool:functions.saveSummary(id="<chat-id>", summary="<updated summary string, max 400 words>")]
+// The tool call format MUST be:
+// [tool:functions.saveSummary(id="<chat-id>", summary="<updated summary string, max 400 words>")]
 
-Guidelines:
-- Create a single, updated, highly cohesive, and concise summary statement (max 400 words) for each Chat ID. It should contain WHAT user talked about, WHAT were the tasks, Temporal info, HOW/WHAT the model responded. DON'T REMOVE ANY KEY AND TURN BY TURN INFO DENSITY.
-- Focus on key goals, preferences, modified files, and technical decisions.
-- Under no circumstances write normal conversational text. Output ONLY the tool calls.
-- You can stack multiple tool calls for multiple chats.
+// Guidelines:
+// - Create a single, updated, highly cohesive, and concise summary statement (max 400 words) for each Chat ID. It should contain WHAT user talked about, WHAT were the tasks, Temporal info, HOW/WHAT the model responded. DON'T REMOVE ANY KEY AND TURN BY TURN INFO DENSITY.
+// - Focus on key goals, preferences, modified files, and technical decisions.
+// - Under no circumstances write normal conversational text. Output ONLY the tool calls.
+// - You can stack multiple tool calls for multiple chats.
 
-Chats to process:
+// Chats to process:
 
-`;
+// `;
 
-        const cacheStorage = readEncryptedJson(TEMP_MEM_CHAT_FILE, {});
-        for (const id of chatsToSummarize) {
-            const rawMemories = tempStorage[id];
-            const newMemoryListStr = rawMemories.map(m => `- ${m}`).join('\n');
-            const oldSummary = cacheStorage[id];
+//         const cacheStorage = readEncryptedJson(TEMP_MEM_CHAT_FILE, {});
+//         for (const id of chatsToSummarize) {
+//             const rawMemories = tempStorage[id];
+//             const newMemoryListStr = rawMemories.map(m => `- ${m}`).join('\n');
+//             const oldSummary = cacheStorage[id];
 
-            prompt += `[Chat ID: ${id}]\n`;
-            if (oldSummary) {
-                prompt += `- Existing Summary: "${oldSummary}"\n`;
-                prompt += `\n-- New Memories to integrate:\n${newMemoryListStr}\n\n`;
-            } else {
-                prompt += `-- Individual Memories:\n${newMemoryListStr}\n\n`;
-            }
-        }
+//             prompt += `[Chat ID: ${id}]\n`;
+//             if (oldSummary) {
+//                 prompt += `- Existing Summary: "${oldSummary}"\n`;
+//                 prompt += `\n-- New Memories to integrate:\n${newMemoryListStr}\n\n`;
+//             } else {
+//                 prompt += `-- Individual Memories:\n${newMemoryListStr}\n\n`;
+//             }
+//         }
 
-        // 4. Send the batch request with a programmatic retry loop (max 3 attempts)
-        let attempts = 0;
-        const maxAttempts = 5;
-        let success = false;
+//         // 4. Send the batch request with a programmatic retry loop (max 3 attempts)
+//         let attempts = 0;
+//         const maxAttempts = 5;
+//         let success = false;
 
-        let targetModel = getFallbackValue('gemma_janitor_fallback_google');
-        if (aiProvider === 'OpenRouter') targetModel = getFallbackValue('janitor_open_router');
-        if (aiProvider === 'DeepSeek') targetModel = getFallbackValue('deepseek_level_1');
-        if (aiProvider === 'Mistral') targetModel = getFallbackValue('mistral_level_1');
-        if (aiProvider === 'NVIDIA') targetModel = getFallbackValue('nvidia_janitor_fallback');
-        if (aiProvider === 'InferX') targetModel = getFallbackValue('inferx_fallback');
-        if (aiProvider === 'SenseNova') targetModel = getFallbackValue('sensenova_fallback');
-        if (aiProvider === 'AIHubMix') targetModel = getFallbackValue('aihubmix_fallback');
-        if (aiProvider === 'Poolside') targetModel = getFallbackValue('poolside_fallback');
-        if (aiProvider === '9router' || aiProvider === '9Router') targetModel = getFallbackValue('9router_fallback');
+//         let targetModel = getFallbackValue('gemma_janitor_fallback_google');
+//         if (aiProvider === 'OpenRouter') targetModel = getFallbackValue('janitor_open_router');
+//         if (aiProvider === 'DeepSeek') targetModel = getFallbackValue('deepseek_level_1');
+//         if (aiProvider === 'Mistral') targetModel = getFallbackValue('mistral_level_1');
+//         if (aiProvider === 'NVIDIA') targetModel = getFallbackValue('nvidia_janitor_fallback');
+//         if (aiProvider === 'InferX') targetModel = getFallbackValue('inferx_fallback');
+//         if (aiProvider === 'SenseNova') targetModel = getFallbackValue('sensenova_fallback');
+//         if (aiProvider === 'AIHubMix') targetModel = getFallbackValue('aihubmix_fallback');
+//         if (aiProvider === 'Poolside') targetModel = getFallbackValue('poolside_fallback');
+//         if (aiProvider === '9router' || aiProvider === '9Router') targetModel = getFallbackValue('9router_fallback');
 
-        while (attempts <= maxAttempts && !success) {
-            // console.log(targetModel, settings);
-            attempts++;
-            try {
-                const response = await generateSimpleContent(settings, targetModel, prompt, null, 'Fast', 0.75, 'background');
+//         while (attempts <= maxAttempts && !success) {
+//             // console.log(targetModel, settings);
+//             attempts++;
+//             try {
+//                 const response = await generateSimpleContent(settings, targetModel, prompt, null, 'Fast', 0.75, 'background');
 
-                const responseText = response.text || '';
-                const janitorToolCalls = detectToolCalls(responseText);
+//                 const responseText = response.text || '';
+//                 const janitorToolCalls = detectToolCalls(responseText);
 
-                if (janitorToolCalls.length === 0) {
-                    throw new Error("No tool calls detected in synthesis response");
-                }
+//                 if (janitorToolCalls.length === 0) {
+//                     throw new Error("No tool calls detected in synthesis response");
+//                 }
 
-                for (const janitorToolCall of janitorToolCalls) {
-                    const toolName = janitorToolCall.toolName;
-                    if (['saveSummary', 'saveSumary', 'SaveSummary', 'SaveSumary'].includes(toolName)) {
-                        await dispatchTool(toolName, janitorToolCall.args, { chatId: currentChatId });
-                    }
-                }
+//                 for (const janitorToolCall of janitorToolCalls) {
+//                     const toolName = janitorToolCall.toolName;
+//                     if (['saveSummary', 'saveSumary', 'SaveSummary', 'SaveSumary'].includes(toolName)) {
+//                         await dispatchTool(toolName, janitorToolCall.args, { chatId: currentChatId });
+//                     }
+//                 }
 
 
 
-                success = true;
-            } catch (err) {
-                if (attempts >= maxAttempts) {
-                    throw new Error(`Failed after ${maxAttempts} attempts. Last error: ${err.message}`);
-                }
-            }
-        }
+//                 success = true;
+//             } catch (err) {
+//                 if (attempts >= maxAttempts) {
+//                     throw new Error(`Failed after ${maxAttempts} attempts. Last error: ${err.message}`);
+//                 }
+//             }
+//         }
 
-    } catch (err) {
-        // Silently log failures to the janitor log directory so it never disrupts user chat
-        const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);;
-        const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-        if (!fs.existsSync(janitorLogDir)) fs.mkdirSync(janitorLogDir, { recursive: true });
-        fs.appendFileSync(
-            path.join(janitorLogDir, 'error.log'),
-            `[${new Date().toLocaleString()}] Past memory batch consolidation error: ${errLog}\n`
-        );
-    }
-};
+//     } catch (err) {
+//         // Silently log failures to the janitor log directory so it never disrupts user chat
+//         const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);;
+//         const janitorLogDir = path.join(LOGS_DIR, 'janitor');
+//         if (!fs.existsSync(janitorLogDir)) fs.mkdirSync(janitorLogDir, { recursive: true });
+//         fs.appendFileSync(
+//             path.join(janitorLogDir, 'error.log'),
+//             `[${new Date().toLocaleString()}] Past memory batch consolidation error: ${errLog}\n`
+//         );
+//     }
+// };
 
 /**
  * Compresses chat history by generating a technical summary and writing it to the summaries file.
  */
-export const compressHistory = async (settings, history, isAuto = false) => {
-    const { chatId, aiProvider = 'Google' } = settings;
-    const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
+// export const compressHistory = async (settings, history, isAuto = false) => {
+//     const { chatId, aiProvider = 'Google' } = settings;
+//     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
 
-    const flattenContext = (hist) => {
-        return hist
-            .filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') &&
-                m.role !== 'think' &&
-                !m.isVisualFeedback &&
-                !m.isMeta &&
-                !m.isTerminalRecord &&
-                !(m.text && m.text.includes('[TERMINAL_RECORD]')) &&
-                !String(m.id).startsWith('welcome')
-            )
-            .map(m => {
-                const rawText = m.fullText || m.text || '';
-                const isToolResult = m.role === 'system' || rawText.startsWith('[ACTION RESULT]:') || rawText.startsWith('[TOOL RESULT]:') || (m.text && (m.text.startsWith('[ACTION RESULT]:') || m.text.startsWith('[TOOL RESULT]:')));
-                let text = rawText;
-                if (isToolResult && (rawText.includes('[ACTION RESULT]:') || rawText.includes('[TOOL RESULT]:') || (m.text && (m.text.includes('[ACTION RESULT]:') || m.text.includes('[TOOL RESULT]:'))))) {
-                    text = '[ACTION RESULT]: ...truncated for summary';
-                } else {
-                    text = text.replace(/(\[(?:tool|action):[a-zA-Z0-9_\.]+)\([\s\S]*?\)(\])/g, '$1(...)$2');
-                }
-                const role = isToolResult ? 'ACTION' : (m.role === 'agent' ? 'AGENT' : 'USER');
-                return `[${role}]: ${text}`;
-            })
-            .join('\n\n');
-    };
+//     const flattenContext = (hist) => {
+//         return hist
+//             .filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') &&
+//                 m.role !== 'think' &&
+//                 !m.isVisualFeedback &&
+//                 !m.isMeta &&
+//                 !m.isTerminalRecord &&
+//                 !(m.text && m.text.includes('[TERMINAL_RECORD]')) &&
+//                 !String(m.id).startsWith('welcome')
+//             )
+//             .map(m => {
+//                 const rawText = m.fullText || m.text || '';
+//                 const isToolResult = m.role === 'system' || rawText.startsWith('[ACTION RESULT]:') || rawText.startsWith('[TOOL RESULT]:') || (m.text && (m.text.startsWith('[ACTION RESULT]:') || m.text.startsWith('[TOOL RESULT]:')));
+//                 let text = rawText;
+//                 if (isToolResult && (rawText.includes('[ACTION RESULT]:') || rawText.includes('[TOOL RESULT]:') || (m.text && (m.text.includes('[ACTION RESULT]:') || m.text.includes('[TOOL RESULT]:'))))) {
+//                     text = '[ACTION RESULT]: ...truncated for summary';
+//                 } else {
+//                     text = text.replace(/(\[(?:tool|action):[a-zA-Z0-9_\.]+)\([\s\S]*?\)(\])/g, '$1(...)$2');
+//                 }
+//                 const role = isToolResult ? 'ACTION' : (m.role === 'agent' ? 'AGENT' : 'USER');
+//                 return `[${role}]: ${text}`;
+//             })
+//             .join('\n\n');
+//     };
 
-    const runCondenser = async (flattenedText, oldSummary) => {
-        const systemInstruction = `You are an expert context summarizer. Summarize the provided chat history (which may include previous summaries, user instructions, agent outputs, and tool results) into a detailed, coherent, and highly technical summary of 1000 to 1500 words. Focus on preserving the architectural decisions made, current system state, task progress, and critical code details, chat messages, file changes. Under no circumstances exceed MAX 2000 words.`;
-        const prompt = oldSummary
-            ? `Here is the previous summary:\n${oldSummary}\n\nHere is the new conversation history:\n${flattenedText}\n\nProvide a new consolidated summary of the entire session.`
-            : `Here is the conversation history:\n${flattenedText}\n\nProvide a consolidated summary of the entire session.`;
+//     const runCondenser = async (flattenedText, oldSummary) => {
+//         const systemInstruction = `You are an expert context summarizer. Summarize the provided chat history (which may include previous summaries, user instructions, agent outputs, and tool results) into a detailed, coherent, and highly technical summary of 1000 to 1500 words. Focus on preserving the architectural decisions made, current system state, task progress, and critical code details, chat messages, file changes. Under no circumstances exceed MAX 2000 words.`;
+//         const prompt = oldSummary
+//             ? `Here is the previous summary:\n${oldSummary}\n\nHere is the new conversation history:\n${flattenedText}\n\nProvide a new consolidated summary of the entire session.`
+//             : `Here is the conversation history:\n${flattenedText}\n\nProvide a consolidated summary of the entire session.`;
 
-        let targetModel = getFallbackValue('gemma_janitor_fallback_google');
-        if (aiProvider === 'OpenRouter') targetModel = getFallbackValue('janitor_open_router');
-        if (aiProvider === 'DeepSeek') targetModel = getFallbackValue('deepseek_level_1');
-        if (aiProvider === 'Mistral') targetModel = getFallbackValue('mistral_level_1');
-        if (aiProvider === 'NVIDIA') targetModel = getFallbackValue('nvidia_chat_summarizer_fallback');
-        if (aiProvider === 'InferX') targetModel = getFallbackValue('inferx_fallback');
-        if (aiProvider === 'SenseNova') targetModel = getFallbackValue('sensenova_fallback');
-        if (aiProvider === 'AIHubMix') targetModel = getFallbackValue('aihubmix_fallback');
-        if (aiProvider === 'Poolside') targetModel = getFallbackValue('poolside_fallback');
-        if (aiProvider === '9router' || aiProvider === '9Router') targetModel = getFallbackValue('9router_fallback');
-        if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') targetModel = getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813';
-        if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') targetModel = getFallbackValue('tokenharbor_fallback') || 'deepseek-v4.1-flash:free';
-        if (aiProvider === 'Infron' || aiProvider === 'infron') targetModel = getFallbackValue('infron_fallback');
-        if (aiProvider === 'xKiro' || aiProvider === 'xkiro' || aiProvider === 'kiro') targetModel = getFallbackValue('xkiro_fallback') || 'openai/gpt-5.6-sol';
+//         let targetModel = getFallbackValue('gemma_janitor_fallback_google');
+//         if (aiProvider === 'OpenRouter') targetModel = getFallbackValue('janitor_open_router');
+//         if (aiProvider === 'DeepSeek') targetModel = getFallbackValue('deepseek_level_1');
+//         if (aiProvider === 'Mistral') targetModel = getFallbackValue('mistral_level_1');
+//         if (aiProvider === 'NVIDIA') targetModel = getFallbackValue('nvidia_chat_summarizer_fallback');
+//         if (aiProvider === 'InferX') targetModel = getFallbackValue('inferx_fallback');
+//         if (aiProvider === 'SenseNova') targetModel = getFallbackValue('sensenova_fallback');
+//         if (aiProvider === 'AIHubMix') targetModel = getFallbackValue('aihubmix_fallback');
+//         if (aiProvider === 'Poolside') targetModel = getFallbackValue('poolside_fallback');
+//         if (aiProvider === '9router' || aiProvider === '9Router') targetModel = getFallbackValue('9router_fallback');
+//         if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') targetModel = getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813';
+//         if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') targetModel = getFallbackValue('tokenharbor_fallback') || 'deepseek-v4.1-flash:free';
+//         if (aiProvider === 'Infron' || aiProvider === 'infron') targetModel = getFallbackValue('infron_fallback');
+//         if (aiProvider === 'xKiro' || aiProvider === 'xkiro' || aiProvider === 'kiro') targetModel = getFallbackValue('xkiro_fallback') || 'openai/gpt-5.6-sol';
 
-        let attempts = 0;
-        let success = false;
-        let response = null;
-        while (attempts <= 3 && !success) {
-            attempts++;
-            try {
-                response = await generateSimpleContent(settings, targetModel, prompt, systemInstruction, 'Fast');
+//         let attempts = 0;
+//         let success = false;
+//         let response = null;
+//         while (attempts <= 3 && !success) {
+//             attempts++;
+//             try {
+//                 response = await generateSimpleContent(settings, targetModel, prompt, systemInstruction, 'Fast');
 
-                success = true;
-            } catch (err) {
-                if (attempts > 3) {
-                    if (aiProvider === 'Google') {
-                        try {
-                            const fallbackModel = getFallbackValue('general_fallback');
-                            const fallback = await generateSimpleContent(settings, fallbackModel, prompt, systemInstruction, 'Fast');
+//                 success = true;
+//             } catch (err) {
+//                 if (attempts > 3) {
+//                     if (aiProvider === 'Google') {
+//                         try {
+//                             const fallbackModel = getFallbackValue('general_fallback');
+//                             const fallback = await generateSimpleContent(settings, fallbackModel, prompt, systemInstruction, 'Fast');
 
-                            return fallback.text || '';
-                        } catch (e) {
-                            return '';
-                        }
-                    }
-                    return '';
-                }
-            }
-        }
-        return response ? (response.text || '') : '';
-    };
+//                             return fallback.text || '';
+//                         } catch (e) {
+//                             return '';
+//                         }
+//                     }
+//                     return '';
+//                 }
+//             }
+//         }
+//         return response ? (response.text || '') : '';
+//     };
 
-    const flattenedText = flattenContext(history);
-    const summaries = readEncryptedJson(summariesFile, {});
-    let chatData = summaries[chatId] || { summary: '', historyLength: 0 };
-    if (typeof chatData === 'string') {
-        chatData = { summary: chatData, historyLength: 0 };
-    }
-    const oldSummary = chatData.summary || '';
-    const newSummary = await runCondenser(flattenedText, oldSummary);
-    if (newSummary) {
-        chatData.summary = newSummary;
-        const cleanLen = getCleanGroupedLength(history);
-        if (isAuto) {
-            chatData.historyLength = (chatData.historyLength || 0) + cleanLen;
-        } else {
-            chatData.historyLength = cleanLen;
-        }
-        summaries[chatId] = chatData;
-        writeEncryptedJson(summariesFile, summaries);
-        return newSummary;
-    }
-    return null;
-};
+//     const flattenedText = flattenContext(history);
+//     const summaries = readEncryptedJson(summariesFile, {});
+//     let chatData = summaries[chatId] || { summary: '', historyLength: 0 };
+//     if (typeof chatData === 'string') {
+//         chatData = { summary: chatData, historyLength: 0 };
+//     }
+//     const oldSummary = chatData.summary || '';
+//     const newSummary = await runCondenser(flattenedText, oldSummary);
+//     if (newSummary) {
+//         chatData.summary = newSummary;
+//         const cleanLen = getCleanGroupedLength(history);
+//         if (isAuto) {
+//             chatData.historyLength = (chatData.historyLength || 0) + cleanLen;
+//         } else {
+//             chatData.historyLength = cleanLen;
+//         }
+//         summaries[chatId] = chatData;
+//         writeEncryptedJson(summariesFile, summaries);
+//         return newSummary;
+//     }
+//     return null;
+// };
 
 /**
  * Deletes chat summary by removing the chatId key from the summaries file.
  */
-export const deleteChatSummary = (chatId) => {
-    try {
-        const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
-        if (fs.existsSync(summariesFile)) {
-            const summaries = readEncryptedJson(summariesFile, {});
-            if (summaries[chatId]) {
-                delete summaries[chatId];
-                writeEncryptedJson(summariesFile, summaries);
-            }
-        }
-    } catch (e) {
-        // ignore
-    }
-};
+// export const deleteChatSummary = (chatId) => {
+//     try {
+//         const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
+//         if (fs.existsSync(summariesFile)) {
+//             const summaries = readEncryptedJson(summariesFile, {});
+//             if (summaries[chatId]) {
+//                 delete summaries[chatId];
+//                 writeEncryptedJson(summariesFile, summaries);
+//             }
+//         }
+//     } catch (e) {
+//         // ignore
+//     }
+// };
 
 
 /**
@@ -1952,7 +1952,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
     // }
 
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx' || settings?.aiProvider === 'xKiro' || settings?.aiProvider === 'xkiro' || settings?.aiProvider === 'kiro' || settings?.aiProvider === 'Infron' || settings?.aiProvider === 'infron' || settings?.aiProvider === 'c_openai' || settings?.aiProvider === 'Custom (OpenAI)') ? false : systemSettings?.memory !== false;
+    // const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs' || settings?.aiProvider === 'TokenHarbor' || settings?.aiProvider === 'Token Harbor' || settings?.aiProvider === 'tokenharbor' || settings?.aiProvider === 'token_harbor' || settings?.aiProvider === 'thk' || settings?.aiProvider === 'APInex' || settings?.aiProvider === 'apinex' || settings?.aiProvider === 'apx' || settings?.aiProvider === 'xKiro' || settings?.aiProvider === 'xkiro' || settings?.aiProvider === 'kiro' || settings?.aiProvider === 'Infron' || settings?.aiProvider === 'infron' || settings?.aiProvider === 'c_openai' || settings?.aiProvider === 'Custom (OpenAI)') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -2052,7 +2053,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // if ((aiProvider === 'NVIDIA' && (modelName?.includes('gpt') || modelName?.includes('qwen') || modelName?.includes('medium') || modelName.includes('muse'))) || aiProvider === 'Mistral') {
         //     contextTruncationCount = 126000;
         // }
-        
+
         if (aiProvider === 'Google' && modelName?.includes('gemma') && gemma_nonsense) {
             contextTruncationCount = 16000;
         }
@@ -2407,7 +2408,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
 
-        const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools. Instead write the action string in chat you WOULD have written\n' : '';
+        const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools. Instead write the action string in chat you WOULD have written, without markdown wrappers. Then wait for systtem response\n' : '';
 
         const isForceReasoning = process.env.forcedReasoning || false;
 

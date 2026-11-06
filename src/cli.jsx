@@ -150,7 +150,6 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --key <key@provider>                     Set API key and provider
   --provider                               Override default provider
   --thinking <Fast|Low|Medium|High|xHigh>  Set startup thinking level
-  --memory <on|off>                        Toggle memory system
   --resume <session_id>                    Resume a previous session
   --allocation <mb>                        Override Node.js max-old-space-size in MB (default: auto)
   --package <npm|pnpm|yarn|bun>            Set package manager for updates
@@ -181,7 +180,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /help                                    Show help menu
   /clear                                   Clear terminal screen
   /resume                                  Load previous session
-  
+
   /truncate                                Truncate tool results in chat history
   /revert                                  Revert codebase back to a checkpoint
   /save                                    Force save current chat

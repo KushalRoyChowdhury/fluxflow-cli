@@ -60,7 +60,6 @@ export default function AppCommands() {
                 <li><strong><code>/key</code></strong> — Manage API keys in a fixed 10-slot vault per provider, switch active keys, use temporary session keys, or run keyless against local endpoints. See the <Link to="/api-keys" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">API Keys &amp; Providers</Link> page for the full guide.</li>
 
                 <li><strong><code>/profile</code></strong> — Update developer persona, nickname, and custom instructions.</li>
-                <li><strong><code>/memory [view|migrate]</code></strong> — View persistent memories or migrate them to the global <code>AGENTS.md</code>.</li>
             </ul>
 
             <h2 id="utility-commands">Utility Commands</h2>
@@ -72,7 +71,7 @@ export default function AppCommands() {
                 <li><strong><code>/about</code></strong> — Displays project info, version, and credits.</li>
                 <li><strong><code>/changelog</code></strong> — Opens the latest release notes in your default browser.</li>
                 <li><strong><code>/docs</code></strong> — Opens documentation site in your default browser.</li>
-                <li><strong><code>/reset</code></strong> — Warning: Wipes all project-specific data (history, memories, checkpoints).</li>
+                <li><strong><code>/reset</code></strong> — Warning: Wipes all project-specific data (history, checkpoints).</li>
                 <li><strong><code>/fluxflow</code></strong> — Project management tools:
                     <ul>
                         <li><code>global</code>: Opens the global FluxFlow directory.</li>

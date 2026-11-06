@@ -39,7 +39,6 @@ Trigger in chat via /command
   - /key use <index>|<key> → Set active key    |    /key use <key> --temp → Session-only key
   - /key clean [--provider <name>] → Remove gaps between slots (no --provider = whole DB)
 * /theme → Select UI color theme
-* /memory → View/manage agent persistent memory
 * /budget → Set/view token budget limits
 * /stats → Session token usage telemetry
 * /usage → Open graphical browser analytics dashboard

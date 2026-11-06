@@ -88,12 +88,3 @@ FluxFlow uses a transparent, string-based protocol for tool dispatching:
 
 ### `WriteDoc`
 - **Purpose**: Creates professional Word documents (.docx).
-
-### `GenerateImage`
-- **Purpose**: Creates high-fidelity images via AI.
-
----
-
-## Memory Management
-
-Managed primarily by the background **Janitor** model to maintain persistent user context and session summaries without bloating the reasoning loop.
