@@ -447,7 +447,19 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                 if (!diffOutput) {
                     process.exit(0);
                 }
-                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nWrite as conventional, title + bullet description style commit message. No markdown, emojis, fluff`;
+
+                let extraContext = '';
+                if (promptText && promptText.trim()) {
+                    let trimmed = promptText.trim();
+                    if (trimmed.startsWith('={') && trimmed.endsWith('}')) {
+                        const instruction = trimmed.slice(2, -1).trim();
+                        extraContext = `\n\nInstruction: ${instruction}`;
+                    } else {
+                        extraContext = `\n\nHint: ${trimmed}`;
+                    }
+                }
+
+                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nWrite as conventional, title + bullet description style commit message. No markdown, emojis, fluff${extraContext}`;
             } catch (err) {
                 process.exit(0);
             }

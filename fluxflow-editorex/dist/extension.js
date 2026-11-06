@@ -4576,6 +4576,37 @@ function activate(context) {
     if (scmContext?.rootUri?.fsPath) {
       repoCwd = scmContext.rootUri.fsPath;
     }
+    let presetMsg = "";
+    if (typeof scmContext?.inputBox?.value === "string") {
+      presetMsg = scmContext.inputBox.value;
+    }
+    if (!presetMsg) {
+      try {
+        const gitExtension = vscode.extensions.getExtension("vscode.git")?.exports;
+        const git = gitExtension?.getAPI?.(1);
+        if (git?.repositories && git.repositories.length > 0) {
+          const repo = git.repositories.find((r) => r.rootUri?.fsPath?.toLowerCase() === repoCwd.toLowerCase()) || git.repositories[0];
+          if (typeof repo?.inputBox?.value === "string") {
+            presetMsg = repo.inputBox.value;
+          }
+        }
+      } catch (e) {
+      }
+    }
+    if (scmContext?.inputBox) {
+      scmContext.inputBox.value = "";
+    }
+    try {
+      const gitExtension = vscode.extensions.getExtension("vscode.git")?.exports;
+      const git = gitExtension?.getAPI?.(1);
+      if (git?.repositories && git.repositories.length > 0) {
+        const repo = git.repositories.find((r) => r.rootUri?.fsPath?.toLowerCase() === repoCwd.toLowerCase()) || git.repositories[0];
+        if (repo?.inputBox) {
+          repo.inputBox.value = "";
+        }
+      }
+    } catch (e) {
+    }
     const notificationTitle = useHeadlessContext ? "Generating commit message (Headless Context)" : "Generating commit message";
     await vscode.window.withProgress({
       location: vscode.ProgressLocation.Window,
@@ -4583,7 +4614,11 @@ function activate(context) {
       cancellable: false
     }, async () => {
       return new Promise((resolve2) => {
-        const finalCmd = useHeadlessContext ? "fluxflow --commit_8f4a2b9c" : "fluxflow -n --commit_8f4a2b9c";
+        let promptArg = "";
+        if (presetMsg.trim()) {
+          promptArg = ` -p ${JSON.stringify(presetMsg.trim())}`;
+        }
+        const finalCmd = useHeadlessContext ? `fluxflow --commit_8f4a2b9c${promptArg}` : `fluxflow -n --commit_8f4a2b9c${promptArg}`;
         const execOptions = {
           cwd: repoCwd,
           env: { ...process.env },

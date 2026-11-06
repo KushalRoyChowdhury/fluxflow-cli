@@ -1101,6 +1101,39 @@ export function activate(context: vscode.ExtensionContext) {
             repoCwd = scmContext.rootUri.fsPath;
         }
 
+        // Read preset text from SCM input box (context or Git extension API)
+        let presetMsg = '';
+        if (typeof scmContext?.inputBox?.value === 'string') {
+            presetMsg = scmContext.inputBox.value;
+        }
+        if (!presetMsg) {
+            try {
+                const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+                const git = gitExtension?.getAPI?.(1);
+                if (git?.repositories && git.repositories.length > 0) {
+                    const repo = git.repositories.find((r: any) => r.rootUri?.fsPath?.toLowerCase() === repoCwd.toLowerCase()) || git.repositories[0];
+                    if (typeof repo?.inputBox?.value === 'string') {
+                        presetMsg = repo.inputBox.value;
+                    }
+                }
+            } catch (e: any) { }
+        }
+
+        // Clear input box immediately before generating
+        if (scmContext?.inputBox) {
+            scmContext.inputBox.value = '';
+        }
+        try {
+            const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+            const git = gitExtension?.getAPI?.(1);
+            if (git?.repositories && git.repositories.length > 0) {
+                const repo = git.repositories.find((r: any) => r.rootUri?.fsPath?.toLowerCase() === repoCwd.toLowerCase()) || git.repositories[0];
+                if (repo?.inputBox) {
+                    repo.inputBox.value = '';
+                }
+            }
+        } catch (e: any) { }
+
         const notificationTitle = useHeadlessContext
             ? "Generating commit message (Headless Context)"
             : "Generating commit message";
@@ -1111,9 +1144,14 @@ export function activate(context: vscode.ExtensionContext) {
             cancellable: false
         }, async () => {
             return new Promise<void>((resolve) => {
+                let promptArg = '';
+                if (presetMsg.trim()) {
+                    promptArg = ` -p ${JSON.stringify(presetMsg.trim())}`;
+                }
+
                 const finalCmd = useHeadlessContext
-                    ? 'fluxflow --commit_8f4a2b9c'
-                    : 'fluxflow -n --commit_8f4a2b9c';
+                    ? `fluxflow --commit_8f4a2b9c${promptArg}`
+                    : `fluxflow -n --commit_8f4a2b9c${promptArg}`;
 
                 const execOptions: any = {
                     cwd: repoCwd,
