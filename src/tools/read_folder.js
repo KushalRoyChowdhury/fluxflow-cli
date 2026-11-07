@@ -36,7 +36,12 @@ const EXCLUDED_DIRS = new Set([
     'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache', '.VSCodeCounter', '.skills', 'skills'
 ]);
 
-const isExcludedDir = (dirName) => EXCLUDED_DIRS.has(dirName) || dirName.startsWith('.pnpm');
+const isExcludedDir = (dirName, allowSkills = false) => {
+    if (allowSkills && (dirName.includes('skills') || dirName.includes('.skills') || dirName.includes('skill')|| dirName.includes('.skill'))) {
+        return false;
+    }
+    return EXCLUDED_DIRS.has(dirName) || dirName.startsWith('.pnpm');
+};
 
 const formatMtime = (d) => {
     try {
@@ -143,6 +148,7 @@ export const read_folder = async (args) => {
         let totalItemsScanned = 0;
         const maxTotalItems = 500;
         let truncated = false;
+        const allowSkills = targetPath.toLowerCase().includes('skill');
 
         const buildTree = (dirPath, currentDepth, depth = 1) => {
             if (currentDepth > recurseDepth || truncated) return [];
@@ -189,7 +195,7 @@ export const read_folder = async (args) => {
 
                 lines.push(`${indent}${subDir.name}/`);
 
-                if (currentDepth < recurseDepth && !isExcludedDir(subDir.name)) {
+                if (currentDepth < recurseDepth && !isExcludedDir(subDir.name, allowSkills)) {
                     const childLines = buildTree(subDir.fullPath, currentDepth + 1, depth + 1);
                     lines.push(...childLines);
                 }

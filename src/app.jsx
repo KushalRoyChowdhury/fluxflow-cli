@@ -3058,7 +3058,8 @@ export default function App({ args = [] }) {
                 { cmd: 'latest', desc: 'Install latest release' },
                 { cmd: 'check', desc: 'Check for new version' },
             ]
-        }
+        },
+        { cmd: '/skill-creator', desc: 'Generate new skills with natural language. /skills-creator "describe" --project/global.' }
     ];
 
     const handleSubmit = async (value, isProgrammatic = false) => {
@@ -3151,7 +3152,7 @@ export default function App({ args = [] }) {
             return;
         }
 
-        if (absoluteClean.startsWith('/')) {
+        if (absoluteClean.startsWith('/') && !absoluteClean.startsWith('/skill-creator')) {
             setInput('');
             const parts = absoluteClean.split(' ');
             const cmd = parts[0]?.toLowerCase();

@@ -440,479 +440,479 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     //     process.stdout.write(`\x1b]633;P;TerminalTitle=Finalizing...\x07`);
     // }
 
-//     const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
-//     const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
+    //     const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
+    //     const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
 
-//     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
-//     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
-//     const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs' || aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') ? false : systemSettings?.memory !== false;
+    //     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
+    //     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
+    //     const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs' || aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') ? false : systemSettings?.memory !== false;
 
-//     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
-//     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
-//     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
+    //     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
+    //     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
+    //     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
-//     const janitorContents = history.slice(0, -1)
-//         .filter(msg => msg.text && !msg.text.includes('[ACTION RESULT]') && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:') && !msg.text.startsWith('[TERMINAL_RECORD]') && !msg.isTerminalRecord && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
-//         .slice(-14)
-//         .map(msg => {
-//             let processedText = stripLeadingThinking(stripAnsi(msg.text))
-//                 .replace(/\[(?:tool|action):(?:functions\.)?.*?\]/g, '')
-//                 .replace(/\[Prompted on:.*?\]/g, '')
-//                 .replace(/\[METADATA \(PRIORITY: DYNAMIC\)\] Time: ([^|\n]+)/g, (match, p1) => {
-//                     return `[METADATA (PRIORITY: DYNAMIC)] Time: ${p1.replace(/:\d{2}/g, '')}`;
-//                 })
-//                 .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
-//                 .replace(/\[\[END\]\]/g, '')
-//                 .replace(/\[\[(?:TOOL|ACTION) RESULTS\]\]/gi, '')
-//                 .replace(/\[(?:TOOL|ACTION) RESULTS?\]/gi, '')
-//                 .replace(/\[(?:tool|action) results\]/gi, '')
-//                 .replace(/\r?\n\r?\n/g, '\n')
-//                 .replace(/\n\n/g, '\n')
-//                 .replace(/\\n\\n/g, '')
-//                 .trim();
+    //     const janitorContents = history.slice(0, -1)
+    //         .filter(msg => msg.text && !msg.text.includes('[ACTION RESULT]') && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:') && !msg.text.startsWith('[TERMINAL_RECORD]') && !msg.isTerminalRecord && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
+    //         .slice(-14)
+    //         .map(msg => {
+    //             let processedText = stripLeadingThinking(stripAnsi(msg.text))
+    //                 .replace(/\[(?:tool|action):(?:functions\.)?.*?\]/g, '')
+    //                 .replace(/\[Prompted on:.*?\]/g, '')
+    //                 .replace(/\[METADATA \(PRIORITY: DYNAMIC\)\] Time: ([^|\n]+)/g, (match, p1) => {
+    //                     return `[METADATA (PRIORITY: DYNAMIC)] Time: ${p1.replace(/:\d{2}/g, '')}`;
+    //                 })
+    //                 .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
+    //                 .replace(/\[\[END\]\]/g, '')
+    //                 .replace(/\[\[(?:TOOL|ACTION) RESULTS\]\]/gi, '')
+    //                 .replace(/\[(?:TOOL|ACTION) RESULTS?\]/gi, '')
+    //                 .replace(/\[(?:tool|action) results\]/gi, '')
+    //                 .replace(/\r?\n\r?\n/g, '\n')
+    //                 .replace(/\n\n/g, '\n')
+    //                 .replace(/\\n\\n/g, '')
+    //                 .trim();
 
-//             const limit = msg.role === 'user' ? USER_CONTEXT_LENGTH : AGENT_CONTEXT_LENGTH;
-//             let truncatedText = processedText.substring(0, limit);
-//             if (processedText.length > limit) {
-//                 truncatedText += '\n... (truncated) ...';
-//             }
+    //             const limit = msg.role === 'user' ? USER_CONTEXT_LENGTH : AGENT_CONTEXT_LENGTH;
+    //             let truncatedText = processedText.substring(0, limit);
+    //             if (processedText.length > limit) {
+    //                 truncatedText += '\n... (truncated) ...';
+    //             }
 
-//             const prefix = msg.role === 'user'
-//                 ? (truncatedText.startsWith('[USER]') ? '' : '[USER]: ')
-//                 : (truncatedText.startsWith('[AGENT]') ? '' : '[AGENT]: ');
+    //             const prefix = msg.role === 'user'
+    //                 ? (truncatedText.startsWith('[USER]') ? '' : '[USER]: ')
+    //                 : (truncatedText.startsWith('[AGENT]') ? '' : '[AGENT]: ');
 
-//             return {
-//                 role: msg.role === 'user' ? 'user' : 'model',
-//                 parts: [{ text: `${prefix}${truncatedText}` }]
-//             };
-//         });
+    //             return {
+    //                 role: msg.role === 'user' ? 'user' : 'model',
+    //                 parts: [{ text: `${prefix}${truncatedText}` }]
+    //             };
+    //         });
 
-//     const isFirstPrompt = history.filter(m => m.role === 'user').length === 1;
-//     const hasTitleSignal = agentText.includes('[TITLE-UPDATE]');
-//     const thisHas80pChanceOfBeingTrue = Math.random() < 0.8;
-//     const needTitle = isFirstPrompt || hasTitleSignal || thisHas80pChanceOfBeingTrue;
+    //     const isFirstPrompt = history.filter(m => m.role === 'user').length === 1;
+    //     const hasTitleSignal = agentText.includes('[TITLE-UPDATE]');
+    //     const thisHas80pChanceOfBeingTrue = Math.random() < 0.8;
+    //     const needTitle = isFirstPrompt || hasTitleSignal || thisHas80pChanceOfBeingTrue;
 
-//     const cleanedFullResponse = stripLeadingThinking(fullAgentTextRaw).trim();
-//     const janitorPrompt = getJanitorInstruction(
-//         janitorUserMemories,
-//         isMemoryEnabled,
-//         needTitle
-//     );
+    //     const cleanedFullResponse = stripLeadingThinking(fullAgentTextRaw).trim();
+    //     const janitorPrompt = getJanitorInstruction(
+    //         janitorUserMemories,
+    //         isMemoryEnabled,
+    //         needTitle
+    //     );
 
-//     let agentRes = `${cleanedFullResponse.replace(/\[(?:tool|action):(?:functions\.)?.*?\]/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '').replace(/\[\[END\]\]/g, '').replace(/\[\[(?:TOOL|ACTION) RESULTS\]\]/gi, '').replace(/\[(?:TOOL|ACTION) RESULTS?\]/gi, '').replace(/\[(?:tool|action) results\]/gi, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
-//     if (agentRes.length > AGENT_CONTEXT_LENGTH) {
-//         agentRes += '\n... (truncated) ...';
-//     }
-//     // replace the [Prompted on: ...] from user prompt
-//     let originalTextProcessed = agentText.replace(/\[Prompted on:.*?\]/g, '').trim();
-//     // fs.writeFileSync('test.txt', originalTextProcessed);
-//     // replace the consecutive newlines and literal escaped \n\n with clean formatting
-//     agentRes = agentRes.replace(/\r?\n\r?\n/g, '\n').replace(/\n\n/g, '\n').replace(/\\n\\n/g, '').trim();
-//     const now1223 = new Date();
-//     const dateTimeStr1223 = `${now1223.getFullYear()}-${now1223.toLocaleString('en-US', { month: 'short' }).toUpperCase()}-${String(now1223.getDate()).padStart(2, '0')}, ${now1223.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`;
-//     let userPrompt = `[METADATA] Current date and Time: ${dateTimeStr1223}
+    //     let agentRes = `${cleanedFullResponse.replace(/\[(?:tool|action):(?:functions\.)?.*?\]/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '').replace(/\[\[END\]\]/g, '').replace(/\[\[(?:TOOL|ACTION) RESULTS\]\]/gi, '').replace(/\[(?:TOOL|ACTION) RESULTS?\]/gi, '').replace(/\[(?:tool|action) results\]/gi, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
+    //     if (agentRes.length > AGENT_CONTEXT_LENGTH) {
+    //         agentRes += '\n... (truncated) ...';
+    //     }
+    //     // replace the [Prompted on: ...] from user prompt
+    //     let originalTextProcessed = agentText.replace(/\[Prompted on:.*?\]/g, '').trim();
+    //     // fs.writeFileSync('test.txt', originalTextProcessed);
+    //     // replace the consecutive newlines and literal escaped \n\n with clean formatting
+    //     agentRes = agentRes.replace(/\r?\n\r?\n/g, '\n').replace(/\n\n/g, '\n').replace(/\\n\\n/g, '').trim();
+    //     const now1223 = new Date();
+    //     const dateTimeStr1223 = `${now1223.getFullYear()}-${now1223.toLocaleString('en-US', { month: 'short' }).toUpperCase()}-${String(now1223.getDate()).padStart(2, '0')}, ${now1223.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+    //     let userPrompt = `[METADATA] Current date and Time: ${dateTimeStr1223}
 
-// [USER]: ${originalTextProcessed.substring(0, USER_CONTEXT_LENGTH)}\n${originalTextProcessed.length > USER_CONTEXT_LENGTH ? '... (truncated) ...\n\n' : ''}
-// [AGENT (current turn)]: ${agentRes}`
+    // [USER]: ${originalTextProcessed.substring(0, USER_CONTEXT_LENGTH)}\n${originalTextProcessed.length > USER_CONTEXT_LENGTH ? '... (truncated) ...\n\n' : ''}
+    // [AGENT (current turn)]: ${agentRes}`
 
-//     janitorContents.push({ role: 'user', parts: [{ text: userPrompt }] });
+    //     janitorContents.push({ role: 'user', parts: [{ text: userPrompt }] });
 
-//     // fs.writeFileSync('janitorContents.txt', `${janitorPrompt}\n\n${userPrompt}`);
+    //     // fs.writeFileSync('janitorContents.txt', `${janitorPrompt}\n\n${userPrompt}`);
 
-//     const nvidiaApiKey = await getProviderAPIKey('NVIDIA');
-//     const fullSettings = await loadSettings();
-//     const isNvidiaFree = fullSettings.quotas?.providerTiers?.NVIDIA === 'Free';
+    //     const nvidiaApiKey = await getProviderAPIKey('NVIDIA');
+    //     const fullSettings = await loadSettings();
+    //     const isNvidiaFree = fullSettings.quotas?.providerTiers?.NVIDIA === 'Free';
 
-//     let finalSynthesis = '';
-//     let attempts = 0;
-//     const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
+    //     let finalSynthesis = '';
+    //     let attempts = 0;
+    //     const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
 
-//     // console.log("Before Loop"); // [DEBUGGING POINT]
+    //     // console.log("Before Loop"); // [DEBUGGING POINT]
 
-//     while (attempts <= MAX_JANITOR_RETRIES) {
-//         try {
-//             if (!(await checkQuota('background', settings))) {
-//                 return;
-//             }
+    //     while (attempts <= MAX_JANITOR_RETRIES) {
+    //         try {
+    //             if (!(await checkQuota('background', settings))) {
+    //                 return;
+    //             }
 
-//             let fullContent = '';
-//             let lastUsage = null;
-//             let useNvidiaFallback = false;
-//             let effectiveProvider = aiProvider;
+    //             let fullContent = '';
+    //             let lastUsage = null;
+    //             let useNvidiaFallback = false;
+    //             let effectiveProvider = aiProvider;
 
-//             try {
-//                 const timeoutPromise = new Promise((_, reject) =>
-//                     setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 10000)
-//                 );
+    //             try {
+    //                 const timeoutPromise = new Promise((_, reject) =>
+    //                     setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 10000)
+    //                 );
 
-//                 // console.log("WE ARE HERE!"); // [DEBUGGING POINT]
+    //                 // console.log("WE ARE HERE!"); // [DEBUGGING POINT]
 
-//                 const useNvidiaFallbackForGoogle = aiProvider === 'Google' && attempts >= 0 && attempts < 6 && nvidiaApiKey && isNvidiaFree;
-//                 const useNvidiaFallbackForDeepSeek = aiProvider === 'DeepSeek' && attempts < 4 && nvidiaApiKey && isNvidiaFree;
-//                 useNvidiaFallback = useNvidiaFallbackForGoogle || useNvidiaFallbackForDeepSeek;
-//                 effectiveProvider = useNvidiaFallback ? 'NVIDIA' : aiProvider;
-//                 // console.log(effectiveProvider); // [DEBUGGING POINT]
+    //                 const useNvidiaFallbackForGoogle = aiProvider === 'Google' && attempts >= 0 && attempts < 6 && nvidiaApiKey && isNvidiaFree;
+    //                 const useNvidiaFallbackForDeepSeek = aiProvider === 'DeepSeek' && attempts < 4 && nvidiaApiKey && isNvidiaFree;
+    //                 useNvidiaFallback = useNvidiaFallbackForGoogle || useNvidiaFallbackForDeepSeek;
+    //                 effectiveProvider = useNvidiaFallback ? 'NVIDIA' : aiProvider;
+    //                 // console.log(effectiveProvider); // [DEBUGGING POINT]
 
-//                 const janitorReqStart = Date.now();
-//                 let janitorTtft = null;
+    //                 const janitorReqStart = Date.now();
+    //                 let janitorTtft = null;
 
-//                 const streamPromise = (async () => {
-//                     if (aiProvider === 'OpenRouter') {
-//                         const janitorOpenRouterModel = getFallbackValue('janitor_open_router');
-//                         const stream = (await loadProvider('OpenRouter'))(
-//                             apiKey,
-//                             janitorOpenRouterModel,
-//                             janitorContents,
-//                             janitorPrompt,
-//                             'Fast', // Janitor always minimal
-//                             mode,
-//                             false,
-//                             null,
-//                             0.7
-//                         );
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     } else if (aiProvider === 'DeepSeek' && !useNvidiaFallback) {
-//                         const stream = (await loadProvider('DeepSeek'))(
-//                             apiKey,
-//                             getFallbackValue('deepseek_fast_fallback'),
-//                             janitorContents,
-//                             janitorPrompt,
-//                             'Fast', // Janitor always minimal
-//                             mode,
-//                             false,
-//                             null,
-//                             0.7
-//                         );
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     } else if (aiProvider === 'Mistral' && !useNvidiaFallback) {
-//                         const stream = (await loadProvider('Mistral'))(
-//                             apiKey,
-//                             getFallbackValue('mistral_janitor_fallback'),
-//                             janitorContents,
-//                             janitorPrompt,
-//                             'Fast', // Janitor always minimal
-//                             mode,
-//                             false,
-//                             null,
-//                             0.7
-//                         );
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     } else if (aiProvider === 'NVIDIA' || useNvidiaFallback) {
-//                         const stream = (await loadProvider('NVIDIA'))(
-//                             useNvidiaFallback ? nvidiaApiKey : apiKey,
-//                             getFallbackValue('nvidia_janitor_fallback'),
-//                             // "mistralai/mistral-nemotron", // [DEBUGGING POINT]
-//                             janitorContents,
-//                             janitorPrompt,
-//                             'Fast', // Janitor always minimal
-//                             mode,
-//                             false,
-//                             null,
-//                             0.7
-//                         );
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     } else if (aiProvider === 'InferX') {
-//                         const stream = (await loadProvider('InferX'))(
-//                             apiKey,
-//                             targetModel || getFallbackValue('inferx_fallback') || 'deepseek-v4-flash',
-//                             janitorContents,
-//                             janitorPrompt,
-//                             'Fast',
-//                             mode,
-//                             false,
-//                             null,
-//                             0.7
-//                         );
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     } else if (aiProvider === 'SenseNova') {
-//                         const stream = (await loadProvider('SenseNova'))(
-//                             apiKey,
-//                             targetModel || getFallbackValue('sensenova_fallback') || 'sensenova-6.8-flash-lite',
-//                             janitorContents,
-//                             janitorPrompt,
-//                             'Fast',
-//                             mode,
-//                             false,
-//                             null,
-//                             0.7
-//                         );
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     } else if (aiProvider === 'AIHubMix') {
-//                         const stream = (await loadProvider('AIHubMix'))(
-//                             apiKey,
-//                             targetModel || getFallbackValue('aihubmix_fallback') || 'gpt-4o-mini',
-//                             janitorContents,
-//                             janitorPrompt,
-//                             'Fast',
-//                             mode,
-//                             false,
-//                             null,
-//                             0.7
-//                         );
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     } else if (aiProvider === 'Poolside') {
-//                         const stream = (await loadProvider('Poolside'))(
-//                             apiKey,
-//                             targetModel || getFallbackValue('poolside_fallback') || 'poolside/laguna-s-2.1',
-//                             janitorContents,
-//                             janitorPrompt,
-//                             'Fast',
-//                             mode,
-//                             false,
-//                             null,
-//                             0.7
-//                         );
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     } else if (aiProvider === '9router' || aiProvider === '9Router') {
-//                         const stream = (await loadProvider('NineRouter'))(
-//                             apiKey,
-//                             targetModel || getFallbackValue('9router_fallback') || 'z-ai/glm-5.3-flash',
-//                             janitorContents,
-//                             janitorPrompt,
-//                             'Fast',
-//                             mode,
-//                             false,
-//                             null,
-//                             0.7
-//                         );
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
-//                         const stream = (await loadProvider('ExpLabs'))(
-//                             apiKey,
-//                             targetModel || getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813',
-//                             janitorContents,
-//                             janitorPrompt,
-//                             'Fast',
-//                             mode,
-//                             false,
-//                             null,
-//                             0.7
-//                         );
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     } else {
-//                         const googleClient = getGoogleClient(apiKey);
-//                         const stream = await googleClient.models.generateContentStream({
-//                             model: janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google')),
-//                             contents: janitorContents,
-//                             config: {
-//                                 systemInstruction: janitorPrompt,
-//                                 temperature: 0.7,
-//                                 safetySettings: [
-//                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-//                                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-//                                     { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-//                                     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-//                                 ],
-//                                 thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }, // Janitor always minimal
-//                                 serviceTier: 'flex' // Janitor always uses flex tier
-//                             }
-//                         });
-//                         // console.log("MEMORY REQ SENT"); // [DEBUGGING POINT]
-//                         const iterator = stream[Symbol.asyncIterator]();
-//                         const firstResult = await iterator.next();
-//                         return { iterator, firstResult };
-//                     }
-//                 })();
+    //                 const streamPromise = (async () => {
+    //                     if (aiProvider === 'OpenRouter') {
+    //                         const janitorOpenRouterModel = getFallbackValue('janitor_open_router');
+    //                         const stream = (await loadProvider('OpenRouter'))(
+    //                             apiKey,
+    //                             janitorOpenRouterModel,
+    //                             janitorContents,
+    //                             janitorPrompt,
+    //                             'Fast', // Janitor always minimal
+    //                             mode,
+    //                             false,
+    //                             null,
+    //                             0.7
+    //                         );
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     } else if (aiProvider === 'DeepSeek' && !useNvidiaFallback) {
+    //                         const stream = (await loadProvider('DeepSeek'))(
+    //                             apiKey,
+    //                             getFallbackValue('deepseek_fast_fallback'),
+    //                             janitorContents,
+    //                             janitorPrompt,
+    //                             'Fast', // Janitor always minimal
+    //                             mode,
+    //                             false,
+    //                             null,
+    //                             0.7
+    //                         );
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     } else if (aiProvider === 'Mistral' && !useNvidiaFallback) {
+    //                         const stream = (await loadProvider('Mistral'))(
+    //                             apiKey,
+    //                             getFallbackValue('mistral_janitor_fallback'),
+    //                             janitorContents,
+    //                             janitorPrompt,
+    //                             'Fast', // Janitor always minimal
+    //                             mode,
+    //                             false,
+    //                             null,
+    //                             0.7
+    //                         );
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     } else if (aiProvider === 'NVIDIA' || useNvidiaFallback) {
+    //                         const stream = (await loadProvider('NVIDIA'))(
+    //                             useNvidiaFallback ? nvidiaApiKey : apiKey,
+    //                             getFallbackValue('nvidia_janitor_fallback'),
+    //                             // "mistralai/mistral-nemotron", // [DEBUGGING POINT]
+    //                             janitorContents,
+    //                             janitorPrompt,
+    //                             'Fast', // Janitor always minimal
+    //                             mode,
+    //                             false,
+    //                             null,
+    //                             0.7
+    //                         );
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     } else if (aiProvider === 'InferX') {
+    //                         const stream = (await loadProvider('InferX'))(
+    //                             apiKey,
+    //                             targetModel || getFallbackValue('inferx_fallback') || 'deepseek-v4-flash',
+    //                             janitorContents,
+    //                             janitorPrompt,
+    //                             'Fast',
+    //                             mode,
+    //                             false,
+    //                             null,
+    //                             0.7
+    //                         );
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     } else if (aiProvider === 'SenseNova') {
+    //                         const stream = (await loadProvider('SenseNova'))(
+    //                             apiKey,
+    //                             targetModel || getFallbackValue('sensenova_fallback') || 'sensenova-6.8-flash-lite',
+    //                             janitorContents,
+    //                             janitorPrompt,
+    //                             'Fast',
+    //                             mode,
+    //                             false,
+    //                             null,
+    //                             0.7
+    //                         );
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     } else if (aiProvider === 'AIHubMix') {
+    //                         const stream = (await loadProvider('AIHubMix'))(
+    //                             apiKey,
+    //                             targetModel || getFallbackValue('aihubmix_fallback') || 'gpt-4o-mini',
+    //                             janitorContents,
+    //                             janitorPrompt,
+    //                             'Fast',
+    //                             mode,
+    //                             false,
+    //                             null,
+    //                             0.7
+    //                         );
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     } else if (aiProvider === 'Poolside') {
+    //                         const stream = (await loadProvider('Poolside'))(
+    //                             apiKey,
+    //                             targetModel || getFallbackValue('poolside_fallback') || 'poolside/laguna-s-2.1',
+    //                             janitorContents,
+    //                             janitorPrompt,
+    //                             'Fast',
+    //                             mode,
+    //                             false,
+    //                             null,
+    //                             0.7
+    //                         );
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     } else if (aiProvider === '9router' || aiProvider === '9Router') {
+    //                         const stream = (await loadProvider('NineRouter'))(
+    //                             apiKey,
+    //                             targetModel || getFallbackValue('9router_fallback') || 'z-ai/glm-5.3-flash',
+    //                             janitorContents,
+    //                             janitorPrompt,
+    //                             'Fast',
+    //                             mode,
+    //                             false,
+    //                             null,
+    //                             0.7
+    //                         );
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
+    //                         const stream = (await loadProvider('ExpLabs'))(
+    //                             apiKey,
+    //                             targetModel || getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813',
+    //                             janitorContents,
+    //                             janitorPrompt,
+    //                             'Fast',
+    //                             mode,
+    //                             false,
+    //                             null,
+    //                             0.7
+    //                         );
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     } else {
+    //                         const googleClient = getGoogleClient(apiKey);
+    //                         const stream = await googleClient.models.generateContentStream({
+    //                             model: janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google')),
+    //                             contents: janitorContents,
+    //                             config: {
+    //                                 systemInstruction: janitorPrompt,
+    //                                 temperature: 0.7,
+    //                                 safetySettings: [
+    //                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    //                                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+    //                                     { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    //                                     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    //                                 ],
+    //                                 thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }, // Janitor always minimal
+    //                                 serviceTier: 'flex' // Janitor always uses flex tier
+    //                             }
+    //                         });
+    //                         // console.log("MEMORY REQ SENT"); // [DEBUGGING POINT]
+    //                         const iterator = stream[Symbol.asyncIterator]();
+    //                         const firstResult = await iterator.next();
+    //                         return { iterator, firstResult };
+    //                     }
+    //                 })();
 
-//                 if (process.stdout.isTTY) {
-//                     const historyIndex = await loadHistory();
-//                     const chatData = historyIndex[chatId];
-//                     const chatName = chatData?.name || '';
-//                     const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Idle';
-//                     process.stdout.write(`\x1b]0;${title}\x07`);
-//                     process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
-//                 }
+    //                 if (process.stdout.isTTY) {
+    //                     const historyIndex = await loadHistory();
+    //                     const chatData = historyIndex[chatId];
+    //                     const chatName = chatData?.name || '';
+    //                     const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Idle';
+    //                     process.stdout.write(`\x1b]0;${title}\x07`);
+    //                     process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
+    //                 }
 
-//                 const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
-//                 janitorTtft = Date.now() - janitorReqStart;
-//                 let { value: firstChunk, done: firstDone } = firstResult;
+    //                 const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
+    //                 janitorTtft = Date.now() - janitorReqStart;
+    //                 let { value: firstChunk, done: firstDone } = firstResult;
 
-//                 if (!firstDone && firstChunk) {
-//                     const parts = firstChunk.candidates?.[0]?.content?.parts;
-//                     const chunkText = parts ? (effectiveProvider === 'Google' ? (parts[1]?.text || parts[0]?.text || '') : parts.filter(p => p.text && !p.thought).map(p => p.text).join('')) : (typeof firstChunk.text === 'function' ? firstChunk.text() : '');
-//                     if (chunkText) {
-//                         fullContent += chunkText;
-//                     }
-//                     lastUsage = firstChunk.usageMetadata;
+    //                 if (!firstDone && firstChunk) {
+    //                     const parts = firstChunk.candidates?.[0]?.content?.parts;
+    //                     const chunkText = parts ? (effectiveProvider === 'Google' ? (parts[1]?.text || parts[0]?.text || '') : parts.filter(p => p.text && !p.thought).map(p => p.text).join('')) : (typeof firstChunk.text === 'function' ? firstChunk.text() : '');
+    //                     if (chunkText) {
+    //                         fullContent += chunkText;
+    //                     }
+    //                     lastUsage = firstChunk.usageMetadata;
 
-//                     for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
-//                         const p = chunk.candidates?.[0]?.content?.parts;
-//                         const t = p ? (effectiveProvider === 'Google' ? (p[1]?.text || p[0]?.text || '') : p.filter(part => part.text && !part.thought).map(part => part.text).join('')) : (typeof chunk.text === 'function' ? chunk.text() : '');
-//                         if (t) fullContent += t;
-//                         lastUsage = chunk.usageMetadata;
-//                         // console.log(useNvidiaFallback, " : ", fullContent); // [DEBUGGING POINT]
-//                     }
-//                 }
-//             } catch (e) {
-//                 // console.log("ERROR: " + e); // [DEBUGGING POINT]
-//                 throw e;
-//             }
+    //                     for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
+    //                         const p = chunk.candidates?.[0]?.content?.parts;
+    //                         const t = p ? (effectiveProvider === 'Google' ? (p[1]?.text || p[0]?.text || '') : p.filter(part => part.text && !part.thought).map(part => part.text).join('')) : (typeof chunk.text === 'function' ? chunk.text() : '');
+    //                         if (t) fullContent += t;
+    //                         lastUsage = chunk.usageMetadata;
+    //                         // console.log(useNvidiaFallback, " : ", fullContent); // [DEBUGGING POINT]
+    //                     }
+    //                 }
+    //             } catch (e) {
+    //                 // console.log("ERROR: " + e); // [DEBUGGING POINT]
+    //                 throw e;
+    //             }
 
-//             if (fullContent) {
-//                 finalSynthesis = fullContent;
-//                 // console.log(`Fallback: ${useNvidiaFallback};  Provider: ${effectiveProvider}; Final Synthesis: ${finalSynthesis}`); // [DEBUGGING POINT]
-//                 if (lastUsage) {
-//                     const total = lastUsage.totalTokenCount || 0;
-//                     const cached = lastUsage.cachedContentTokenCount || 0;
-//                     // [SCHEMA] Gemini adds thoughts outside candidates; OpenAI-style nests reasoning inside completion.
-//                     const candidates = (lastUsage.candidatesTokenCount || 0) + (effectiveProvider === 'Google' ? (lastUsage.thoughtsTokenCount || 0) : 0);
-//                     const jModel = useNvidiaFallback
-//                         ? getFallbackValue('nvidia_janitor_fallback')
-//                         : (effectiveProvider === 'DeepSeek'
-//                             ? getFallbackValue('deepseek_fast_fallback')
-//                             : (effectiveProvider === 'ExpLabs' || effectiveProvider === 'ExperientialLabs'
-//                                 ? (getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813')
-//                                 : (effectiveProvider === 'OpenRouter'
-//                                     ? getFallbackValue('janitor_open_router')
-//                                     : (janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google'))))));
-//                     await addToUsage('tokens', total, effectiveProvider, jModel);
-//                     if (cached > 0) {
-//                         await addToUsage('cachedTokens', cached, effectiveProvider, jModel);
-//                     }
-//                     if (candidates > 0) {
-//                         await addToUsage('candidateTokens', candidates, effectiveProvider, jModel);
-//                     }
-//                     if (janitorTtft !== null && janitorTtft > 0) {
-//                         await addToUsage('ttft', janitorTtft, effectiveProvider, jModel);
-//                     }
-//                     recordTimedUsage({ provider: effectiveProvider, model: jModel, prompt: lastUsage.promptTokenCount || 0, cached, output: candidates, reasoning: lastUsage.thoughtsTokenCount || 0, ttft: janitorTtft });
-//                 }
+    //             if (fullContent) {
+    //                 finalSynthesis = fullContent;
+    //                 // console.log(`Fallback: ${useNvidiaFallback};  Provider: ${effectiveProvider}; Final Synthesis: ${finalSynthesis}`); // [DEBUGGING POINT]
+    //                 if (lastUsage) {
+    //                     const total = lastUsage.totalTokenCount || 0;
+    //                     const cached = lastUsage.cachedContentTokenCount || 0;
+    //                     // [SCHEMA] Gemini adds thoughts outside candidates; OpenAI-style nests reasoning inside completion.
+    //                     const candidates = (lastUsage.candidatesTokenCount || 0) + (effectiveProvider === 'Google' ? (lastUsage.thoughtsTokenCount || 0) : 0);
+    //                     const jModel = useNvidiaFallback
+    //                         ? getFallbackValue('nvidia_janitor_fallback')
+    //                         : (effectiveProvider === 'DeepSeek'
+    //                             ? getFallbackValue('deepseek_fast_fallback')
+    //                             : (effectiveProvider === 'ExpLabs' || effectiveProvider === 'ExperientialLabs'
+    //                                 ? (getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813')
+    //                                 : (effectiveProvider === 'OpenRouter'
+    //                                     ? getFallbackValue('janitor_open_router')
+    //                                     : (janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google'))))));
+    //                     await addToUsage('tokens', total, effectiveProvider, jModel);
+    //                     if (cached > 0) {
+    //                         await addToUsage('cachedTokens', cached, effectiveProvider, jModel);
+    //                     }
+    //                     if (candidates > 0) {
+    //                         await addToUsage('candidateTokens', candidates, effectiveProvider, jModel);
+    //                     }
+    //                     if (janitorTtft !== null && janitorTtft > 0) {
+    //                         await addToUsage('ttft', janitorTtft, effectiveProvider, jModel);
+    //                     }
+    //                     recordTimedUsage({ provider: effectiveProvider, model: jModel, prompt: lastUsage.promptTokenCount || 0, cached, output: candidates, reasoning: lastUsage.thoughtsTokenCount || 0, ttft: janitorTtft });
+    //                 }
 
-//                 // const date = new Date().toLocaleString();
-//                 // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-//                 // if (!fs.existsSync(janitorLogDir)) fs.mkdirSync(janitorLogDir, { recursive: true });
-//                 // fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `\n\n---------------------------------------------------\n\n\nDEBUG [${date}]: ${finalSynthesis}\n\n`);
+    //                 // const date = new Date().toLocaleString();
+    //                 // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
+    //                 // if (!fs.existsSync(janitorLogDir)) fs.mkdirSync(janitorLogDir, { recursive: true });
+    //                 // fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `\n\n---------------------------------------------------\n\n\nDEBUG [${date}]: ${finalSynthesis}\n\n`);
 
-//                 // fs.writeFileSync('debug.log', `${finalSynthesis}`);
-//                 // fs.writeFileSync('janitorContentsChatHistory.json', `${JSON.stringify(janitorContents, null, 2)}`);
-//                 // fs.writeFileSync('janitorPrompt.log', `${janitorPrompt}`);
+    //                 // fs.writeFileSync('debug.log', `${finalSynthesis}`);
+    //                 // fs.writeFileSync('janitorContentsChatHistory.json', `${JSON.stringify(janitorContents, null, 2)}`);
+    //                 // fs.writeFileSync('janitorPrompt.log', `${janitorPrompt}`);
 
-//             } else {
-//                 throw new Error("No synthesis generated by Janitor.");
-//             }
+    //             } else {
+    //                 throw new Error("No synthesis generated by Janitor.");
+    //             }
 
-//             if (onBackgroundIncrement) {
-//                 onBackgroundIncrement();
-//                 await incrementUsage('background');
-//             }
+    //             if (onBackgroundIncrement) {
+    //                 onBackgroundIncrement();
+    //                 await incrementUsage('background');
+    //             }
 
-//             const janitorToolCalls = detectToolCalls(finalSynthesis);
-//             let scoreToolCalled = false;
-//             for (const janitorToolCall of janitorToolCalls) {
-//                 const toolName = janitorToolCall.toolName;
-//                 if (['addMemScore', 'add_mem_score', 'AddMemScore', 'addMemoryScore', 'AddMemoryScore'].includes(toolName)) {
-//                     scoreToolCalled = true;
-//                 }
-//                 const toolContext = { chatId: chatId, sessionId: chatId, history };
-//                 const result = await dispatchTool(toolName, janitorToolCall.args, toolContext);
+    //             const janitorToolCalls = detectToolCalls(finalSynthesis);
+    //             let scoreToolCalled = false;
+    //             for (const janitorToolCall of janitorToolCalls) {
+    //                 const toolName = janitorToolCall.toolName;
+    //                 if (['addMemScore', 'add_mem_score', 'AddMemScore', 'addMemoryScore', 'AddMemoryScore'].includes(toolName)) {
+    //                     scoreToolCalled = true;
+    //                 }
+    //                 const toolContext = { chatId: chatId, sessionId: chatId, history };
+    //                 const result = await dispatchTool(toolName, janitorToolCall.args, toolContext);
 
-//                 // const date = new Date().toLocaleString();
-//                 // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-//                 // fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${toolName}]: ${result}\n`);
+    //                 // const date = new Date().toLocaleString();
+    //                 // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
+    //                 // fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${toolName}]: ${result}\n`);
 
-//                 if (toolName.toLowerCase() === 'memory') {
-//                     const isUserAction = janitorToolCall.args.includes("action='user'") || janitorToolCall.args.includes('action="user"');
-//                     if (isUserAction && !result.startsWith("ERROR")) {
-//                         if (onMemoryUpdated) onMemoryUpdated();
-//                         if (process.stdout.isTTY) {
-//                             process.stdout.write(`\x1b]0;Memory Updated\x07`);
-//                             process.stdout.write(`\x1b]633;P;TerminalTitle=Memory Updated\x07`);
-//                         }
-//                         await new Promise(resolve => setTimeout(resolve, 3000));
-//                     }
-//                 }
-//             }
+    //                 if (toolName.toLowerCase() === 'memory') {
+    //                     const isUserAction = janitorToolCall.args.includes("action='user'") || janitorToolCall.args.includes('action="user"');
+    //                     if (isUserAction && !result.startsWith("ERROR")) {
+    //                         if (onMemoryUpdated) onMemoryUpdated();
+    //                         if (process.stdout.isTTY) {
+    //                             process.stdout.write(`\x1b]0;Memory Updated\x07`);
+    //                             process.stdout.write(`\x1b]633;P;TerminalTitle=Memory Updated\x07`);
+    //                         }
+    //                         await new Promise(resolve => setTimeout(resolve, 3000));
+    //                     }
+    //                 }
+    //             }
 
-//             // Apply 0.05% global geometric decay if no memory was referenced/scored this turn
-//             if (!scoreToolCalled) {
-//                 try {
-//                     const memories = readEncryptedJson(MEMORIES_FILE, []);
-//                     if (memories.length > 0) {
-//                         const updatedMemories = [];
-//                         for (const mem of memories) {
-//                             if (mem.score === undefined) {
-//                                 mem.score = 0.5;
-//                             }
-//                             mem.score *= 0.99995; // 0.005% decay when no memory is referenced
-//                             if (mem.score < 0.05) mem.score = 0.0; // Cutoff cliff edge
+    //             // Apply 0.05% global geometric decay if no memory was referenced/scored this turn
+    //             if (!scoreToolCalled) {
+    //                 try {
+    //                     const memories = readEncryptedJson(MEMORIES_FILE, []);
+    //                     if (memories.length > 0) {
+    //                         const updatedMemories = [];
+    //                         for (const mem of memories) {
+    //                             if (mem.score === undefined) {
+    //                                 mem.score = 0.5;
+    //                             }
+    //                             mem.score *= 0.99995; // 0.005% decay when no memory is referenced
+    //                             if (mem.score < 0.05) mem.score = 0.0; // Cutoff cliff edge
 
-//                             mem.score = Math.round(mem.score * 100000) / 100000;
-//                             if (mem.score > 0) {
-//                                 updatedMemories.push(mem);
-//                             }
-//                         }
-//                         writeEncryptedJson(MEMORIES_FILE, updatedMemories);
-//                     }
-//                 } catch (decayErr) {
-//                     // Silently ignore or log background decay failure
-//                 }
-//             }
+    //                             mem.score = Math.round(mem.score * 100000) / 100000;
+    //                             if (mem.score > 0) {
+    //                                 updatedMemories.push(mem);
+    //                             }
+    //                         }
+    //                         writeEncryptedJson(MEMORIES_FILE, updatedMemories);
+    //                     }
+    //                 } catch (decayErr) {
+    //                     // Silently ignore or log background decay failure
+    //                 }
+    //             }
 
-//             break; // Success! Break retry loop.
-//         } catch (err) {
-//             attempts++;
-//             const date = new Date().toLocaleString();
-//             // if (process.stdout.isTTY) {
-//             //     process.stdout.write(`\u001b]0;Finalizing Error\u0007`);
-//             // }
-//             const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);
-//             await new Promise(resolve => setTimeout(resolve, 1000));
-//             const janitorErrDir = path.join(LOGS_DIR, 'janitor');
-//             if (!fs.existsSync(janitorErrDir)) fs.mkdirSync(janitorErrDir, { recursive: true });
-//             fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}\n\n`);
+    //             break; // Success! Break retry loop.
+    //         } catch (err) {
+    //             attempts++;
+    //             const date = new Date().toLocaleString();
+    //             // if (process.stdout.isTTY) {
+    //             //     process.stdout.write(`\u001b]0;Finalizing Error\u0007`);
+    //             // }
+    //             const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);
+    //             await new Promise(resolve => setTimeout(resolve, 1000));
+    //             const janitorErrDir = path.join(LOGS_DIR, 'janitor');
+    //             if (!fs.existsSync(janitorErrDir)) fs.mkdirSync(janitorErrDir, { recursive: true });
+    //             fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}\n\n`);
 
-//             if (attempts > MAX_JANITOR_RETRIES) break;
+    //             if (attempts > MAX_JANITOR_RETRIES) break;
 
-//             const backoff = Math.min(750 * Math.pow(2, attempts - 1), 5000);
-//             await new Promise(resolve => setTimeout(resolve, backoff));
-//         }
-//     }
-//     if (attempts) {
-//         const janitorErrDir = path.join(LOGS_DIR, 'janitor');
-//         fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `-----------------------------------------------------------------------------\n\n`)
+    //             const backoff = Math.min(750 * Math.pow(2, attempts - 1), 5000);
+    //             await new Promise(resolve => setTimeout(resolve, backoff));
+    //         }
+    //     }
+    //     if (attempts) {
+    //         const janitorErrDir = path.join(LOGS_DIR, 'janitor');
+    //         fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `-----------------------------------------------------------------------------\n\n`)
 
-//         // if (attempts >= MAX_JANITOR_RETRIES) {
-//         //     if (process.stdout.isTTY) {
-//         //         process.stdout.write(`\u001b]0;${isMemoryEnabled ? 'Finalizing Error' : 'Finalizing Skipped'}\u0007`);
-//         //     }
-//         //     await new Promise(resolve => setTimeout(resolve, 3000));
-//         // }
-//     }
+    //         // if (attempts >= MAX_JANITOR_RETRIES) {
+    //         //     if (process.stdout.isTTY) {
+    //         //         process.stdout.write(`\u001b]0;${isMemoryEnabled ? 'Finalizing Error' : 'Finalizing Skipped'}\u0007`);
+    //         //     }
+    //         //     await new Promise(resolve => setTimeout(resolve, 3000));
+    //         // }
+    //     }
 
-//     // Restore title based on chat name when janitor finishes
-//     if (process.stdout.isTTY) {
-//         try {
-//             const historyIndex = await loadHistory();
-//             const chatData = historyIndex[chatId];
-//             const chatName = chatData?.name || '';
-//             const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Idle';
-//             process.stdout.write(`\x1b]0;${title}\x07`);
-//             process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
-//         } catch (e) {
-//             process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
-//             process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
-//         }
-//     }
+    //     // Restore title based on chat name when janitor finishes
+    //     if (process.stdout.isTTY) {
+    //         try {
+    //             const historyIndex = await loadHistory();
+    //             const chatData = historyIndex[chatId];
+    //             const chatName = chatData?.name || '';
+    //             const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Idle';
+    //             process.stdout.write(`\x1b]0;${title}\x07`);
+    //             process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
+    //         } catch (e) {
+    //             process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
+    //             process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
+    //         }
+    //     }
 };
 
 export const maskCodeSpans = (text) => {
@@ -1583,7 +1583,7 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
                 stream = (await loadProvider('xKiro'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
                 let cBaseUrl = settings.systemSettings?.customOpenAIBaseUrl || '';
-                try { cBaseUrl = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl; } catch (e) {}
+                try { cBaseUrl = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl; } catch (e) { }
                 stream = (await loadProvider('c_openai'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, cBaseUrl);
             } else {
                 const googleClient = getGoogleClient(apiKey);
@@ -2073,7 +2073,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             const totalMemoriesCount = Object.values(tempStorage).flat().length;
             if (totalMemoriesCount > 5) {
 
-        // [DISABLED] await consolidatePastMemories(chatId, settings, tempStorage);
+                // [DISABLED] await consolidatePastMemories(chatId, settings, tempStorage);
             }
         }
         // --------------------------------------------------
@@ -2276,6 +2276,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let taggedContextBlocks = [];
         let attachedBinaryPart = null;
+        let isBinaryAttached = false;
 
         for (let tIdx = 0; tIdx < tagsFound.length; tIdx++) {
             const { tag, isEscaped } = tagsFound[tIdx];
@@ -2373,9 +2374,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (isImage) {
                                 label = `✔  Processed: ${path.basename(filePath)}`;
                                 attachedBinaryPart = binPart;
+                                isBinaryAttached = true;
                             } else if (isPdf || isOfficeFile) {
                                 label = `✔  Auto-Analysed: ${path.basename(filePath)}`;
                                 attachedBinaryPart = binPart;
+                                isBinaryAttached = true;
                             } else {
                                 label = `✔  Auto-Read: ${path.basename(filePath)}`;
                                 taggedContextBlocks.push(textResult);
@@ -2402,11 +2405,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let taggedContextStr = '';
         if (taggedContextBlocks.length > 0) {
-            taggedContextStr = '\n[Tagged File Contents] Auto Read User Tagged files by System, No need to re-read\n' + taggedContextBlocks.join('\n\n') + '\n[Tagged File Contents]\n';
+            taggedContextStr = `\n[Tagged File Contents] Auto Read User Tagged files by System${isBinaryAttached ? ', attached below & multimodal part' : ''}. No need to re-read\n` + taggedContextBlocks.join('\n\n') + '\n[Tagged File Contents]\n';
+        } else if (isBinaryAttached) {
+            taggedContextStr = '\n[Tagged File Contents] Auto Read User Tagged files by System & attached as multimodal part. No need to re-read [Tagged File Contents]\n';
         }
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
-        const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
+        let cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
 
         const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools. Instead write the action string in chat you WOULD have written, without markdown wrappers. Then wait for systtem response\n' : '';
 
@@ -2433,6 +2438,24 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let firstUserMsg = '';
         const shouldCheckExclude = !!systemSettings?.autoExcludeMetadata;
+
+        let isSkillCreation = false;
+        let scopeSpecified = null;
+        if (cleanPromptForModel.startsWith('/skill-creator ')) {
+            isSkillCreation = true;
+            cleanPromptForModel = cleanPromptForModel.replace('/skill-creator', '').trim();
+            if (/^--project(\s|$)|(\s|^)--project$/.test(cleanPromptForModel)) {
+                scopeSpecified = 'project';
+            } else if (/^--global(\s|$)|(\s|^)--global$/.test(cleanPromptForModel)) {
+                scopeSpecified = 'global';
+            }
+            cleanPromptForModel = cleanPromptForModel.replace(/^--project\s*|\s*--project$/g, '').trim();
+            cleanPromptForModel = cleanPromptForModel.replace(/^--global\s*|\s*--global$/g, '').trim();
+
+            cleanPromptForModel = cleanPromptForModel.replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
+        }
+        const skillCreationPrompt = isSkillCreation ? `[system] ## Skill Creation Rules\n* ${scopeSpecified ? scopeSpecified === 'project' ? "Creation path: ./skills/skillName?/SKILL.md\n* If skills folder already present, ReadFolder for existing structure" : "Creation path: ~/.fluxflow/skills/skillName/SKILL.md" : "Extract skill scope, global/project. If not given AskUser. Project scope: ./skills/skillName?/SKILL.md. Global scope: ~/.fluxflow/skills/skillName/SKILL.md\n* If skills folder already present, ReadFolder for existing structure"}\n* SKILL.md should start with YAML frontmatter\n---\nname: uniqueName\ndescription: concise detail to explain the skill\n---\n* Lazy Loading for long skills:\n - Create references/*.md folder beside SKILL.md\n - Write relative link to this .md in SKILL.md with concise description about content of that reference\n* For any ambiguity AskUser\n* After creation, tell user to restart fluxflow for reindexing${(sessionStats?.tokens || 0) > 24576 ? '\n* Warn: This session is currently long, and reindexing will cause full cache invalidation' : ''}\n[/system]\n` : '';
+
         const hasMovingParts = Boolean(
             ideBlock ||
             taggedContextStr ||
@@ -2441,13 +2464,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             thinkingPolicyBlock ||
             cwdMismatch ||
             systemSettings?.dynamicDirAwareness ||
-            systemSettings?.autoTruncateResults
+            systemSettings?.autoTruncateResults ||
+            isSkillCreation
         );
+
 
         if (shouldCheckExclude && !hasMovingParts) {
             firstUserMsg = cleanPromptForModel.trim();
         } else {
-            firstUserMsg = `[System Metadata] Time: ${dateTimeStrExclude}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${ideBlock}\n${clipboardContext.trim().length > 0 ? `[Clipboard Context]\n- ${clipboardContext.trim()}\n` : ''}${IDEComments ? `[Additional Comments]\n${IDEComments.trimEnd()}\n` : ''}Action format: [action:ActionName(...)]\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+            firstUserMsg = `[System Metadata] Time: ${dateTimeStrExclude}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${ideBlock}\n${clipboardContext.trim().length > 0 ? `[Clipboard Context]\n- ${clipboardContext.trim()}\n` : ''}${IDEComments ? `[Additional Comments]\n${IDEComments.trimEnd()}\n` : ''}Action format: [action:ActionName(...)]\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}${taggedContextStr}${skillCreationPrompt}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
         }
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
@@ -2542,7 +2567,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (choice) {
                             let steeringHint = '';
                             if (typeof choice === 'string' && (choice.toLowerCase() === 'stop' || choice.includes('Stop Loop'))) {
-                                steeringHint = `STOP REPEATING THE SAME TOOL CALL. Acknowledge what failed or succeeded, summarize your current findings, and conclude.`;
+                                steeringHint = `Stop repeating the same action call. Acknowledge what failed or succeeded, summarize your current findings, and conclude.`;
                             } else if (typeof choice === 'string' && (choice.toLowerCase() === 'continue' || choice.includes('Continue Anyway'))) {
                                 // Clear duplicate records to give it a fresh cycle before warning again
                                 toolsThisUserTurn = toolsThisUserTurn.filter(t => t !== stuckToolStr);
@@ -3272,7 +3297,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         );
                     } else if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
                         let cBaseUrl2 = systemSettings?.customOpenAIBaseUrl || '';
-                        try { cBaseUrl2 = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl2; } catch (e) {}
+                        try { cBaseUrl2 = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl2; } catch (e) { }
                         stream = (await loadProvider('c_openai'))(
                             settings.apiKey,
                             targetModel,
@@ -4943,7 +4968,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                         // presence proves nothing about this block.
                                                         const replaceWasPresent = replaceRaw
                                                             ? originalContentForReporting.includes(replaceRaw) ||
-                                                              (!!replaceClean && originalContentForReporting.includes(replaceClean))
+                                                            (!!replaceClean && originalContentForReporting.includes(replaceClean))
                                                             : false;
                                                         const searchPresent = searchClean
                                                             ? finalContent.includes(searchRaw) || finalContent.includes(searchClean)
@@ -5884,8 +5909,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (wasToolCalledInLastLoop || (detectedAnyToolCalls && attemptedToolsCount > 0) || attemptedToolsCount > 0) {
                         const diag = diagnoseUnexecutedTools(toolActionableText);
                         const errorMsg = diag
-                            ? `[system] Failed to execute ${attemptedToolsCount > 0 ? attemptedToolsCount : 1} tool call${attemptedToolsCount > 1 ? 's' : ''} due to syntax/structure issues:\n${diag} [/system]`
-                            : `[system] Failed to execute ${attemptedToolsCount > 0 ? attemptedToolsCount : 1} tool${attemptedToolsCount > 1 ? 's' : ''}. Verify proper structure compliance [action:ActionName(arg="value")] & try again [/system]`;
+                            ? `[system] Failed to execute ${attemptedToolsCount > 0 ? attemptedToolsCount : 1} action call${attemptedToolsCount > 1 ? 's' : ''} due to syntax/structure issues:\n${diag} [/system]`
+                            : `[system] Failed to execute ${attemptedToolsCount > 0 ? attemptedToolsCount : 1} action${attemptedToolsCount > 1 ? 's' : ''}. Verify proper structure compliance [action:ActionName(arg="value")] & try again [/system]`;
                         modifiedHistory.push({ role: 'user', text: errorMsg });
                         await incrementUsage('toolFailure');
                         yield { type: 'visual_feedback', content: `\n ${colorMainWords(`✘  Model produced malformed tool call`)}\n` };
