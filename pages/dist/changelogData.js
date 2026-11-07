@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.1.0": {
+        "note": "NOVEMBER 7",
+        "added": [
+            "Added new command `/skill-creator`. Usage: `/skill-creator --global/project \"what_the_skill_should_do\"` and agent will make a optimized skill."
+        ],
+        "changed": [
+            "Improved Agent's folder reading tool."
+        ],
+        "fixes": []
+    },
     "5.0.0": {
         "note": "NOVEMBER 7. **Nothing Massive**. `v4` went patch version too high *(4.50)*, so welcome to `v5`.",
         "added": [
