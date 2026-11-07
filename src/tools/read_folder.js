@@ -61,14 +61,23 @@ const formatMtime = (d) => {
  */
 export const read_folder = async (args) => {
     const parsed = parseArgs(args);
-    const targetPath = parsed.path || null;
+    let rawPath = parsed.path || null;
 
-    if (!targetPath) {
+    if (!rawPath) {
         return "ERROR: No directory path provided.";
     }
 
-    if (targetPath.trim().toLowerCase().startsWith('#skills')) {
+    if (rawPath.trim().toLowerCase().startsWith('#skills')) {
         return "ERROR: '#skill' is reserved VFS namespace, not folder. Use 'ReadFile' to read specific skills."
+    }
+
+    // Support offset syntax like folderA/+50 or folderA\+50
+    let offset = 0;
+    let targetPath = rawPath.trim();
+    const offsetMatch = targetPath.match(/[/\\]\+(\d+)$/);
+    if (offsetMatch) {
+        offset = parseInt(offsetMatch[1], 10);
+        targetPath = targetPath.slice(0, offsetMatch.index).trim() || '.';
     }
 
     let recurseDepth = 1;
@@ -97,32 +106,48 @@ export const read_folder = async (args) => {
         }
 
         if (recurseDepth === 1) {
-            const files = fs.readdirSync(absolutePath);
-            const totalItems = files.length;
-            const maxDisplay = 150;
-            const displayItems = files.slice(0, maxDisplay);
-            const folderData = [];
-
-            for (const file of displayItems) {
-                const fPath = path.join(absolutePath, file);
-                let info = { name: file, type: 'unknown', size: 'N/A', mtime: 'N/A' };
-
-                try {
-                    const fStats = fs.statSync(fPath);
-                    info = {
-                        name: file,
-                        type: fStats.isDirectory() ? 'directory' : 'file',
-                        size: (fStats.size / 1024).toFixed(1) + 'KB',
-                        mtime: formatMtime(fStats.mtime)
-                    };
-                } catch (e) {
-                    info.type = 'inaccessible';
-                }
-
-                folderData.push(info);
+            let entries = [];
+            try {
+                entries = fs.readdirSync(absolutePath);
+            } catch (e) {
+                return `ERROR: Inaccessible Directory [${targetPath}].`;
             }
 
-            const formatted = folderData.map(f => {
+            // Stat entries and partition directories vs files
+            const dirList = [];
+            const fileList = [];
+
+            for (const name of entries) {
+                const fPath = path.join(absolutePath, name);
+                let isDir = false;
+                let size = 'N/A';
+                let mtime = 'N/A';
+                try {
+                    const fStats = fs.statSync(fPath);
+                    isDir = fStats.isDirectory();
+                    size = (fStats.size / 1024).toFixed(1) + 'KB';
+                    mtime = formatMtime(fStats.mtime);
+                } catch (e) {
+                    // Inaccessible
+                }
+
+                if (isDir) {
+                    dirList.push({ name, type: 'directory', size, mtime });
+                } else {
+                    fileList.push({ name, type: 'file', size, mtime });
+                }
+            }
+
+            // Sort directories alphabetically, then files alphabetically
+            dirList.sort((a, b) => a.name.localeCompare(b.name));
+            fileList.sort((a, b) => a.name.localeCompare(b.name));
+
+            const allSortedItems = [...dirList, ...fileList];
+            const totalItems = allSortedItems.length;
+            const maxDisplay = 150;
+            const displayItems = allSortedItems.slice(offset, offset + maxDisplay);
+
+            const formatted = displayItems.map(f => {
                 if (f.type === 'directory') {
                     return `${f.name}/`;
                 }
@@ -130,16 +155,28 @@ export const read_folder = async (args) => {
             }).join('\n');
 
             let footer = `\n\n(Total items in folder: ${totalItems})`;
-            if (totalItems > maxDisplay) {
-                footer = `\n\nTRUNCATED: Showing first ${maxDisplay} of ${totalItems} items.`;
+            const nextOffset = offset + displayItems.length;
+            const normalizedDisplayPath = targetPath.replace(/\\/g, '/');
+
+            if (offset > 0 || nextOffset < totalItems) {
+                const rangeStart = totalItems === 0 ? 0 : offset + 1;
+                const rangeEnd = offset + displayItems.length;
+                footer = `\n\n(Showing items ${rangeStart}–${rangeEnd} of ${totalItems})`;
+
+                if (nextOffset < totalItems) {
+                    const nextSlash = normalizedDisplayPath.endsWith('/') ? '+' : '/+';
+                    footer += `\nTRUNCATED: More items remain. Pass path as '${normalizedDisplayPath}${nextSlash}${nextOffset}' to view next page`;
+                }
             }
 
-            files.length = 0;
+            entries.length = 0;
+            dirList.length = 0;
+            fileList.length = 0;
+            allSortedItems.length = 0;
             displayItems.length = 0;
-            folderData.length = 0;
 
-            // fs.writeFileSync("DEBUG-NORMAL.txt", `Detailed folder stats for [${targetPath}]:\n\n${formatted}${footer}`);
-            return `Detailed folder stats for [${targetPath}]:\n\n${formatted}${footer}`;
+            const titlePath = offset > 0 ? `${normalizedDisplayPath}/+${offset}` : normalizedDisplayPath;
+            return `Detailed folder stats for [${titlePath}]:\n\n${formatted}${footer}`;
         }
 
         // Recursive tree traversal (recurseDepth 1..3)
@@ -233,7 +270,7 @@ export const read_folder = async (args) => {
 
         let footer = `\n\n(Total items scanned: ${totalItemsScanned}, Directories: ${totalDirectories}, Files: ${totalFiles})`;
         if (truncated) {
-            footer = `\n\nTRUNCATED: Scan capped at ${maxTotalItems} items. (Directories: ${totalDirectories}, Files: ${totalFiles})`;
+            footer = `\n\nTRUNCATED: Scan capped at ${maxTotalItems} items. (Directories: ${totalDirectories}, Files: ${totalFiles})\nTIP: Targeted folders exceeded recursive limit. Use read_folder with recurse=1 on specific subdirectories to inspect them in full detail.`;
         }
 
         // fs.writeFileSync("DEBUG-RECURSE.txt", `Detailed directory tree for [${targetPath}] (Recursive depth: ${recurseDepth}):\n\n${formattedTree}${footer}`);

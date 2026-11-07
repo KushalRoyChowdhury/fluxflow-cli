@@ -236,7 +236,7 @@ export const search_keyword = async (args) => {
         try {
             // Auto mode: collapse '||' (JS/SQL-style OR) into single '|' regex alternation.
             // Explicit regex:true keeps '||' verbatim — model asked for raw regex.
-            const regexSource = regexExplicitlyTrue ? keyword : keyword.replace(/\|\|/g, '|');
+            const regexSource = regexExplicitlyTrue ? keyword : keyword; //.replace(/\|\|/g, '|');
             regexPattern = new RegExp(regexSource, 'i');
         } catch (e) {
             if (regexExplicitlyTrue) {
