@@ -1,10 +1,22 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.2.0": {
+        "note": "NOVEMBER 8",
+        "added": [
+            "Added new command `/skill edit --(skillName) instructions` to edit any existing skills.`"
+        ],
+        "changed": [
+            "Removed Poolside integration due to inference platform shutdown."
+        ],
+        "fixes": [
+            "Improved agent path handling with `~`."
+        ]
+    },
     "5.1.0": {
         "note": "NOVEMBER 7",
         "added": [
-            "Added new command `/skill-creator`. Usage: `/skill-creator --global/project \"what_the_skill_should_do\"` and agent will make a optimized skill."
+            "Added new command `/skill create`. Usage: `/skill create --(global|project) \"what_the_skill_should_do\"` and agent will make a optimized skill."
         ],
         "changed": [
             "Improved Agent's folder reading tool."

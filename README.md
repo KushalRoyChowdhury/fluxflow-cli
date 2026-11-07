@@ -30,7 +30,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **CrofAI** (*Removed from v4.16 onwards*)
   - **InferX**
   - **SenseNovaAI**
-  - **Poolside**
+  - **Poolside** (*Removed due to provider inference shutdown*)
   - **Token Harbor**
   - **APInex**
   - **Infron**
