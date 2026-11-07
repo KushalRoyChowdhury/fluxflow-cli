@@ -5,6 +5,7 @@ import { RevertManager } from '../utils/revert.js';
 import { applyPatches, generateHighFidelityDiff, parsePatchPairs, computeStructuredPatchStats } from '../utils/text.js';
 import { loadSettings } from '../utils/settings.js';
 import { recordCodeChange } from '../utils/usage.js';
+import { resolvePathWithTilde } from '../utils/paths.js';
 
 /**
  * Update File Tool (Smart Patching)
@@ -12,9 +13,12 @@ import { recordCodeChange } from '../utils/usage.js';
  */
 export const update_file = async (args, context = {}) => {
     const parsed = parseArgs(args);
-    const targetPath = parsed.path;
+    let targetPath = parsed.path;
 
     if (!targetPath) return 'ERROR: Missing "path" argument for PatchFile.';
+
+    const { resolvedPath, isTildeResolved } = resolvePathWithTilde(targetPath);
+    targetPath = resolvedPath;
 
     // Extract replacement pairs using shared utility
     const { patchPairs, allowMultiple: parsedAllowMultiple, error: parseError } = parsePatchPairs(parsed);
@@ -63,10 +67,11 @@ export const update_file = async (args, context = {}) => {
         if (added > 0 || removed > 0) {
             await recordCodeChange({ added, removed, file: targetPath });
         }
+        const tildeNote = isTildeResolved ? `\n\n[Note: '~' resolved to user home directory. To target literal '~' in current directory, escape it as '\\~']` : '';
         if (failures.length > 0) {
-            return `File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.\n\nFailures:\n${failures.map(f => `  • ${f.error}`).join('\n')}\n\n${diffText}`;
+            return `File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.\n\nFailures:\n${failures.map(f => `  • ${f.error}`).join('\n')}\n\n${diffText}${tildeNote}`;
         }
-        return `File [${targetPath}] updated. [${results.length}/${patchPairs.length}] blocks applied.\n\n${diffText}`;
+        return `File [${targetPath}] updated. [${results.length}/${patchPairs.length}] blocks applied.\n\n${diffText}${tildeNote}`;
 
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);

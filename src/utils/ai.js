@@ -1,11 +1,11 @@
-import { DATA_DIR, LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes, SETTINGS_FILE, matchesPathPattern } from './paths.js';
+import { DATA_DIR, LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes, SETTINGS_FILE, matchesPathPattern, resolvePathWithTilde } from './paths.js';
 
 // NOTE: dotenv is already fully initialised by src/cli.jsx (all 14 env paths, in
 // the same order) before this module is ever reached, so the duplicate block was
 // removed to avoid redundant synchronous FS reads on the boot path.
 
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
-import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';
+import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt, localSkills, globalSkills } from './prompts.js';
 import { getTruncatedHistory, loadHistory } from './history.js';
 import { checkQuota, checkQuotaDetailed, incrementUsage, addToUsage, recordTimedUsage, recordCodeChange } from './usage.js';
 import { dispatchTool, isKnownTool } from './tools.js';
@@ -178,7 +178,9 @@ export const stripTrailingFluffAfterTools = (text) => {
     if (/\[\s*(?:tool|action):/i.test(trailingPart)) {
         return text.trimEnd();
     }
-    return text.substring(0, endOfLastTool).trimEnd();
+    // Check if trailing part had a trailing newline so \n between tools or after a tool is preserved
+    const hasTrailingNewline = /\r?\n/.test(trailingPart);
+    return text.substring(0, endOfLastTool) + (hasTrailingNewline ? '\n' : '');
 };
 
 let client = null;
@@ -2440,10 +2442,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const shouldCheckExclude = !!systemSettings?.autoExcludeMetadata;
 
         let isSkillCreation = false;
-        let scopeSpecified = null;
-        if (cleanPromptForModel.startsWith('/skill-creator ')) {
+        let isSkillEdit = false;
+        let skillCreationPrompt = '';
+        if (cleanPromptForModel.startsWith('/skill create ') || cleanPromptForModel === '/skill create') {
+            let scopeSpecified = null;
             isSkillCreation = true;
-            cleanPromptForModel = cleanPromptForModel.replace('/skill-creator', '').trim();
+            cleanPromptForModel = cleanPromptForModel.replace(/^\/skill\s+create\b/, '').trim();
             if (/^--project(\s|$)|(\s|^)--project$/.test(cleanPromptForModel)) {
                 scopeSpecified = 'project';
             } else if (/^--global(\s|$)|(\s|^)--global$/.test(cleanPromptForModel)) {
@@ -2453,8 +2457,39 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             cleanPromptForModel = cleanPromptForModel.replace(/^--global\s*|\s*--global$/g, '').trim();
 
             cleanPromptForModel = cleanPromptForModel.replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
+
+            skillCreationPrompt = `[system] ## Skill Creation Rules\n* ${scopeSpecified ? scopeSpecified === 'project' ? "Creation path: ./skills/skillName?/SKILL.md\n* If skills folder already present, ReadFolder for existing structure" : "Creation path: ~/.fluxflow/skills/skillName/SKILL.md" : "Extract skill scope, global/project. If not given AskUser. Project scope: ./skills/skillName?/SKILL.md. Global scope: ~/.fluxflow/skills/skillName/SKILL.md\n* If skills folder already present, ReadFolder for existing structure"}\n* SKILL.md should start with YAML frontmatter\n---\nname: skillName\ndescription: concise detail to explain the skill\n---\n* Lazy Loading for long skills:\n - Create references/*.md folder beside SKILL.md\n - Write relative link to this .md in SKILL.md with concise description about content of that reference\n* Similar skill loaded in your prompt? AskUser & offer extending it. If agreed tell them to use \`/skill edit --skillName ...\` and end your turn\n* For any ambiguity AskUser\n* After creation, tell user to restart fluxflow for reindexing${(sessionStats?.tokens || 0) > 24576 ? '\n* Warn: This session is currently long, and reindexing will cause full cache invalidation' : ''}\n[/system]\n`;
+
+        } else if (cleanPromptForModel.startsWith('/skill edit ') || cleanPromptForModel === '/skill edit') {
+            isSkillEdit = true;
+            cleanPromptForModel = cleanPromptForModel.replace(/^\/skill\s+edit\b/, '').trim();
+            let skillName = null;
+            const startMatch = cleanPromptForModel.match(/^--([^\s]+)(?:\s|$)/);
+            if (startMatch) {
+                skillName = startMatch[1];
+                cleanPromptForModel = cleanPromptForModel.slice(startMatch[0].length).trim();
+            } else {
+                const endMatch = cleanPromptForModel.match(/(?:\s|^)--([^\s]+)$/);
+                if (endMatch) {
+                    skillName = endMatch[1];
+                    cleanPromptForModel = cleanPromptForModel.slice(0, endMatch.index).trim();
+                }
+            }
+            cleanPromptForModel = cleanPromptForModel.replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
+
+            let skillDir = null;
+            let skillFilePath = null;
+            if (skillName) {
+                const targetLower = skillName.toLowerCase();
+                const matchedSkill = [...(localSkills || []), ...(globalSkills || [])].find(s => s && s.name && s.name.toLowerCase() === targetLower);
+                if (matchedSkill && matchedSkill.filePath) {
+                    skillFilePath = path.resolve(matchedSkill.filePath);
+                    skillDir = path.dirname(skillFilePath);
+                }
+            }
+
+            skillCreationPrompt = `[system] ## Skill Modification Rules\n${skillDir && skillName ? `* Target Skill: ${skillName}\n* Physical Skill path: ${skillFilePath}\n* Skill will have a SKILL.md at this path. And may have lazy loaded *.md files in folders\n* Extract requirements, use file tools with physical disk path\n* Maintain existing conventions, and modify based on requirements\n* Any ambiguity AskUser\n* After completion tell user no reindexing needed, will be auto updated on next #skill read if frontmatter stays same${(sessionStats?.tokens || 0) > 24576 ? '\n* Warn: This session is currently long, if name, description is changed reindex is needed, and will cause a full cache invalidation' : ''}` : "- User didnt provided any structured skill name to modify. Tell them to use proper syntax: `/skill edit --skillName instructions`"}\n[/system]\n`;
         }
-        const skillCreationPrompt = isSkillCreation ? `[system] ## Skill Creation Rules\n* ${scopeSpecified ? scopeSpecified === 'project' ? "Creation path: ./skills/skillName?/SKILL.md\n* If skills folder already present, ReadFolder for existing structure" : "Creation path: ~/.fluxflow/skills/skillName/SKILL.md" : "Extract skill scope, global/project. If not given AskUser. Project scope: ./skills/skillName?/SKILL.md. Global scope: ~/.fluxflow/skills/skillName/SKILL.md\n* If skills folder already present, ReadFolder for existing structure"}\n* SKILL.md should start with YAML frontmatter\n---\nname: skillName\ndescription: concise detail to explain the skill\n---\n* Lazy Loading for long skills:\n - Create references/*.md folder beside SKILL.md\n - Write relative link to this .md in SKILL.md with concise description about content of that reference\n* Similar skill exists? AskUser & offer extending it\n* For any ambiguity AskUser\n* After creation, tell user to restart fluxflow for reindexing${(sessionStats?.tokens || 0) > 24576 ? '\n* Warn: This session is currently long, and reindexing will cause full cache invalidation' : ''}\n[/system]\n` : '';
 
         const hasMovingParts = Boolean(
             ideBlock ||
@@ -2465,7 +2500,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             cwdMismatch ||
             systemSettings?.dynamicDirAwareness ||
             systemSettings?.autoTruncateResults ||
-            isSkillCreation
+            isSkillCreation ||
+            isSkillEdit
         );
 
 
@@ -4188,7 +4224,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         }
                                     } else {
                                         try {
-                                            const absPath = path.resolve(process.cwd(), targetPath);
+                                            const { resolvedPath } = resolvePathWithTilde(targetPath);
+                                            const absPath = path.resolve(process.cwd(), resolvedPath);
                                             if (fs.existsSync(absPath)) {
                                                 const content = fs.readFileSync(absPath, 'utf8');
                                                 const lines = content.split('\n').length;
@@ -4729,8 +4766,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             if (!isOverwritePrompt && (normToolName === 'write_file' || normToolName === 'update_file')) {
                                                 try {
                                                     const toolArgs = parseArgs(toolCall.args);
-                                                    const { path: filePath } = toolArgs;
+                                                    let { path: filePath } = toolArgs;
                                                     if (filePath) {
+                                                        const { resolvedPath } = resolvePathWithTilde(filePath);
+                                                        filePath = resolvedPath;
                                                         const absPath = path.resolve(process.cwd(), filePath);
                                                         // Ultra-robust normalization for comparison
                                                         const normalize = (p) => p ? p.toLowerCase().replace(/\\/g, '/').replace(/^[a-z]:/, m => m.toUpperCase()) : "";
@@ -4870,8 +4909,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             registerSecurityListener(null);
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
-                                                const { path: filePath } = parseArgs(toolCall.args);
+                                                const toolArgs = parseArgs(toolCall.args);
+                                                let { path: filePath } = toolArgs;
                                                 if (filePath) {
+                                                    const { resolvedPath } = resolvePathWithTilde(filePath);
+                                                    filePath = resolvedPath;
                                                     const absPath = path.resolve(process.cwd(), filePath);
                                                     closeDiffInIDE(absPath, approval);
                                                     if (approval === 'deny' && isNewFileCreated && fs.existsSync(absPath)) {
@@ -4889,7 +4931,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                         if (approval === 'allow' && diffOpened && isBridgeConnected()) {
                                             // SUCCESS: The changes are already in the IDE buffer and we told it to save.
-                                            const { path: filePath } = parseArgs(toolCall.args);
+                                            const toolArgs = parseArgs(toolCall.args);
+                                            let { path: filePath } = toolArgs;
+                                            const { resolvedPath, isTildeResolved } = resolvePathWithTilde(filePath);
+                                            filePath = resolvedPath;
                                             const absPath = path.resolve(process.cwd(), filePath);
 
                                             // Get the FINAL content from IDE (after user tweaks and save)
@@ -5020,7 +5065,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 const statusSummary = statusParts.join(', ');
 
                                                 const failureSection = blockNotes.length > 0 ? `\n\nUser Review Details:\n${blockNotes.join('\n')}` : '';
-                                                result = `File [${filePath}] updated via IDE Companion. ${statusSummary}.${failureSection}\n\n${diffReport}`;
+                                                const tildeNote = isTildeResolved ? `\n\n[Note: '~' resolved to user home directory. To target literal '~' in current directory, escape it as '\\~']` : '';
+                                                result = `File [${filePath}] updated via IDE Companion. ${statusSummary}.${failureSection}\n\n${diffReport}${tildeNote}`;
 
                                                 const { added, removed } = computeStructuredPatchStats(originalContentForReporting, finalContent);
                                                 if (added > 0 || removed > 0) {
@@ -5066,7 +5112,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     snippet = `${head}\n\n... [${verifiedLineCount - 100} lines truncated] ...\n\n${tail}`;
                                                 }
 
-                                                result = `File [${filePath}] saved via IDE Companion (May have user edits).\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
+                                                const tildeNote = isTildeResolved ? `\n\n[Note: '~' resolved to user home directory. To target literal '~' in current directory, escape it as '\\~']` : '';
+                                                result = `File [${filePath}] saved via IDE Companion (May have user edits).\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}${tildeNote}`;
                                                 // console.log(result);
 
                                                 const oldLinesCount = originalContentForReporting ? originalContentForReporting.split(/\r?\n/).length : 0;
@@ -5104,17 +5151,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             let aiContent;
                                             if (normToolName === 'write_file' && !processedResult.startsWith('ERROR:')) {
                                                 const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
+                                                const tildeNoteMatch = cleanText.match(/\n\s*(\[Note:\s*'~'\s*resolved\s*to\s*user\s*home\s*directory[\s\S]*?\])\s*$/);
+                                                const tildeSuffix = tildeNoteMatch ? `\n\n${tildeNoteMatch[1]}` : '';
                                                 if (/- Stats:.*\r?\nOld File contents:/s.test(cleanText)) {
                                                     // Overwrite: keep header + old content, strip Content Preview and new content
                                                     const contentPreviewIdx = cleanText.search(/^- Content Preview:/m);
                                                     const trimmed = contentPreviewIdx !== -1 ? cleanText.slice(0, contentPreviewIdx).trimEnd() : cleanText;
-                                                    aiContent = `[ACTION RESULT]: ${trimmed}\n\n[Old file content for reversal reference. Replaced with new write request]`;
+                                                    aiContent = `[ACTION RESULT]: ${trimmed}\n\n[Old file content for reversal reference. Replaced with new write request]${tildeSuffix}`;
                                                 } else {
                                                     // New file write: just header + stats, no content echoing
                                                     const lines = cleanText.split(/\r?\n/);
                                                     const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
                                                     const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
-                                                    aiContent = `[ACTION RESULT]: ${headerPart}`;
+                                                    aiContent = `[ACTION RESULT]: ${headerPart}${tildeSuffix}`;
                                                 }
                                             } else if (processedResult.startsWith('[[SAME]]')) {
                                                 const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
@@ -5255,7 +5304,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if ((normToolName === 'write_file' || normToolName === 'update_file') && !result.startsWith('ERROR:')) {
                                     const { path: filePath } = parseArgs(toolCall.args);
                                     if (filePath) {
-                                        const absPath = path.resolve(process.cwd(), filePath);
+                                        const { resolvedPath } = resolvePathWithTilde(filePath);
+                                        const absPath = path.resolve(process.cwd(), resolvedPath);
                                         openFileInEditor(absPath);
                                     }
                                 }
@@ -5446,17 +5496,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let aiContent;
                                 if (normToolName === 'write_file' && !processedResult.startsWith('ERROR:')) {
                                     const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
+                                    const tildeNoteMatch = cleanText.match(/\n\s*(\[Note:\s*'~'\s*resolved\s*to\s*user\s*home\s*directory[\s\S]*?\])\s*$/);
+                                    const tildeSuffix = tildeNoteMatch ? `\n\n${tildeNoteMatch[1]}` : '';
                                     if (/- Stats:.*\r?\nOld File contents:/s.test(cleanText)) {
                                         // Overwrite: keep header + old content, strip Content Preview and new content
                                         const contentPreviewIdx = cleanText.search(/^- Content Preview:/m);
                                         const trimmed = contentPreviewIdx !== -1 ? cleanText.slice(0, contentPreviewIdx).trimEnd() : cleanText;
-                                        aiContent = `[ACTION RESULT]: ${trimmed}\n\n[Old file content for reversal reference. Replaced with new write request]`;
+                                        aiContent = `[ACTION RESULT]: ${trimmed}\n\n[Old file content for reversal reference. Replaced with new write request]${tildeSuffix}`;
                                     } else {
                                         // New file write: just header + stats, no content echoing
                                         const lines = cleanText.split(/\r?\n/);
                                         const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
                                         const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
-                                        aiContent = `[ACTION RESULT]: ${headerPart}`;
+                                        aiContent = `[ACTION RESULT]: ${headerPart}${tildeSuffix}`;
                                     }
                                 } else if (processedResult.startsWith('[[SAME]]')) {
                                     const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');

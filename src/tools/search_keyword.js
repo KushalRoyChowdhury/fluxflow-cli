@@ -3,7 +3,7 @@ import path from 'path';
 import fg from 'fast-glob';
 import { Minimatch } from 'minimatch';
 import { parseArgs } from '../utils/arg_parser.js';
-import { FLUXFLOW_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes, matchesPathPattern } from '../utils/paths.js';
+import { FLUXFLOW_DIR, DEFAULT_EXCLUDES, getGitignoreExcludes, matchesPathPattern, resolvePathWithTilde } from '../utils/paths.js';
 import { loadSettings } from '../utils/settings.js';
 import fsSync from 'fs';
 
@@ -205,11 +205,16 @@ function fuzzyMatch(line, keyword) {
  * @param {boolean} [regex=false]    - When true, treats keyword as a regex pattern (case-insensitive).
  */
 export const search_keyword = async (args) => {
-    const { keyword: rawKeyword, path: pathArg, fuzzy, subString, regex } = parseArgs(args);
+    const { keyword: rawKeyword, path: pathArgRaw, fuzzy, subString, regex } = parseArgs(args);
     if (rawKeyword === undefined || rawKeyword === null) return 'ERROR: Missing "keyword" argument.';
     const keyword = String(rawKeyword);
 
+    let pathArg = pathArgRaw;
+    let tildeResolved = false;
     if (pathArg) {
+        const { resolvedPath, isTildeResolved } = resolvePathWithTilde(pathArg);
+        pathArg = resolvedPath;
+        tildeResolved = isTildeResolved;
         const pNorm = pathArg.trim().toLowerCase();
         if (pNorm === '#docs' || pNorm === '#doc' || pNorm === '#documentation' || pNorm.includes('#skill/global/fluxflow') || pNorm.startsWith('#skill')) {
             // return searchDocsDirectory(keyword);
@@ -472,7 +477,8 @@ export const search_keyword = async (args) => {
             }
         }
 
-        return output.trimEnd();
+        const tildeNote = tildeResolved ? `\n[Note: '~' resolved to user home directory. To target literal '~' in current directory, escape it as '\\~']` : '';
+        return `${output.trimEnd()}${tildeNote}`;
 
     } catch (error) {
         return `ERROR: ${error.message}`;

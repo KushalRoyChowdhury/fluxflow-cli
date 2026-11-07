@@ -896,7 +896,8 @@ export const parseMessageToBlocks = (msg, columns) => {
         const mainParts = text.split('- Content Preview:');
         const contentPart = mainParts[1] || '';
         const footerMarker = '[SYSTEM] Check the content preview for verification [/SYSTEM]';
-        const content = contentPart.split(footerMarker)[0]?.trim() || '';
+        let content = contentPart.split(footerMarker)[0]?.trim() || '';
+        content = content.replace(/\n\s*\[Note:\s*'~'\s*resolved\s*to\s*user\s*home\s*directory[\s\S]*?\]\s*$/, '').trimEnd();
 
         const codeLines = content.split('\n').map(l => l.replace(/\r$/, ''));
         const gutterWidth = String(codeLines.length).length;

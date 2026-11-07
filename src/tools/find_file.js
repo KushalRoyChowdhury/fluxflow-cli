@@ -144,7 +144,7 @@ export const find_file = async (args) => {
         }
 
         if (scoredMatches.length === 0) {
-            return `No file found matching name "${query}"`;
+            return `No file found matching name "${query}" in CWD. If working outside CWD use Run`;
         }
 
         // Sort by highest score first, then by shortest relative path
@@ -153,7 +153,7 @@ export const find_file = async (args) => {
         // Deduplicate
         const uniquePaths = Array.from(new Set(scoredMatches.map(m => m.relPath)));
         const count = uniquePaths.length;
-        const header = `Found ${count} file${count === 1 ? '' : 's'} matching "${query}":\n\n`;
+        const header = `Found ${count} file${count === 1 ? '' : 's'} matching "${query}" in CWD:\n\n`;
 
         return `${header}${uniquePaths.join('\n')}`;
     } catch (e) {

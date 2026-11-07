@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
-import { FLUXFLOW_DIR } from '../utils/paths.js';
+import { FLUXFLOW_DIR, resolvePathWithTilde } from '../utils/paths.js';
 
 const parseSkillFrontmatter = (content) => {
     if (!content) return null;
@@ -149,6 +149,9 @@ export const view_file = async (args, context = {}) => {
     let finalEnd = eLine || (sLine ? (sLine + 800) : 800);
 
     if (!targetPath) return 'ERROR: Missing "path" argument for ReadFile.';
+
+    const { resolvedPath, isTildeResolved } = resolvePathWithTilde(targetPath);
+    targetPath = resolvedPath;
 
     // Deterministic #skill path resolution
     if (targetPath.trim().toLowerCase().startsWith('#skill')) {
@@ -330,7 +333,8 @@ export const view_file = async (args, context = {}) => {
         const header = `File: [${targetPath}] (Showing lines ${start + 1}-${end} of ${totalLines}).`;
         const code = resultLines.map((line, i) => `${String(start + i + 1).padStart(4)}: ${line.trimEnd()}`).join('\n');
 
-        return `${header}\n\n${code}`;
+        const tildeNote = isTildeResolved ? `\n\n[Note: '~' resolved to user home directory. To target literal '~' in current directory, escape it as '\\~']` : '';
+        return `${header}\n\n${code}${tildeNote}`;
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to read file [${targetPath}]: ${errorMsg}`;

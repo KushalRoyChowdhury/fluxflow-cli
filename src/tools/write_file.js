@@ -3,7 +3,7 @@ import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
 import { RevertManager } from '../utils/revert.js';
 import { loadSettings } from '../utils/settings.js';
-import { DATA_DIR } from '../utils/paths.js';
+import { DATA_DIR, resolvePathWithTilde } from '../utils/paths.js';
 import { recordCodeChange } from '../utils/usage.js';
 
 /**
@@ -15,6 +15,9 @@ export const write_file = async (args, context = {}) => {
 
     if (!targetPath) return 'ERROR: Missing "path" argument for WriteFile.';
     if (content === undefined) return 'ERROR: Missing "content" argument for WriteFile.';
+
+    const { resolvedPath, isTildeResolved } = resolvePathWithTilde(targetPath);
+    targetPath = resolvedPath;
 
     // Strip markdown code blocks if the LLM accidentally included them and normalize to LF
     content = content.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -116,6 +119,10 @@ export const write_file = async (args, context = {}) => {
             if (headMatches && tailMatches) {
                 resultString = `[[SAME]]\n${resultString}`;
             }
+        }
+
+        if (isTildeResolved) {
+            resultString += `\n\n[Note: '~' resolved to user home directory. To target literal '~' in current directory, escape it as '\\~']`;
         }
 
         return resultString;

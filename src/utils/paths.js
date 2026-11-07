@@ -218,3 +218,22 @@ export const matchesPathPattern = (filePath, patternCsv) => {
     }
     return false;
 };
+
+/**
+ * Resolves ~ to os.homedir(). If path starts with \~, escape it to literal ~.
+ * Returns { resolvedPath, isTildeResolved }
+ */
+export const resolvePathWithTilde = (inputPath) => {
+    if (typeof inputPath !== 'string') return { resolvedPath: inputPath, isTildeResolved: false };
+    const trimmed = inputPath.trim();
+    if (trimmed.startsWith('\\~')) {
+        return { resolvedPath: trimmed.slice(1), isTildeResolved: false };
+    }
+    if (trimmed === '~') {
+        return { resolvedPath: os.homedir(), isTildeResolved: true };
+    }
+    if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
+        return { resolvedPath: path.join(os.homedir(), trimmed.slice(2)), isTildeResolved: true };
+    }
+    return { resolvedPath: trimmed, isTildeResolved: false };
+};

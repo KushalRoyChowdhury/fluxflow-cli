@@ -922,7 +922,8 @@ export const CodeRenderer = React.memo(({ text, columns = 80, theme = 'Dark' }) 
         // Split content from footer
         const footerMarker = '[SYSTEM] Check the content preview for verification [/SYSTEM]';
         const contentAndFooter = contentPart.split(footerMarker);
-        const content = (contentAndFooter[0]?.trim() || '').replaceAll('\t', '    ');
+        let content = (contentAndFooter[0]?.trim() || '').replaceAll('\t', '    ');
+        content = content.replace(/\n\s*\[Note:\s*'~'\s*resolved\s*to\s*user\s*home\s*directory[\s\S]*?\]\s*$/, '').trimEnd();
         const footer = contentAndFooter[1] ? `${footerMarker}${contentAndFooter[1]}` : '';
 
         const codeLines = content.split('\n');

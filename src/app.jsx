@@ -51,7 +51,7 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens, parseMessageToBlocks, clearBlocksCache, flattenString, splitTypewriterTokens } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus, registerBridgeRejectionListener } from './utils/editor.js';
 import GlintText from './components/GlintText.jsx';
-import { loadedFilesCount, getLoadedFilesSummary } from './utils/prompts.js';
+import { loadedFilesCount, getLoadedFilesSummary, globalSkills, localSkills } from './utils/prompts.js';
 import { getProcessTree } from './utils/process.js';
 
 
@@ -734,12 +734,16 @@ export default function App({ args = [] }) {
 
             // Protect active tool call syntax and premature hallucinatory conversational fluff from leaking into frozen UI bubbles across tool execution
             if (activeStreamingMsgRef.current.role === 'agent' && curText) {
+                const hadTrailingNewline = /\r?\n$/.test(curText);
                 const toolCtx = getActiveToolContext(curText);
                 if (toolCtx.inside && typeof toolCtx.startIndex === 'number' && toolCtx.startIndex >= 0) {
                     unclosedToolPrefix = curText.substring(toolCtx.startIndex);
                     curText = curText.substring(0, toolCtx.startIndex);
                 } else {
                     curText = stripTrailingFluffAfterTools(curText);
+                }
+                if (hadTrailingNewline && !curText.endsWith('\n')) {
+                    curText += '\n';
                 }
             }
 
@@ -1468,11 +1472,7 @@ export default function App({ args = [] }) {
 
         if (prevProviderRef.current !== aiProvider) {
             prevProviderRef.current = aiProvider;
-            if (aiProvider === 'SenseNova' || aiProvider === 'Poolside') {
-                setThinkingLevel('High');
-            } else {
-                setThinkingLevel('Low');
-            }
+            setThinkingLevel('Low');
         }
         // else {
         //     if (aiProvider === 'Google' && thinkingLevel === 'xHigh') {
@@ -3059,7 +3059,12 @@ export default function App({ args = [] }) {
                 { cmd: 'check', desc: 'Check for new version' },
             ]
         },
-        { cmd: '/skill-creator', desc: 'Generate new skills with natural language. /skills-creator "describe" --project/global.' }
+        {
+            cmd: '/skill', desc: 'Generate new skills with natural language', subs: [
+                { cmd: 'create', desc: '/skill --(project|global) "describe"' },
+                { cmd: 'edit', desc: '/skill --skill-name "describe"' },
+            ]
+        }
     ];
 
     const handleSubmit = async (value, isProgrammatic = false) => {
@@ -3152,7 +3157,60 @@ export default function App({ args = [] }) {
             return;
         }
 
-        if (absoluteClean.startsWith('/') && !absoluteClean.startsWith('/skill-creator')) {
+        if (absoluteClean.startsWith('/skill')) {
+            const skillParts = absoluteClean.trim().split(/\s+/);
+            const subCmd = skillParts[1]?.toLowerCase();
+            if (subCmd !== 'create' && subCmd !== 'edit') {
+                setInput('');
+                setMessages(prev => {
+                    setCompletedIndex(prev.length + 1);
+                    return [...prev, {
+                        id: Date.now(),
+                        role: 'system',
+                        text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m Invalid /skill subcommand. Usage: /skill <create|edit> ...\n⠀`,
+                        isMeta: true
+                    }];
+                });
+                return;
+            }
+
+            if (subCmd === 'edit') {
+                const restOfCmd = absoluteClean.trim().replace(/^\/skill\s+edit\b/i, '').trim();
+                let matchedFlagName = null;
+                const startMatch = restOfCmd.match(/^--([^\s]+)(?:\s|$)/);
+                if (startMatch) {
+                    matchedFlagName = startMatch[1];
+                } else {
+                    const endMatch = restOfCmd.match(/(?:\s|^)--([^\s]+)$/);
+                    if (endMatch) {
+                        matchedFlagName = endMatch[1];
+                    }
+                }
+
+                const allSkills = [...(localSkills || []), ...(globalSkills || [])];
+                const isValid = matchedFlagName && allSkills.some(s => {
+                    const normPath = (s?.filePath || '').replace(/\\/g, '/').toLowerCase();
+                    const isSystemDocs = normPath.includes('/skills/fluxflow/skill.md') || normPath.includes('/skills/about-fluxflow/skill.md') || s?.name?.toLowerCase() === 'fluxflow';
+                    return s && s.name && !isSystemDocs && s.name.toLowerCase() === matchedFlagName.toLowerCase();
+                });
+
+                if (!isValid) {
+                    setInput('');
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, {
+                            id: Date.now(),
+                            role: 'system',
+                            text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m ${matchedFlagName ? `Skill '--${matchedFlagName}' not found.` : `Missing skill flag.`} Usage: /skill edit --<skill-name> "instruction"\n⠀`,
+                            isMeta: true
+                        }];
+                    });
+                    return;
+                }
+            }
+        }
+
+        if (absoluteClean.startsWith('/') && !absoluteClean.startsWith('/skill')) {
             setInput('');
             const parts = absoluteClean.split(' ');
             const cmd = parts[0]?.toLowerCase();
@@ -5686,6 +5744,31 @@ export default function App({ args = [] }) {
     };
 
     const suggestions = useMemo(() => {
+        // Skill flag autocomplete when preceded by '/skill edit '
+        if (input.startsWith('/skill edit ') && !isFilePickerDismissed) {
+            const parts = input.split(' ');
+            const lastPart = parts[parts.length - 1];
+            if (lastPart && lastPart.startsWith('--')) {
+                const query = lastPart.slice(2).toLowerCase();
+                const allSkills = [...(localSkills || []), ...(globalSkills || [])];
+                const seen = new Set();
+                const uniqueSkills = [];
+                for (const s of allSkills) {
+                    const normPath = (s?.filePath || '').replace(/\\/g, '/').toLowerCase();
+                    const isSystemDocs = normPath.includes('/skills/fluxflow/skill.md') || normPath.includes('/skills/about-fluxflow/skill.md') || s?.name?.toLowerCase() === 'fluxflow';
+                    if (s && s.name && !isSystemDocs && !seen.has(s.name.toLowerCase())) {
+                        seen.add(s.name.toLowerCase());
+                        uniqueSkills.push(s);
+                    }
+                }
+                const matches = uniqueSkills.filter(s => s.name.toLowerCase().includes(query));
+                return matches.map(s => ({
+                    cmd: `--${s.name}`,
+                    desc: s.description || 'Skill'
+                }));
+            }
+        }
+
         if (input.startsWith('/') && !isFilePickerDismissed) {
             const parts = input.split(' ');
             const query = parts[parts.length - 1].toLowerCase();
@@ -5717,6 +5800,7 @@ export default function App({ args = [] }) {
         // File Autocomplete Support
         const parts = input.split(' ');
         const lastPart = parts[parts.length - 1];
+
         // Also trigger on escaped @ (\@) while keeping the escape character preserved
         const isEscapedAt = lastPart && lastPart.startsWith('\\@');
         const isPlainAt = lastPart && lastPart.startsWith('@');
@@ -5940,7 +6024,7 @@ export default function App({ args = [] }) {
                             { label: 'DeepSeek', value: 'DeepSeek' },
                             { label: 'InferX', value: 'InferX' },
                             { label: 'SenseNova', value: 'SenseNova' },
-                            { label: 'Poolside', value: 'Poolside' },
+                            // { label: 'Poolside', value: 'Poolside' },  Gone
                             { label: 'Experiential Labs', value: 'ExpLabs' },
                             { label: 'Token Harbor', value: 'TokenHarbor' },
                             { label: 'Infron', value: 'Infron' },
@@ -8238,7 +8322,7 @@ export default function App({ args = [] }) {
                                                         { label: 'InferX', value: 'InferX' },
                                                         { label: 'SenseNova', value: 'SenseNova' },
                                                         // { label: 'CrofAI', value: 'CrofAI' }, // Cleanup
-                                                        { label: 'Poolside', value: 'Poolside' },
+                                                        // { label: 'Poolside', value: 'Poolside' }, // Gone, Public inference platform shutdown
                                                         { label: 'Experiential Labs', value: 'ExpLabs' },
                                                         { label: 'Token Harbor', value: 'TokenHarbor' },
                                                         { label: 'Infron', value: 'Infron' },

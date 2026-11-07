@@ -1,4 +1,5 @@
 import { WebSocket } from 'ws';
+import { resolvePathWithTilde } from './paths.js';
 
 let ws = null;
 let isConnecting = false;
@@ -133,18 +134,22 @@ export const getIDEContext = () => {
 };
 
 export const openFileInEditor = (filePath) => {
-    send({ command: 'open', filePath });
+    const { resolvedPath } = resolvePathWithTilde(filePath);
+    send({ command: 'open', filePath: resolvedPath });
 };
 
 export const showDiffInIDE = (filePath, originalContent, modifiedContent) => {
-    send({ command: 'showDiff', filePath, originalContent, modifiedContent });
+    const { resolvedPath } = resolvePathWithTilde(filePath);
+    send({ command: 'showDiff', filePath: resolvedPath, originalContent, modifiedContent });
 };
 
 export const closeDiffInIDE = (filePath, result) => {
-    send({ command: 'closeDiff', filePath, result });
+    const { resolvedPath } = resolvePathWithTilde(filePath);
+    send({ command: 'closeDiff', filePath: resolvedPath, result });
 };
 
 export const highlightDiffInEditor = (filePath, diffText) => {
+    const { resolvedPath } = resolvePathWithTilde(filePath);
     const addedLines = [];
     const lines = diffText.split(/\r?\n/);
 
@@ -174,7 +179,7 @@ export const highlightDiffInEditor = (filePath, diffText) => {
 
         send({
             command: 'diff',
-            filePath,
+            filePath: resolvedPath,
             addedLines: filledLines
         });
     }
