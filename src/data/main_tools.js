@@ -110,7 +110,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     const fluxInstructions = `- JSON escape literal sequences, backslash: \\\\, newLine: \\ n
 - Same file, multiple edits? One PatchFile ≤15 blocks${autoExec ? '' : '\n- Action denied? Ask for guidance'}
 - Need text or large file? CodeSearch > Full Read
-- Stuck on syntax error? Tell user > waste time
+- Ignore indentation mismatch when possible
 `;
 
     // =====================================================================================================
@@ -163,7 +163,7 @@ Rules:
 - Max 5 actions/turn
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 **User Communication**
-- AskUser(question=string, optionA?="title::description", ...MAX4). Any Ambiguity
+- AskUser(question=string, optionA?="title::description", ...MAX4). Mid task Ambiguity Resolution
 
 **Web**
 - WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). For unknown topics, time sensitive, fact checking

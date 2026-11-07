@@ -6167,11 +6167,11 @@ Rules:
 - JSON escape literal sequences, backslash: \\\\, newLine: \\ n
 - Same file, multiple edits? ONE PatchFile ≤15 blocks
 - Need text or huge file? CodeSearch > Full Read
-- Stuck on syntax error? Tell user > waste time
+- Ignore indentation mismatch when possible
 
 # Provided Actions
 **Communication**
-- AskUser(question=string, optionA?="title::description", ...MAX4). Any Ambiguity
+- AskUser(question=string, optionA?="title::description", ...MAX4). Mid task Ambiguity Resolution
 ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web**
