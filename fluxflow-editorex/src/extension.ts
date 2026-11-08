@@ -97,6 +97,16 @@ function restoreTerminalFocus(): void {
     }
 }
 
+/**
+ * Heuristic: is the terminal the currently focused view?
+ * (No official VS Code API for terminal focus, so we infer from
+ *  activeTextEditor === undefined + activeTerminal !== undefined.)
+ */
+function isTerminalLikelyFocused(): boolean {
+    return vscode.window.activeTextEditor === undefined
+        && vscode.window.activeTerminal !== undefined;
+}
+
 const lastKnownStates = new Map<string, string>();
 const originalStates = new Map<string, string>();
 const virtualDocs = new Map<string, string>();
@@ -1546,6 +1556,9 @@ export function activate(context: vscode.ExtensionContext) {
             return links;
         },
         handleTerminalLink: async (link: any) => {
+            // Snapshot focus state BEFORE any file/diff open steals focus.
+            const terminalWasFocused = isTerminalLikelyFocused();
+
             const workspaceFolders = vscode.workspace.workspaceFolders;
             let absolutePath = link.path;
 
@@ -1576,8 +1589,11 @@ export function activate(context: vscode.ExtensionContext) {
                     editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
                 }
 
-                // Belt & braces: some VS Code versions still shift focus on reveal — actively restore the terminal.
-                restoreTerminalFocus();
+                // Only restore terminal focus if the user was in the terminal before we opened the file.
+                // If they were reading code in the editor, keep focus there (the win!).
+                if (terminalWasFocused) {
+                    restoreTerminalFocus();
+                }
             } else {
                 vscode.window.showErrorMessage(`Could not find file: ${link.path}`);
             }
