@@ -87,12 +87,12 @@ export default function StableModels() {
                             </td>
                         </tr>
                         <tr>
-                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--info</td>
-                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-i</td>
+                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--price / -p</td>
+                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-p</td>
                             <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
-                                <div>Configures or resets per-million token pricing info (<code>IN</code>, <code>OUT</code>, <code>CR</code>, <code>CW</code>) for cost estimation and hover breakdown tooltips in the dashboard. Pass <code>0</code> (e.g. <code>-i 0</code>) to reset/remove existing pricing info.</div>
-                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-model -i "IN 0.15, OUT 0.6, CR 0.05, CW 0.1"</code>
-                                <code className="text-xs text-slate-500 font-mono mt-0.5 block">/model my-model -i 0  # Resets pricing info</code>
+                                <div>Configures or resets per-million token pricing info (<code>IN</code>, <code>OUT</code>, <code>CR</code>, <code>CW</code>) for cost estimation and hover breakdown tooltips in the dashboard. Pass <code>0</code> (e.g. <code>-p 0</code>) to reset/remove existing pricing info.</div>
+                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-model -p "IN 0.15, OUT 0.6, CR 0.05, CW 0.1"</code>
+                                <code className="text-xs text-slate-500 font-mono mt-0.5 block">/model my-model -p 0  # Resets pricing info</code>
                             </td>
                         </tr>
                     </tbody>
