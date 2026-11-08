@@ -26,18 +26,18 @@ Trigger in chat via /command
 * /settings → Full-screen interactive settings menu
 * /mode → Toggle Operating Mode
 * /display index → Select active screen for Computer Use mode
-* /model model-id --flags → Flags optional to customize list (--save, --remove, --default, /model old-model new-model --rename, --price/-p "IN price, OUT price, CR price, CW price"). Price lets user enter API prices for use/budget in fluxflow. --price 0 to reset, --price "metric price" to update. CR = Cache Read, CW = Cache Write. 0 default
+* /model model-id --flags → Flags optional to customize list (--save, --remove, --default, /model old-model new-model --rename, --price/-p "IN price, OUT price, CR price, CW price"). Price lets user enter API prices for use/budget in fluxflow. --price 0 to reset, --price "metric price" to update
 * /provider → Switch AI provider
-* /thinking effort → Set reasoning effort. Can be mapped based on provider & model support (/thinking effort --map provider-effort-value/'rm' to unmap). Changes the Translation Table only for the currently selected provider and model
+* /thinking effort → Set reasoning effort. Can be mapped based on provider & model support. --map /thinking effort --map provider-effort-value/'rm' to unmap. Changes the Translation Table only for the currently selected provider and model, --force (Uses CoT system prompt on non reasoning models), --raw (Strips harness reasoning guidance)
 * /wildcard-tooling → Tool compatibility mode for non-tooling models
 * /wildercard-tooling → Extended version of /wildcard-tooling
 * /key → Manage saved API keys (10-slot array per provider)
-  - /key list [--provider <name>] → Show slots 1-10 (active marked); no --provider value = all-providers summary
-  - /key add <key> [--index <n>] [--url <endpoint>] | /key new → Add a key (alias: new)
-  - --url (custom provider only): endpoint ending in /v1 or /v1/chat/completions. Overrides the saved base URL for that slot.
-  - /key remove [<index>|<key>|--all] → Remove by index/key/substring, or all
+  - /key list --provider <name> → Show slots 1-10 (active marked); no --provider value = all-providers summary
+  - /key add <key> --index <n> --url <endpoint> | /key new → Add a key (alias: new)
+  - --url (custom provider only): endpoint ending in /v1 or /v1/chat/completions. Overrides the saved base URL for that slot
+  - /key remove <index>|<key>|--all → Remove by index/key/substring, or all
   - /key use <index>|<key> → Set active key    |    /key use <key> --temp → Session-only key
-  - /key clean [--provider <name>] → Remove gaps between slots (no --provider = whole DB)
+  - /key clean --provider <name> → Remove gaps between slots (no --provider = whole DB)
 * /theme → Select UI color theme
 * /budget → Set/view token budget limits
 * /stats → Session token usage telemetry
@@ -51,5 +51,5 @@ Trigger in chat via /command
 * /update check → Check npm updates
 * /update latest → Install latest release
 * /fluxflow global/saves → Openes fluxflow storage paths in explorer
-* /move → Transfer Playground session data to CWD/playground-export
+* /move → Transfer Playground session data to ./playground-export
 `;
