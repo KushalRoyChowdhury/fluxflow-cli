@@ -2,6 +2,78 @@ import { Ollama } from 'ollama';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 import { NULL_KEY_SENTINEL } from '../secrets_v2.js';
 
+// Module-level in-memory cache for model thinking configs: Map<cacheKey, thinkingConfig | null>
+const thinkingConfigCache = new Map();
+
+async function getModelThinkingConfig(ollamaClient, host, model) {
+    const cacheKey = `${host}::${model}`;
+    if (thinkingConfigCache.has(cacheKey)) {
+        return thinkingConfigCache.get(cacheKey);
+    }
+
+    try {
+        const info = await ollamaClient.show({ model });
+        const thinking = info?.thinking || null;
+        thinkingConfigCache.set(cacheKey, thinking);
+        return thinking;
+    } catch {
+        // Fallback gracefully if endpoint fails or doesn't support /api/show
+        thinkingConfigCache.set(cacheKey, null);
+        return null;
+    }
+}
+
+function resolveThinkingParam(thinkingConfig, thinkingLevel) {
+    const values = thinkingConfig?.values;
+    const isBooleanConfig = Array.isArray(values) && values.some(v => typeof v === 'boolean');
+    const isLevelConfig = Array.isArray(values) && values.some(v => typeof v === 'string');
+
+    if (isBooleanConfig) {
+        // Boolean values: [false, true]
+        switch (thinkingLevel) {
+            case 'Fast':
+                return false;
+            case 'Low':
+            case 'Medium':
+            case 'Standard':
+            case 'High':
+            case 'xHigh':
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    if (isLevelConfig) {
+        // String levels: e.g. ["low", "medium", "high"]
+        switch (thinkingLevel) {
+            case 'Fast':
+                return values.includes('low') ? 'low' : false;
+            case 'Low':
+                return 'low';
+            case 'Medium':
+            case 'Standard':
+                return 'medium';
+            case 'High':
+            case 'xHigh':
+                return 'high';
+            default:
+                return 'medium';
+        }
+    }
+
+    // Default fallback when model thinking config is unknown or missing
+    const thinkMap = {
+        'Fast': false,
+        'Low': 'low',
+        'Medium': 'medium',
+        'Standard': 'medium',
+        'High': 'high',
+        'xHigh': 'high'
+    };
+    return thinkMap[thinkingLevel] !== undefined ? thinkMap[thinkingLevel] : true;
+}
+
 export const getOllamaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0, endpointType = 'Cloud') {
     const messages = [];
     if (systemInstruction) {
@@ -54,15 +126,25 @@ export const getOllamaStream = async function* (apiKey, model, contents, systemI
     let hasNewData = false;
 
     const customThink = getMappedThinkingLevel('Ollama', model, thinkingLevel);
-    const thinkMap = {
-        'Fast': false,
-        'Low': 'low',
-        'Medium': 'medium',
-        'Standard': 'medium',
-        'High': 'high',
-        'xHigh': 'high'
-    };
-    const thinkParam = customThink !== null ? (customThink === 'false' || customThink === false ? false : customThink === 'true' || customThink === true ? true : customThink) : (thinkMap[thinkingLevel] !== undefined ? thinkMap[thinkingLevel] : true);
+    let thinkParam;
+    if (customThink !== null) {
+        thinkParam = (customThink === 'false' || customThink === false) ? false : (customThink === 'true' || customThink === true) ? true : customThink;
+    } else {
+        const thinkingConfig = await getModelThinkingConfig(ollamaClient, host, model);
+        thinkParam = resolveThinkingParam(thinkingConfig, thinkingLevel);
+    }
+
+    // Gemma 4 requires <|think|> in system prompt to trigger reasoning
+    if (thinkParam && model && model.toLowerCase().includes('gemma4')) {
+        const sysIdx = messages.findIndex(m => m.role === 'system');
+        if (sysIdx !== -1) {
+            if (!messages[sysIdx].content.includes('<|think|>')) {
+                messages[sysIdx].content = `<|think|>\n${messages[sysIdx].content}`;
+            }
+        } else {
+            messages.unshift({ role: 'system', content: '<|think|>' });
+        }
+    }
 
     const chatParams = {
         model: model,
@@ -82,8 +164,6 @@ export const getOllamaStream = async function* (apiKey, model, contents, systemI
             throw new DOMException('The user aborted a request.', 'AbortError');
         }
 
-        // fs.appendFileSync("OLLAMA.txt", `${JSON.stringify(chunk, null, 2)}\n`)
-
         if (chunk.message?.thinking) {
             pendingParts.push({ text: chunk.message.thinking, thought: true });
             hasNewData = true;
@@ -96,7 +176,8 @@ export const getOllamaStream = async function* (apiKey, model, contents, systemI
 
         if (chunk.done) {
             // 1. First check explicit fields returned by newer Ollama versions
-            let cachedCount = chunk.prompt_cached_count || 0;
+            let cachedCount = chunk.prompt_eval_cached_count || 0;
+            // Ollama finally started reporting cached tokens directly under `prompt_eval_cached_count`. We dont need to check '2' anymore on updated clients.
 
             // 2. Fallback to duration heuristic if explicit field is missing
             if (!cachedCount && chunk.prompt_eval_count) {
