@@ -39,7 +39,7 @@ let _spookyLines = null;
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession, sendUsageHeartbeat, sendUsageFinalize, onCodeChange } from './utils/usage.js';
-import { getModels, getDefaultModel, getFallbackValue, setCustomMultimodal, setOllamaMultimodal, isModelMultimodal, saveModelToProvider, removeModelFromProvider, renameModelInProvider, setDefaultModelForProvider, setModelMultimodalInProvider, updateModelInfoInProvider, getModelPricing } from './data/model_config.js';
+import { getModels, getDefaultModel, getFallbackValue, setCustomMultimodal, setOllamaMultimodal, isModelMultimodal, saveModelToProvider, removeModelFromProvider, renameModelInProvider, setDefaultModelForProvider, setModelMultimodalInProvider, updateModelInfoInProvider, getModelPricing, formatModelPricingText } from './data/model_config.js';
 import { setThinkingLevelMapping, getMappedThinkingLevel, removeThinkingLevelMapping } from './data/thinking_config.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
@@ -3745,13 +3745,13 @@ export default function App({ args = [] }) {
                     if (parts[1]) {
                         const rawCmdStr = parts.slice(1).join(' ');
 
-                        // Extract info flag content if present: --info "..." or -i '...' or -i {...} or bare string up to next flag
+                        // Extract price flag content if present: --price "..." or -p '...' or -p {...} or bare string up to next flag
                         let parsedPricing = null;
                         let isResetInfo = false;
                         let infoArgsStr = null;
                         let cleanedCmdStr = rawCmdStr;
 
-                        const infoRegex = /(?:^|\s)(?:--info|-i)(?:\s+(?:"([^"]*)"|'([^']*)'|\{([^}]*)\}|((?:(?!--[a-z]|-[a-z]\b).)+)))?(?=\s+--|\s+-[a-z]\b|$)/i;
+                        const infoRegex = /(?:^|\s)(?:--price|-p)(?:\s+(?:"([^"]*)"|'([^']*)'|\{([^}]*)\}|((?:(?!--[a-z]|-[a-z]\b).)+)))?(?=\s+--|\s+-[a-z]\b|$)/i;
                         const infoMatch = cleanedCmdStr.match(infoRegex);
 
                         if (infoMatch) {
@@ -3815,7 +3815,8 @@ export default function App({ args = [] }) {
                                         return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide a model ID to set as default. Example: /model my-model --default`, isMeta: true }];
                                     });
                                 } else {
-                                    const res = setDefaultModelForProvider(aiProvider, modelToDefault, isMultimodalFlag, parsedPricing);
+                                    const defaultCustomUrl = aiProvider === 'c_openai' ? systemSettings.customOpenAIBaseUrl : null;
+                                    const res = setDefaultModelForProvider(aiProvider, modelToDefault, isMultimodalFlag, parsedPricing, defaultCustomUrl);
                                     if (res.success) {
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
@@ -3840,11 +3841,14 @@ export default function App({ args = [] }) {
                                     });
                                 } else {
                                     const customUrl = aiProvider === 'c_openai' ? systemSettings.customOpenAIBaseUrl : null;
+                                    const providerDisplay = aiProvider === 'c_openai'
+                                        ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
+                                        : aiProvider.replace('c_openai', 'Custom Endpoint');
                                     const res = saveModelToProvider(aiProvider, modelToSave, isMultimodalFlag, parsedPricing, customUrl);
                                     if (res.success) {
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Saved:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m Model: \x1b[32m${modelToSave}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}${formatPricingText()}\n⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Saved:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m Model: \x1b[32m${modelToSave}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}${formatPricingText()}\n⠀`, isMeta: true }];
                                         });
                                     } else {
                                         setMessages(prev => {
@@ -3998,7 +4002,7 @@ export default function App({ args = [] }) {
                                 const providerDisplay = aiProvider === 'c_openai'
                                     ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
                                     : aiProvider.replace('c_openai', 'Custom Endpoint');
-                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m ${mod}\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${modelDisplayThinking}\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMmActive ? 'ON' : 'OFF'}\n⠀`, isMeta: true }]; });
+                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m ${mod}\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${modelDisplayThinking}\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMmActive ? 'ON' : 'OFF'}${formatModelPricingText(aiProvider, mod)}\n⠀`, isMeta: true }]; });
                             }
                         }
                     } else {
@@ -6083,7 +6087,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to Custom (OpenAI)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}\n⠀⠀\x1b[2m└─\x1b[22m Endpoint: ${systemSettings.customOpenAIBaseUrl}${systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom (OpenAI).` : ''}\n⠀`,
+                                        text: `✦ Switched to Custom (OpenAI)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${formatModelPricingText(selectedProvider, defaultModel)}\n⠀⠀\x1b[2m└─\x1b[22m Endpoint: ${systemSettings.customOpenAIBaseUrl}${systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom (OpenAI).` : ''}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -6111,7 +6115,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${displayProvName} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'Infron' || selectedProvider === 'APInex' || selectedProvider === 'xKiro' || selectedProvider === 'c_openai') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${displayProvName}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}${warningMsg}\n⠀`,
+                                        text: `✦ Switched to ${displayProvName} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${formatModelPricingText(selectedProvider, defaultModel)}${(selectedProvider === 'Ollama' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs' || selectedProvider === 'TokenHarbor' || selectedProvider === 'Infron' || selectedProvider === 'APInex' || selectedProvider === 'xKiro' || selectedProvider === 'c_openai') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${displayProvName}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}${warningMsg}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);

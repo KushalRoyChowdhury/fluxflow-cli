@@ -243,7 +243,7 @@ export const setModelMultimodalInProvider = (provider, modelId, multimodal = tru
     return { success: true };
 };
 
-export const setDefaultModelForProvider = (provider, modelId, multimodal = false, info = null) => {
+export const setDefaultModelForProvider = (provider, modelId, multimodal = false, info = null, baseUrl = null) => {
     if (!provider || !modelId) return { success: false, reason: 'Invalid provider or model ID' };
     const id = modelId.trim();
     if (!id) return { success: false, reason: 'Model ID cannot be empty' };
@@ -262,14 +262,18 @@ export const setDefaultModelForProvider = (provider, modelId, multimodal = false
 
     const existingItem = p.models.Free.find(m => (typeof m === 'string' ? m : m?.cmd) === id);
     if (!existingItem) {
+        const cleanBaseUrl = baseUrl ? String(baseUrl).trim().replace(/\/+$/, '') : null;
         const newModel = { cmd: id, multimodal: !!multimodal, desc: id };
         if (info && Object.keys(info).length > 0) newModel.info = info;
+        if (cleanBaseUrl) newModel.baseUrl = cleanBaseUrl;
         p.models.Free.push(newModel);
     } else {
         if (typeof existingItem === 'string') {
             const idx = p.models.Free.indexOf(existingItem);
+            const cleanBaseUrl = baseUrl ? String(baseUrl).trim().replace(/\/+$/, '') : null;
             const updated = { cmd: id, multimodal: !!multimodal, desc: id };
             if (info && Object.keys(info).length > 0) updated.info = info;
+            if (cleanBaseUrl) updated.baseUrl = cleanBaseUrl;
             p.models.Free[idx] = updated;
         } else {
             if (multimodal) existingItem.multimodal = true;
@@ -392,6 +396,20 @@ export const getDefaultModel = (provider, apiTier) => {
     const p = activeConfig.providers[provider];
     if (!p) return '';
     return apiTier === 'Free' ? p.default_free : p.default_paid;
+};
+
+export const formatModelPricingText = (provider, modelId) => {
+    const LINE = '\n⠀⠀\x1b[2m└─\x1b[22m ';
+    let pricing = null;
+    try {
+        pricing = provider && modelId ? getModelPricing(provider, modelId) : null;
+    } catch (e) { pricing = null; }
+    if (!pricing || (Number(pricing.IN) === 0 && Number(pricing.OUT) === 0 && Number(pricing.CR) === 0 && Number(pricing.CW) === 0)) {
+        return `${LINE}Price: \x1b[33mNot Set\x1b[0m`;
+    }
+    const parts = [`In $${pricing.IN}`, `Out $${pricing.OUT}`, `Cache $${pricing.CR}`];
+    if (Number(pricing.CW) > 0) parts.push(`Cache Write $${pricing.CW}`);
+    return `${LINE}Price: ${parts.join(', ')}`;
 };
 
 export const getModelPricing = (provider, modelId) => {
