@@ -406,6 +406,16 @@ export const applyPatches = (content, patches, options = {}) => {
         const rawReplace = (pair.replace || '').trim();
         const content_to_add = strip(pair.new || '');
 
+        // Guard: empty or whitespace-only searchContent matches every position and shreds the file
+        if (!rawReplace || rawReplace.length < 1) {
+            patchMatches.push({
+                index: i,
+                success: false,
+                error: `Block ${i + 1}: searchContent cannot be empty`
+            });
+            continue;
+        }
+
         // --- LINE-ANCHORED PATCH SUPPORT (^LINE:startLine..endLine$ or ^LINE:startLine-endLine$) ---
         if (rawReplace.startsWith('^LINE:') && rawReplace.endsWith('$')) {
             const body = rawReplace.slice(6, -1).trim();
