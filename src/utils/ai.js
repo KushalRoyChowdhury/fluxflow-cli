@@ -2328,7 +2328,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             try {
                                 lineCount = fs.readFileSync(absPath, 'utf8').split(/\r\n|\r|\n/).length;
                             } catch (e) { }
-                            if (lineCount > 300) {
+                            if (lineCount > 150) {
                                 const label = `↷  Skipped (Too Large): ${path.basename(filePath)}`;
                                 let terminalWidth = 115;
                                 if (process.stdout.isTTY) {
@@ -2342,9 +2342,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
 
                         const finalStart = startLine !== null ? startLine : 1;
-                        let finalEnd = endLine !== null ? endLine : (startLine !== null ? startLine : finalStart + 299);
-                        if (finalEnd - finalStart > 300) {
-                            finalEnd = finalStart + 300;
+                        let finalEnd = endLine !== null ? endLine : (startLine !== null ? startLine : finalStart + 149);
+                        if (finalEnd - finalStart > 200) {
+                            const label = `↷  Skipped (Too Large): ${path.basename(filePath)}`;
+                            let terminalWidth = 115;
+                            if (process.stdout.isTTY) {
+                                terminalWidth = process.stdout.columns - 5 || 120;
+                            }
+                            const boxWidth = Math.min(label.length + 4, terminalWidth);
+                            const boxMid = label.padEnd(boxWidth - 2).substring(0, boxWidth - 2);
+                            yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n`) };
+                            continue;
                         }
 
                         const argsStr = `path=${JSON.stringify(filePath)}, startLine=${finalStart}, endLine=${finalEnd}`;
