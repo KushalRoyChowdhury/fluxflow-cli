@@ -459,7 +459,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                     }
                 }
 
-                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nWrite as conventional, title + bullet description style commit message. No markdown, emojis, fluff${extraContext}`;
+                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nWrite as conventional, title + bullet description style commit message. No markdown, emojis, fluff\nCommit types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert${extraContext}`;
             } catch (err) {
                 process.exit(0);
             }
