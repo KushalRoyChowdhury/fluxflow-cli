@@ -907,12 +907,12 @@ function generateDashboardHtml() {
 
             <div class="glass-panel metric-card" style="--card-accent: var(--accent-amber);">
                 <div class="metric-header">
-                    <span class="metric-label">API Calls</span>
+                    <span class="metric-label">API Requests</span>
                     <div class="metric-icon">⚙️</div>
                 </div>
                 <div class="metric-value mono" id="m-total-requests">0</div>
                 <div class="metric-sub">
-                    <span id="m-requests-sub">0 Agent / 0 Sub-agents</span>
+                    <span id="m-requests-sub">Success Only</span>
                 </div>
             </div>
 
@@ -1261,7 +1261,15 @@ function generateDashboardHtml() {
 
         function getProviderBrandIcon(providerName, size = 20) {
             const p = (providerName || '').toLowerCase().trim();
-            if (p.includes('google') || p.includes('gemini')) {
+            if (p.includes('xkiro') || p.includes('kiro')) {
+                return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="24" height="24" rx="7" fill="#16A34A"/>
+                    <path d="M7 6.5C9.5 8 10.5 9 12 11.2C13.5 9 14.5 8 17 6.5C15 8.5 13.8 9.8 12 12.6C10.2 9.8 9 8.5 7 6.5Z" fill="#FFFFFF"/>
+                    <path d="M7 17.5C9.5 16 10.5 15 12 12.8C13.5 15 14.5 16 17 17.5C15 15.5 13.8 14.2 12 11.4C10.2 14.2 9 15.5 7 17.5Z" fill="#FFFFFF"/>
+                    <path d="M6.5 7C8 9.5 9 10.5 11.2 12C9 13.5 8 14.5 6.5 17C8.5 15 9.8 13.8 12.6 12C9.8 10.2 8.5 9 6.5 7Z" fill="#FFFFFF"/>
+                    <path d="M17.5 7C16 9.5 15 10.5 12.8 12C15 13.5 16 14.5 17.5 17C15.5 15 14.2 13.8 11.4 12C14.2 10.2 15.5 9 17.5 7Z" fill="#FFFFFF"/>
+                </svg>\`;
+            } else if (p.includes('google') || p.includes('gemini')) {
                 return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                         <linearGradient id="gg-gemini" x1="0%" y1="0%" x2="100%" y2="100%">
