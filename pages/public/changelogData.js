@@ -1,6 +1,15 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.3.0": {
+        "note": "NOVEMBER 9",
+        "added": [],
+        "changed": [
+            "Updated Ollama integration to use latest documented cache parameters & resoning configs.",
+            "Improved commit message generator (No Companion Extension update needed)."
+        ],
+        "fixes": []
+    },
     "5.2.0": {
         "note": "NOVEMBER 8",
         "added": [
