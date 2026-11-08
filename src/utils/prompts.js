@@ -580,7 +580,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
             thinkingConfig = "No thinking. Immediate response\nVerify imports, tool results & system stability"
         } else if (thinkingLevel.toLowerCase() === 'max') {
             // Hidden escape path of problem is genuinely hard enough that in "Direct resoning" it's unsolvable
-            thinkingConfig = "Effort: Max\nPlan step by step"
+            thinkingConfig = null; // Strip any harness level reasoning guidance, and rely on model resoning quality itself.
         }
     }
 
@@ -702,10 +702,9 @@ mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze
 '\n- Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary' : ''}`.trimEnd()}
 
 - OS: ${osDetected}${!isNoDev && targetModel.length > 1 ? `\n- Model: ${formattedModelName}`.trimEnd() : ''}\n- Date: ${dateTimeStr}${isMemoryEnabled && false ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}
-
--- REASONING GUIDANCE --
-${((aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini))) || forcedReasoning ? `${thinkingConfig.trimEnd()}${forcedReasoning || (thinkingLevel !== 'Fast' && (((aiProvider === 'Mistral' && thinkingLevel === 'Low') && !isGemini) || (thinkingLevel !== 'High' && !isGemini))) ? `\nCritical Thinking Policy
-Use <think_fluxflow>...</think_fluxflow> for reasoning before responding any queries` : ''}` : `${thinkingConfig.trimEnd()}`}${!keepReasoningContext ? '\nBefore actions, provide user facing summary of findings & decisions IN detail\n' : ''}
+${thinkingLevel.toLowerCase() !== 'max' && process.env.rawReasoning !== 'true' ? `\n-- REASONING GUIDANCE --
+${((aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini))) || forcedReasoning ? `${thinkingConfig.trimEnd()}\n${forcedReasoning || (thinkingLevel !== 'Fast' && (((aiProvider === 'Mistral' && thinkingLevel === 'Low') && !isGemini) || (thinkingLevel !== 'High' && !isGemini))) ? `Critical Thinking Policy
+Use <think_fluxflow>...</think_fluxflow> for reasoning before responding any queries` : ''}\n` : `${thinkingConfig.trimEnd()}`}\n` : ''}${!keepReasoningContext ? `${thinkingLevel.toLowerCase() === 'max' || process.env.rawReasoning === 'true' ? "\n-- REASONING GUIDANCE --\n" : ''}Before actions, provide user facing summary of findings & decisions IN detail\n` : ''}
 ${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec, !!systemSettings?.disableTodo, systemSettings?.preferBash !== false)}${isMemoryEnabled && false ? `\n\n-- MEMORY RULES --
 - Subtly Personalize with relevent contextual memories. Auto Saves` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential/logins/captcha screens → Tell user to complete it' : ''}${ideConnected ? '\n\nReference files as ./file:start..end' : ''}
 === END SYSTEM PROMPT ===${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n\n- Read relevant skills before tasks, scope: global/project: Use ReadFile, path=\"#skills/scope?/skillName\". In-skill references: path=\"#skills/scope?/skillName/reference-folder/*.md\"' : ''}

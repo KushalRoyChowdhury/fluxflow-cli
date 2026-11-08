@@ -3038,7 +3038,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // [SYSTEM INSTRUCTION CACHING]
                     // const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}|${!!systemSettings?.keepReasoningContext}`;
 
-                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${thinkingLevelOriginal}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}`;
+                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${thinkingLevelOriginal}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}|${process.env.rawReasoning === 'true'}`;
                     let isCacheHit = systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
                     const userHasWAYYTOOMuchMoney_GoodLuck = process.env.I_HAVE_TOO_MUCH_MONEY === "true" || process.env.I_HAVE_TOO_MUCH_MONEY === true || false;
 

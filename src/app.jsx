@@ -1453,6 +1453,10 @@ export default function App({ args = [] }) {
             setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Forced Reasoning:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
             process.env.forcedReasoning = false;
         }
+        if (process.env.rawReasoning) {
+            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Raw Reasoning:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
+            process.env.rawReasoning = false;
+        }
         if (thinkingLevel === 'xHigh' && !isFirstRender.current) {
             setThinkingLevel('Medium');
         }
@@ -2908,8 +2912,8 @@ export default function App({ args = [] }) {
                     return [...prev, { id: 'keynotice-' + Date.now(), role: 'system', text: `✦ ${msg}\n⠀`, isMeta: true }];
                 });
             });
-        } catch (e) {}
-        return () => { try { setNoticeHandler(null); } catch (e) {} };
+        } catch (e) { }
+        return () => { try { setNoticeHandler(null); } catch (e) { } };
     }, []);
 
     // Duration Watcher (Telemetry & Daemon Heartbeat)
@@ -3119,7 +3123,7 @@ export default function App({ args = [] }) {
                 if (h.length > 200) h.shift();
                 setHistoryCursor(-1);
                 historyDraftRef.current = '';
-            } catch (e) {}
+            } catch (e) { }
         }
 
         if (isProcessing) {
@@ -3618,6 +3622,7 @@ export default function App({ args = [] }) {
                         const rawArgs = parts.slice(1);
                         const isBypass = rawArgs.includes('--bypass') || rawArgs.includes('-b'); // New Alias
                         const isForce = rawArgs.includes('--force') || rawArgs.includes('-f'); // New Alias
+                        const isRaw = rawArgs.includes('--raw') || rawArgs.includes('-r'); // New Alias
 
                         // Check for --map flag (e.g. /thinking Standard --map high or /thinking Standard --map 8192)
                         const mapIdx = rawArgs.findIndex(a => a === '--map' || a === '-m');
@@ -3720,6 +3725,16 @@ export default function App({ args = [] }) {
                                 forceMsg = '⠀⠀\x1b[2m└─\x1b[22m --force is not supported in this context.\n⠀';
                             }
                             process.env.forcedReasoning = 'true';
+                            process.env.rawReasoning = 'false';
+                        } else if (isRaw) {
+                            if (process.env.rawReasoning !== 'true') {
+                                forceMsg = '⠀⠀\x1b[2m└─\x1b[22m Enabled Raw Reasoning.\n⠀';
+                                process.env.rawReasoning = 'true';
+                                process.env.forcedReasoning = 'false';
+                            } else {
+                                forceMsg = '⠀⠀\x1b[2m└─\x1b[22m Disabled Raw Reasoning.\n⠀';
+                                process.env.rawReasoning = 'false';
+                            }
                         }
 
                         // Strict Mode Validation
@@ -6073,7 +6088,7 @@ export default function App({ args = [] }) {
                                 }
 
                                 const effectiveKey = key || '';
-                                try { clearAllTempKeys(); } catch (e) {}
+                                try { clearAllTempKeys(); } catch (e) { }
                                 setAiProvider(selectedProvider);
                                 setApiKey(effectiveKey);
                                 initAI(effectiveKey, { aiProvider: selectedProvider, onIDEApproval: resetPendingApproval });
@@ -6096,7 +6111,7 @@ export default function App({ args = [] }) {
                             }
 
                             if (key) {
-                                try { clearAllTempKeys(); } catch (e) {}
+                                try { clearAllTempKeys(); } catch (e) { }
                                 setAiProvider(selectedProvider);
                                 setApiKey(key);
                                 initAI(key, { aiProvider: selectedProvider, onIDEApproval: resetPendingApproval });
