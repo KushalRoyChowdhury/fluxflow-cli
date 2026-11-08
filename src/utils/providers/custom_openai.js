@@ -197,6 +197,21 @@ export const getCustomOpenAIStream = async function* (apiKey, model, contents, s
     let lastFlushTime = Date.now();
     let hasNewData = false;
 
+    // Buffer early content chunks briefly to catch any late-arriving reasoning packets from custom endpoints
+    let bufferedContentParts = [];
+    let contentHoldChunks = 0;
+    const CONTENT_HOLD_THRESHOLD = 5;
+    let isHoldingContent = true;
+
+    const flushContentHold = () => {
+        if (bufferedContentParts.length > 0) {
+            pendingParts.push(...bufferedContentParts);
+            bufferedContentParts = [];
+            hasNewData = true;
+        }
+        isHoldingContent = false;
+    };
+
     // Helper to safely extract reasoning/thinking across different model APIs
     const extractThought = (delta, choiceObj) => {
         if (!delta && !choiceObj) return null;
@@ -275,6 +290,7 @@ export const getCustomOpenAIStream = async function* (apiKey, model, contents, s
     while (true) {
         const { done, value } = await reader.read();
         if (done) {
+            flushContentHold();
             if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
                 yield {
                     candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
@@ -294,6 +310,7 @@ export const getCustomOpenAIStream = async function* (apiKey, model, contents, s
             let isDone = false;
             if (cleanLine === 'data: [DONE]' || cleanLine === 'data: [DONE]\r') {
                 isDone = true;
+                flushContentHold();
             } else {
                 try {
                     const json = JSON.parse(cleanLine.substring(6));
@@ -323,8 +340,16 @@ export const getCustomOpenAIStream = async function* (apiKey, model, contents, s
 
                     const contentText = extractContent(delta, choice);
                     if (contentText) {
-                        pendingParts.push({ text: contentText });
-                        hasNewData = true;
+                        if (isHoldingContent) {
+                            bufferedContentParts.push({ text: contentText });
+                            contentHoldChunks++;
+                            if (contentHoldChunks >= CONTENT_HOLD_THRESHOLD) {
+                                flushContentHold();
+                            }
+                        } else {
+                            pendingParts.push({ text: contentText });
+                            hasNewData = true;
+                        }
                     }
                 } catch (e) {
                     if (e.message && e.message.startsWith('Custom OpenAI Stream Error:')) {
