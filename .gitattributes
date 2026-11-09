@@ -1,0 +1,35 @@
+# === Line Endings: Normalize to LF in repo ===
+* text=auto
+
+# Force LF for source files
+*.js  text eol=lf
+*.jsx text eol=lf
+*.ts  text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.md  text eol=lf
+*.svg text eol=lf
+
+# Force CRLF for Windows scripts
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# === Binary Files ===
+*.png  binary
+*.ico  binary
+*.onnx binary merge=ours
+*.vsix binary merge=ours
+*.woff2 binary
+*.woff binary
+
+# Disable auto-detect for known binaries
+*.exe -text
+*.dll -text
+
+# === Language-specific diff (optional) ===
+# Need `git diff --word-diff` or a JSON diff driver
+# *.json diff=json
