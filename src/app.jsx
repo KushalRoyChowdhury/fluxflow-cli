@@ -1,4 +1,5 @@
 import os from 'os';
+import crypto from 'crypto';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Text, useInput, useStdout, Static } from 'ink';
 import Spinner from 'ink-spinner';
@@ -4530,10 +4531,10 @@ export default function App({ args = [] }) {
                     setMessages(prev => {
                         const updatedMessages = prev.map(m => {
                             const fullTextStr = m.fullText || m.text || '';
-                            if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
+                            if (!fullTextStr.startsWith('[ACTION RESULT]: ') && !fullTextStr.startsWith('[TOOL RESULT]: ')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || fullTextStr.includes('...Old result truncated to save tokens')) {
+                            if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || fullTextStr.includes('[ACTION RESULT]: ...Old result truncated to save tokens')) {
                                 return m;
                             }
                             truncatedCount++;
@@ -5325,12 +5326,69 @@ export default function App({ args = [] }) {
                                 setMessages(prev => {
                                     const updatedMessages = prev.map(m => {
                                         const fullTextStr = m.fullText || m.text || '';
-                                        if (!fullTextStr.startsWith('[ACTION RESULT]:') && !fullTextStr.startsWith('[TOOL RESULT]:')) {
+                                        if (!fullTextStr.startsWith('[ACTION RESULT]: ') && !fullTextStr.startsWith('[TOOL RESULT]: ')) {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('...Old result truncated to save tokens') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || /^\[ACTION RESULT\]: File \[.*?\] saved/s.test(fullTextStr)) {
+                                        if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('[ACTION RESULT]: ...Old result truncated') || fullTextStr.includes('[ACTION RESULT]: Diff result ') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || /^\[ACTION RESULT\]: File \[.*?\] saved/s.test(fullTextStr)) {
                                             return m;
                                         }
+
+                                        if (systemSettings?.overwriteProtection !== false) {
+                                            const fileUpdateMatch = fullTextStr.match(/^\[ACTION RESULT\]:\s*File\s*\[(.*?)\]\s*updated(?:\s+with\s+some\s+blocks\s+failed)?\.\s*(?:\[(\d+\/\d+)\]\s*blocks\s*applied\.)?([\s\S]*)$/);
+                                            if (fileUpdateMatch) {
+                                                try {
+                                                    const rawFilePath = fileUpdateMatch[1];
+                                                    const blocksInfo = fileUpdateMatch[2] || '';
+                                                    const rawDiffBody = fileUpdateMatch[3] || '';
+                                                    const fileName = path.basename(rawFilePath);
+
+                                                    let polished = rawDiffBody.replace('[DIFF_START]', '');
+                                                    polished = polished.replace(/\[DIFF_END\](?=[^\[]*$)/, '');
+                                                    polished = polished
+                                                        .split(/\r?\n/)
+                                                        .filter(line => {
+                                                            const trimmed = line.trim();
+                                                            return trimmed.startsWith('-') || trimmed.startsWith('+') || trimmed.startsWith('@@');
+                                                        })
+                                                        .join('\n')
+                                                        .trim();
+
+                                                    let totalAdded = 0;
+                                                    let totalRemoved = 0;
+                                                    const hunkHeaderMatches = rawDiffBody.matchAll(/@@\s*([^@]+?)\s*@@/g);
+                                                    for (const match of hunkHeaderMatches) {
+                                                        const headerContent = match[1];
+                                                        const addMatch = headerContent.match(/\+(\d+)/);
+                                                        const removeMatch = headerContent.match(/-(\d+)/);
+                                                        if (addMatch) totalAdded += parseInt(addMatch[1], 10);
+                                                        if (removeMatch) totalRemoved += parseInt(removeMatch[1], 10);
+                                                    }
+
+                                                    const changeParts = [];
+                                                    if (totalAdded > 0) changeParts.push(`+${totalAdded}`);
+                                                    if (totalRemoved > 0) changeParts.push(`-${totalRemoved}`);
+                                                    const changedCount = changeParts.length > 0 ? ` Total ${changeParts.join(' ')} changes.` : '';
+
+                                                    const backupDir = path.join(DATA_DIR, 'DiffBackups');
+                                                    fs.ensureDirSync(backupDir);
+                                                    const timeSuffix = String(Date.now()).slice(-5);
+                                                    const randomHash = crypto.randomBytes(2).toString('hex');
+                                                    const backupFileName = `${fileName}-diff-${timeSuffix}-${randomHash}.txt`;
+                                                    const backupFilePath = path.join(backupDir, backupFileName);
+                                                    fs.writeFileSync(backupFilePath, polished, 'utf8');
+
+                                                    const displayBackupPath = `${DATA_DIR.replaceAll('\\', '/').replace(os.homedir().replaceAll('\\', '/'), '~')}/DiffBackups/${backupFileName}`;
+                                                    const blocksSuffix = blocksInfo ? ` ${blocksInfo} blocks.` : '';
+                                                    return {
+                                                        ...m,
+                                                        fullText: `[ACTION RESULT]: Diff result ${fileName} saved in '${displayBackupPath}'.${blocksSuffix}${changedCount}`
+                                                    };
+                                                } catch (err) {
+                                                    // Fallback to default truncation if file save fails
+                                                }
+                                            }
+                                        }
+
                                         return {
                                             ...m,
                                             fullText: '[ACTION RESULT]: ...Old result truncated to save tokens'

@@ -14,6 +14,7 @@ import { parseArgs } from './arg_parser.js';
 import { fileURLToPath } from 'url';
 import path, { normalize } from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { view_file } from '../tools/view_file.js';
 import { emojiSpace } from './terminal.js';
@@ -5102,12 +5103,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                 fs.mkdirSync(bakDir, { recursive: true });
                                                             } catch (e) { }
                                                         }
-                                                        const bakName = `${parsedPath.name}-old-${Date.now()}${parsedPath.ext}.bak`;
+                                                        const timeSuffix = String(Date.now()).slice(-5);
+                                                        const randomHash = crypto.randomBytes(2).toString('hex');
+                                                        const bakName = `${parsedPath.name}-old-${timeSuffix}-${randomHash}${parsedPath.ext}.bak`;
                                                         const bakPath = path.join(bakDir, bakName);
                                                         try {
                                                             fs.writeFileSync(bakPath, originalContentForReporting, 'utf8');
                                                         } catch (e) { }
-                                                        ancestry = `Old File contents:\n- Renamed old file as ${bakPath} and written requested content in ${filePath}. For reversal use Run\n\n`;
+                                                        ancestry = `Old File contents:\n- Renamed old file as ${bakPath.replaceAll('\\', '/').replace(os.homedir().replaceAll('\\', '/'), '~') } and written requested content in ${filePath}. For reversal use Run\n\n`;
                                                     }
                                                 }
 

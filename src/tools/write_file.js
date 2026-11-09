@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { parseArgs } from '../utils/arg_parser.js';
 import { RevertManager } from '../utils/revert.js';
 import { loadSettings } from '../utils/settings.js';
@@ -53,10 +54,12 @@ export const write_file = async (args, context = {}) => {
                     if (!fs.existsSync(bakDir)) {
                         fs.mkdirSync(bakDir, { recursive: true });
                     }
-                    const bakName = `${parsedPath.name}-old-${Date.now()}${parsedPath.ext}.bak`;
+                    const timeSuffix = String(Date.now()).slice(-5);
+                    const randomHash = crypto.randomBytes(2).toString('hex');
+                    const bakName = `${parsedPath.name}-old-${timeSuffix}-${randomHash}${parsedPath.ext}.bak`;
                     const bakPath = path.join(bakDir, bakName);
                     fs.copyFileSync(absolutePath, bakPath);
-                    ancestry = `Old File contents:\n- Renamed old file as ${bakPath} and written requested content in ${targetPath}. For reversal use Run\n\n`;
+                    ancestry = `Old File contents:\n- Renamed old file as ${bakPath.replaceAll('\\', '/').replace(os.homedir().replaceAll('\\', '/'), '~')} and written requested content in ${targetPath}. For reversal use Run\n\n`;
                 }
             } catch (e) {
                 ancestry = `[Note: Could not read existing file for reversal reference]\n\n`;
