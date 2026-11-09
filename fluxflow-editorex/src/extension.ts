@@ -98,13 +98,23 @@ function restoreTerminalFocus(): void {
 }
 
 /**
- * Heuristic: is the terminal the currently focused view?
- * (No official VS Code API for terminal focus, so we infer from
- *  activeTextEditor === undefined + activeTerminal !== undefined.)
+ * Checks if the FluxFlow terminal is currently focused.
+ * If a different terminal (e.g. bash, zsh, node) is focused, returns false.
  */
 function isTerminalLikelyFocused(): boolean {
-    return vscode.window.activeTextEditor === undefined
-        && vscode.window.activeTerminal !== undefined;
+    // 1. If we have a direct handle on the FluxFlow terminal, check if it's focused
+    if (fluxFlowTerminal) {
+        return !!(fluxFlowTerminal as any)?.state?.isFocused;
+    }
+
+    // 2. If fluxFlowTerminal handle hasn't been set yet, check if the currently active
+    // terminal is the 'FluxFlow' terminal and is focused
+    const active = vscode.window.activeTerminal;
+    if (active && active.name === 'FluxFlow') {
+        return !!(active as any)?.state?.isFocused;
+    }
+
+    return false;
 }
 
 const lastKnownStates = new Map<string, string>();
@@ -1940,18 +1950,40 @@ async function handleMessage(message: any, ws?: WebSocket) {
     // Use absolute path
     const uri = vscode.Uri.file(filePath);
 
+    // Snapshot focus state BEFORE opening docs/diffs so we don't steal focus unexpectedly
+    const terminalWasFocused = isTerminalLikelyFocused();
+
     try {
         if (command === 'open') {
             const doc = await vscode.workspace.openTextDocument(uri);
-            await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
             lastKnownStates.set(doc.fileName, doc.getText());
-            restoreTerminalFocus();
+
+            if (terminalWasFocused) {
+                // Terminal was focused: reveal file as active editor, keep keyboard in terminal
+                await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
+                restoreTerminalFocus();
+            } else {
+                // Terminal was NOT focused (user was working in editor):
+                // Keep the current active file active (don't switch away to the newly opened file)
+                const currentEditor = vscode.window.activeTextEditor;
+                if (currentEditor && currentEditor.document.uri.toString() !== uri.toString()) {
+                    await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
+                    await vscode.window.showTextDocument(currentEditor.document, {
+                        viewColumn: currentEditor.viewColumn,
+                        preserveFocus: false
+                    });
+                } else if (!currentEditor) {
+                    await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
+                }
+            }
         }
         else if (command === 'diff') {
             lastDiffTimestamp = Date.now();
             const doc = await vscode.workspace.openTextDocument(uri);
-            await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
-            restoreTerminalFocus();
+            await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: terminalWasFocused });
+            if (terminalWasFocused) {
+                restoreTerminalFocus();
+            }
         }
         else if (command === 'showDiff') {
             // Handle new file creation placeholder
@@ -1986,12 +2018,14 @@ async function handleMessage(message: any, ws?: WebSocket) {
                 });
             }
 
-            // Open diff with preserveFocus: true
+            // Open diff viewer:
+            // - If terminal was focused: preserveFocus: true & restore terminal focus so keyboard stays in terminal
+            // - If terminal was NOT focused: preserveFocus: false so keyboard focus shifts to diff viewer
             await vscode.commands.executeCommand('vscode.diff',
                 virtualUri,
                 uri,
                 `${path.basename(filePath)} (Original) ↔ Modified (AI)`,
-                { preserveFocus: true }
+                { preserveFocus: terminalWasFocused }
             );
 
             // Ensure inline diff mode without modifying user's persistent settings
@@ -2000,7 +2034,9 @@ async function handleMessage(message: any, ws?: WebSocket) {
                 await vscode.commands.executeCommand('toggle.diff.renderSideBySide');
             }
 
-            restoreTerminalFocus();
+            if (terminalWasFocused) {
+                restoreTerminalFocus();
+            }
         }
         else if (command === 'save') {
             const doc = await vscode.workspace.openTextDocument(uri);
