@@ -78,6 +78,10 @@ export const emergency_rollback = async (args, context = {}) => {
         if (!id) {
             return "ERROR: Missing required parameter 'id' for forceRevert.";
         }
+        // Alias: 'turn_0' is accepted as shorthand for the very first checkpoint ('initial')
+        if (id === 'turn_0') {
+            id = 'initial';
+        }
         try {
             const result = await AdvanceRevertManager.rollbackToCheckpoint(chatId, id);
             const { checkpointId, stats } = result;
