@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Text, useInput, useStdout, Static } from 'ink';
 import Spinner from 'ink-spinner';
 import fs from 'fs-extra';
+import { minimatch } from 'minimatch';
 import path from 'path';
 import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
@@ -5030,13 +5031,40 @@ export default function App({ args = [] }) {
 
                                     const matchesCmdList = (cmd, csv) => {
                                         if (!csv) return false;
-                                        const list = csv.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
                                         const lower = cmd.toLowerCase();
+                                        const hasGlob = /[*?]/.test(csv);
+                                        const list = csv.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                                        if (hasGlob) {
+                                            // Glob patterns: test full command and binary/args tokens
+                                            return list.some(item => {
+                                                if (!/[*?]/.test(item)) {
+                                                    // literal entry inside glob list -> fall back to prefix rule
+                                                    if (lower === item) return true;
+                                                    if (lower.startsWith(item)) {
+                                                        return /\s|[;&|/]/.test(lower.charAt(item.length));
+                                                    }
+                                                    return false;
+                                                }
+                                                try {
+                                                    if (minimatch(lower, item, { dot: true, nocase: true })) return true;
+                                                    // token-glob: match binary + first args, e.g. 'echo *rm*' against 'echo "rm" x'
+                                                    const tokens = lower.match(/"[^"]*"|'[^']*'|\S+/g) || [];
+                                                    const tokenJoins = [
+                                                        tokens.join(' '),
+                                                        tokens.slice(0, 3).join(' '),
+                                                        tokens.slice(1).join(' ') // skip binary, match arguments
+                                                    ];
+                                                    return tokenJoins.some(j => j && minimatch(j, item, { dot: true, nocase: true }));
+                                                } catch (e) {
+                                                    return false;
+                                                }
+                                                return false;
+                                            });
+                                        }
                                         return list.some(item => {
                                             if (lower === item) return true;
                                             if (lower.startsWith(item)) {
-                                                const nextChar = lower.charAt(item.length);
-                                                return /\s|[;&|/]/.test(nextChar);
+                                                return /\s|[;&|/]/.test(lower.charAt(item.length));
                                             }
                                             return false;
                                         });

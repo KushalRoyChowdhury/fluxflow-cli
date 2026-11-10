@@ -175,12 +175,7 @@ export const matchesPathPattern = (filePath, patternCsv) => {
         .map(p => p.trim())
         .filter(Boolean);
 
-    let minimatchFn = null;
-    try {
-        // dynamic require / import fallback or standard import
-        const mm = (typeof minimatch !== 'undefined') ? minimatch : null;
-        if (mm) minimatchFn = mm;
-    } catch (e) {}
+    const minimatchFn = minimatch;
 
     for (const pat of patterns) {
         const cleanPat = pat.replace(/\\/g, '/');
