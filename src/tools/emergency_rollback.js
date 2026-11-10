@@ -8,7 +8,7 @@ import { AdvanceRevertManager } from '../utils/advanceRevert.js';
 export const emergency_rollback = async (args, context = {}) => {
     const parsed = parseArgs(args);
     const method = parsed.method;
-    const id = parsed.id;
+    let id = parsed.id;
     const chatId = context.chatId;
     const systemSettings = context.systemSettings;
 
