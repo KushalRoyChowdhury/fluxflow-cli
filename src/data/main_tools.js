@@ -121,7 +121,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
 - ReadFolder(path=string, recurse?=int[1..3])
 - PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Anchor: ^LINE:...$ syntax, must for large blocks &  escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
-- CodeSearch(keyword=string, path?="file/glob, inclusion !exclusion ;-separated", regex?=bool:auto)
+- CodeSearch(keyword=string, path?="file/glob, inclusion !exclusion ;-separated"). Regex auto detected
 - ${runSignature}. ${runDesc}. Destructive command → Ask user${!disableTodo ? `\n- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. get + markDone marks complete` : ''}
 ${_cachedAdvanceRollback ? `
 **Emergency**
@@ -166,8 +166,8 @@ ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : "
 - AskUser(question=string, optionA?="title::description", ...MAX4). Mid task Ambiguity Resolution
 
 **Web**
-- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). For unknown topics, time sensitive, fact checking
-- WebScrape(url=string). JS supported
+- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). For unknown topic, time sensitive, fact/docs checking
+- WebScrape(url=string)
 
 ${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();
 };

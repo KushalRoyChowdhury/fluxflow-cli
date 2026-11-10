@@ -6186,11 +6186,11 @@ Rules:
 ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web**
-- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). For unknown topics, time sensitive, fact checking
-- WebScrape(url=string). JS supported
+- WebSearch(query=string, aiMode?=bool:false, limit?=int[3..10]). For unknown topic, time sensitive, fact/docs checking
+- WebScrape(url=string)
 
 **Workspace**
-- CodeSearch(keyword=string, path?="file/glob, inclusion !exclusion ;-separated", regex?=bool:auto)
+- CodeSearch(keyword=string, path?="file/glob, inclusion !exclusion ;-separated"). Regex auto detected
 - ReadFolder(path=string, recurse?=int[1..3])
 - FindFile(basename=string)
 - ReadFile(path=string, startLine?=int, endLine?=int)
