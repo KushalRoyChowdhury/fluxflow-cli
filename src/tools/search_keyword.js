@@ -232,9 +232,17 @@ export const search_keyword = async (args) => {
     let regexPattern = null; // used for regex mode
     let wordRegex = null;    // used for normal (whole-word) mode
 
+    // Helper to build word-boundary regex only on sides that actually start/end with a word character
+    const buildWordRegex = (kw) => {
+        const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const leadingBoundary = /^\w/.test(kw) ? '(?<![\\w])' : '';
+        const trailingBoundary = /\w$/.test(kw) ? '(?![\\w])' : '';
+        return new RegExp(`${leadingBoundary}${escaped}${trailingBoundary}`, 'i');
+    };
+
     if (regexExplicitlyFalse) {
         if (!isFuzzy) {
-            wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i');
+            wordRegex = buildWordRegex(keyword);
         }
     } else {
         // If regex is not explicitly false (default or explicit true), search both regex & normal whole-word unless regex fails
@@ -249,7 +257,7 @@ export const search_keyword = async (args) => {
             }
             // If regex auto-failed and wasn't explicitly requested as true, fall back gracefully
         }
-        wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i');
+        wordRegex = buildWordRegex(keyword);
     }
 
     const excludes = Array.from(new Set([
