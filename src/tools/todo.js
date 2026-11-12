@@ -12,7 +12,7 @@ import { RevertManager } from '../utils/revert.js';
  * [tool:functions.Todo(method="create/append/get", tasks=["task 1", "task 2"], markDone=["task 1"])]
  */
 export const todo = async (args, context = {}) => {
-    const { method, tasks, markDone } = parseArgs(args);
+    const { method, tasks, markDone } = parseArgs(args, ['method', 'tasks', 'markDone']);
     const chatId = context.chatId || 'default';
 
     if (!method) return 'ERROR: Missing "method" argument for Goal tool (create/append/get).';

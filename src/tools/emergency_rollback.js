@@ -6,7 +6,7 @@ import { AdvanceRevertManager } from '../utils/advanceRevert.js';
  * Allows reverting the repository to a previous turn's state.
  */
 export const emergency_rollback = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['method', 'id']);
     const method = parsed.method;
     let id = parsed.id;
     const chatId = context.chatId;

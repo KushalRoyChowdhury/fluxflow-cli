@@ -82,7 +82,7 @@ const injectPngMetadata = (buffer, metadata = {}) => {
  * Generates an image based on the provided prompt and active quality/key settings.
  */
 export const generate_image = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['prompt', 'text', 'path', 'outputPath', 'output', 'ratio']);
     const prompt = parsed.prompt || parsed.text;
     const outputPath = parsed.path || parsed.outputPath || parsed.output || 'generated_image.png';
     const ratio = parsed.ratio;

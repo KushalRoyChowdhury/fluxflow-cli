@@ -5,7 +5,7 @@ import { parseArgs } from '../utils/arg_parser.js';
  * Prompts the user with a question and multiple-choice options.
  */
 export const ask_user = async (args, context) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['question']);
     const { question } = parsed;
 
     if (!question) return 'ERROR: Missing "question" argument for ask.';

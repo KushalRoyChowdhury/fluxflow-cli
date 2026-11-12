@@ -6,7 +6,7 @@ import { executeKeyboardAction } from '../utils/computer_use.js';
  * Accepts text to type into active window/element.
  */
 export const keyboard_typing = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['text', 'input', 'value', 'autoPressEnter']);
     const text = parsed.text || parsed.input || parsed.value || '';
     const autoPressEnter = parsed.autoPressEnter === true || parsed.autoPressEnter === 'true' || parsed.enter === true || parsed.enter === 'true';
 

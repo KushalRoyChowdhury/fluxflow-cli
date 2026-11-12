@@ -7,7 +7,7 @@ import { captureGriddedScreenshot } from '../utils/screen_grid.js';
  * @param {string|Object} args - Arguments containing optional canvasMode (boolean, default: false).
  */
 export const recapture_screen = async (args, context = {}) => {
-    const parsed = typeof args === 'string' ? parseArgs(args) : (args || {});
+    const parsed = typeof args === 'string' ? parseArgs(args, ['canvasMode', 'canvas_mode']) : (args || {});
     const canvasMode = parsed.canvasMode === true || parsed.canvasMode === 'true' || parsed.canvas_mode === true || parsed.canvas_mode === 'true';
 
     try {

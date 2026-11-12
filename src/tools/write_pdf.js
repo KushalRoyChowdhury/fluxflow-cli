@@ -16,7 +16,7 @@ export const write_pdf = async (args) => {
         content,
         orientation = 'portrait',
         margin = '0px'
-    } = parseArgs(args);
+    } = parseArgs(args, ['path', 'content', 'orientation', 'margin']);
 
     if (!targetPath) return 'ERROR: Missing "path" argument for write_pdf.';
     if (!content) return 'ERROR: Missing "content" (HTML/CSS) for write_pdf.';

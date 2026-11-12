@@ -12,7 +12,7 @@ import { resolvePathWithTilde } from '../utils/paths.js';
  * Replaces a specific block of text with new content.
  */
 export const update_file = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['path', 'allowMultiple', 'searchContent*', 'replaceContent*', 'newContent*']);
     let targetPath = parsed.path;
 
     if (!targetPath) return 'ERROR: Missing "path" argument for PatchFile.';

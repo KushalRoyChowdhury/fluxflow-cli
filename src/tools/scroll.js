@@ -6,7 +6,7 @@ import { executeMouseAction } from '../utils/computer_use.js';
  * Accepts direction ("up" or "down"), amount (integer scroll steps or px), and optional gridId/target to hover before scrolling.
  */
 export const scroll = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['direction', 'amount', 'gridId', 'grid', 'coordinate', 'target', 'id']);
     const direction = (parsed.direction || 'down').toLowerCase();
     const amount = parsed.amount ? parseInt(parsed.amount, 10) : 6;
     const gridId = parsed.gridId || parsed.grid || parsed.coordinate || parsed.target || parsed.id || null;

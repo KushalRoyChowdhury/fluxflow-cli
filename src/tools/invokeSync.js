@@ -2,7 +2,7 @@ import { parseArgs } from '../utils/arg_parser.js';
 
 export const invokeSync = async (args, context = {}) => {
     const { runSubagent } = await import('../utils/ai.js');
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['task', 'instruction', 'prompt', 'model', 'tools']);
     const task = parsed.task || parsed.instruction || parsed.prompt;
     const model = parsed.model || null;
     const toolsRaw = parsed.tools || null;

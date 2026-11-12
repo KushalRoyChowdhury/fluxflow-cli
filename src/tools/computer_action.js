@@ -6,7 +6,7 @@ import { executeMouseAction, executeKeyboardAction } from '../utils/computer_use
  * Allows the agent to control mouse cursor and keyboard based on 720p gridded vision feedback.
  */
 export const computer_action = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['action', 'type', 'cmd', 'target', 'grid', 'gridCode', 'location', 'input', 'button', 'clickType', 'from', 'to', 'direction', 'amount', 'autoPressEnter', 'enter', 'text', 'keys']);
     const action = parsed.action || parsed.type || parsed.cmd;
     const target = parsed.target || parsed.grid || parsed.gridCode || parsed.location || parsed.input;
 

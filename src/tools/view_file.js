@@ -136,7 +136,7 @@ const findSkillSubFile = (skillDir, subPath) => {
  * Reads a file, optionally within a specific line range.
  */
 export const view_file = async (args, context = {}) => {
-    let { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(args);
+    let { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(args, ['path', 'StartLine', 'EndLine', 'start_line', 'end_line', 'startLine', 'endLine']);
 
     // Normalize argument names and apply dynamic paging logic
     const sLine = parseInt(StartLine || start_line || startLine);

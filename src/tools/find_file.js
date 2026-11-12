@@ -70,7 +70,7 @@ async function scanFiles(dir, excludesSet, baseDir = dir, depth = 1, maxDepth = 
  * Finds all matching files across the CWD using exact, glob, substring, and bigram (>= 0.4 score) matches.
  */
 export const find_file = async (args) => {
-    let parsed = typeof args === 'object' && args !== null ? args : parseArgs(args);
+    let parsed = typeof args === 'object' && args !== null ? args : parseArgs(args, ['basename', 'name', 'path', 'file', 'filename', 'query', 'directory']);
     let target = parsed.basename || parsed.name || parsed.path || parsed.file || parsed.filename || parsed.query;
 
     if (!target && typeof args === 'string' && args.trim()) {

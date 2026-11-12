@@ -551,7 +551,7 @@ export const adjustWindowsCommand = (command, usePowerShell = false) => {
 };
 
 export const exec_command = async (args, options = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['command', 'usePowershell', 'forcePowershell', 'useCwd', 'useCmd', 'forceCwd', 'forceCmd']);
     const rawCommand = parsed.command;
     const { onChunk } = options;
 

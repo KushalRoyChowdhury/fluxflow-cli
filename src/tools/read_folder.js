@@ -60,7 +60,7 @@ const formatMtime = (d) => {
  * Provides detailed statistics for files in a directory, with optional recursion up to depth 3.
  */
 export const read_folder = async (args) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['path', 'recurse']);
     let rawPath = parsed.path || null;
 
     if (!rawPath) {

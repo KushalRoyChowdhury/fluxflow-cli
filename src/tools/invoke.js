@@ -4,7 +4,7 @@ import fs from 'fs';
 
 export const invoke = async (args, context = {}) => {
     const { runSubagent } = await import('../utils/ai.js');
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['task', 'instruction', 'prompt', 'model', 'title', 'tools']);
     const task = parsed.task || parsed.instruction || parsed.prompt;
     const model = parsed.model || null;
     const title = parsed.title || null;

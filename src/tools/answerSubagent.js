@@ -2,7 +2,7 @@ import { subagentProgress } from '../utils/subagent_state.js';
 import { parseArgs } from '../utils/arg_parser.js';
 
 export const answerSubagent = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['id', 'answer', 'response']);
     const id = parsed.id;
     const answer = parsed.answer || parsed.response;
 

@@ -2,7 +2,7 @@ import { subagentProgress } from '../utils/subagent_state.js';
 import { parseArgs } from '../utils/arg_parser.js';
 
 export const awaitSubagent = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['id', 'timeout', 'time']);
     const id = parsed.id;
     let timeoutSec = parseInt(parsed.timeout || parsed.time || '120', 10);
     if (isNaN(timeoutSec) || timeoutSec <= 0) timeoutSec = 120;

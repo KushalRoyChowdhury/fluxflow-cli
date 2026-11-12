@@ -205,7 +205,7 @@ function fuzzyMatch(line, keyword) {
  * @param {boolean} [regex=false]    - When true, treats keyword as a regex pattern (case-insensitive).
  */
 export const search_keyword = async (args) => {
-    const { keyword: rawKeyword, path: pathArgRaw, fuzzy, subString, regex } = parseArgs(args);
+    const { keyword: rawKeyword, path: pathArgRaw, fuzzy, subString, regex } = parseArgs(args, ['keyword', 'path']);
     if (rawKeyword === undefined || rawKeyword === null) return 'ERROR: Missing "keyword" argument.';
     const keyword = String(rawKeyword);
 

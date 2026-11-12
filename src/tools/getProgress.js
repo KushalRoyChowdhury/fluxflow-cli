@@ -3,7 +3,7 @@ import { parseArgs } from '../utils/arg_parser.js';
 import fs from 'fs';
 
 export const getProgress = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['id']);
     const id = parsed.id;
 
     if (!id) {

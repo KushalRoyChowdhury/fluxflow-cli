@@ -6,7 +6,7 @@ import { executeMouseAction } from '../utils/computer_use.js';
  * Accepts fromGridId and toGridId.
  */
 export const drag = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['fromGridId', 'from', 'start', 'toGridId', 'to', 'end']);
     const fromGridId = parsed.fromGridId || parsed.from || parsed.start;
     const toGridId = parsed.toGridId || parsed.to || parsed.end;
 

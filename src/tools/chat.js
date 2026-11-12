@@ -6,7 +6,7 @@ import { parseArgs } from '../utils/arg_parser.js';
  * Updates the title of the current session surgically.
  */
 export const chat = async (rawArgs, context = {}) => {
-    const title = parseArgs(rawArgs).title;
+    const title = parseArgs(rawArgs, ['title']).title;
     // High-fidelity identity fallback
     const chatId = context.chatId || context.sessionId;
 

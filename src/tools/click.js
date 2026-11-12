@@ -325,7 +325,7 @@ async function getCachedSnapOpts() {
  * Accepts gridId, click type, mouse button, and optional intendedClickText for OCR verification.
  */
 export const click = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['gridId', 'grid', 'coordinate', 'target', 'id', 'type', 'clickType', 'button', 'intendedClickText', 'text', 'ocrCorrection', 'useOCR', 'words', 'lines']);
     const gridId = parsed.gridId || parsed.grid || parsed.coordinate || parsed.target || parsed.id;
     const type = (parsed.type || parsed.clickType || 'single').toLowerCase();
     const button = (parsed.button || 'left').toLowerCase();

@@ -195,7 +195,7 @@ function traverse(node, depth = 0, isLast = true, prefix = '', parentName = null
 export const file_map = async (args) => {
     let filePath;
     try {
-        const parsed = parseArgs(args);
+        const parsed = parseArgs(args, ['path']);
         filePath = parsed.path;
     } catch (e) {
         return `ERROR: Failed to parse arguments: ${args}`;

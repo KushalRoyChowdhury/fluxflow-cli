@@ -2,7 +2,7 @@ import { subagentProgress } from '../utils/subagent_state.js';
 import { parseArgs } from '../utils/arg_parser.js';
 
 export const steerSubagent = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['id', 'message', 'instruction', 'text', 'prompt']);
     const id = parsed.id;
     const message = parsed.message || parsed.instruction || parsed.text || parsed.prompt;
 

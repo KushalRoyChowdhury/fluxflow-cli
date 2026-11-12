@@ -3886,7 +3886,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools & Search)
                                 let detail = null;
                                 if (['write_file', 'update_file', 'view_file', 'read_folder', 'find_file', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map', 'invoke', 'invoke_sync', 'get_progress', 'await', 'wait', 'answer'].includes(potentialTool)) {
-                                    const pArgs = parseArgs(partialArgs);
+                                    const pArgs = parseArgs(partialArgs, ['basename', 'name', 'path', 'targetFile', 'directory', 'file', 'keyword', 'title', 'task', 'id', 'taskId', 'timeout', 'time', 'seconds', 'sec']);
                                     const filePath = pArgs.basename || pArgs.name || pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory || pArgs.file;
                                     const keyword = pArgs.keyword;
                                     const title = pArgs.title || pArgs.task;
@@ -4190,30 +4190,30 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 // START VISUAL FEEDBACK FOR TOOLS
                                 let label = '';
                                 if (normToolName === 'click') {
-                                    const p = parseArgs(toolCall.args);
+                                    const p = parseArgs(toolCall.args, ['intendedClickText']);
                                     label = `✔  Clicked ${p.intendedClickText ? `: ${p.intendedClickText}` : 'Screen'}`;
                                 } else if (normToolName === 'drag') {
-                                    const p = parseArgs(toolCall.args);
+                                    const p = parseArgs(toolCall.args, ['fromGridId', 'toGridId']);
                                     label = `✔  Dragged: Cell ${p.fromGridId || ''} → Cell ${p.toGridId || ''}`;
                                 } else if (normToolName === 'scroll') {
-                                    const p = parseArgs(toolCall.args);
+                                    const p = parseArgs(toolCall.args, ['direction', 'amount']);
                                     label = `✔  Scrolled: ${p.direction || 'down'} (${p.amount || 1})`;
                                 } else if (normToolName === 'keyboard_typing') {
-                                    const p = parseArgs(toolCall.args);
+                                    const p = parseArgs(toolCall.args, ['text']);
                                     label = `✔  ${p.autoPressEnter ? 'Entered' : 'Typed'}: ${p.text ? `"${p.text.length > 20 ? p.text.substring(0, 20) + '...' : p.text}"` : ''}`;
                                 } else if (normToolName === 'key_press') {
-                                    const p = parseArgs(toolCall.args);
+                                    const p = parseArgs(toolCall.args, ['key']);
                                     label = `✔  Pressed Key: ${p.key || ''}`;
                                 } else if (normToolName === 'recapture_screen') {
                                     label = `✔  Recaptured Screen`;
                                 } else if (normToolName === 'web_search') {
-                                    const { query, limit = 10, aiMode = false } = parseArgs(toolCall.args);
+                                    const { query, limit = 10, aiMode = false } = parseArgs(toolCall.args, ['query', 'limit', 'aiMode']);
                                     label = `${query ? '✔' : '✘'}  ${aiMode ? 'AI Search' : 'Searched'}: ${query ? `${query}` : 'No Search Query'}${aiMode === false && query ? ` → ${limit}` : ''}`;
                                 } else if (normToolName === 'web_scrape') {
-                                    const url = parseArgs(toolCall.args).url || null;
+                                    const url = parseArgs(toolCall.args, ['url']).url || null;
                                     label = `${url ? '✔' : '✘'}  Visited: ${url ? url : 'No Source'}`;
                                 } else if (normToolName === 'view_file') {
-                                    const { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(toolCall.args);
+                                    const { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(toolCall.args, ['path', 'StartLine', 'EndLine', 'start_line', 'end_line', 'startLine', 'endLine']);
 
                                     const rawStart = StartLine || start_line || startLine;
                                     const rawEnd = EndLine || end_line || endLine;
@@ -4261,33 +4261,33 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Browsed';
-                                    const path = parseArgs(toolCall.args).path || null;
-                                    const recurse = parseArgs(toolCall.args).recurse || 1;
+                                    const path = parseArgs(toolCall.args, ['path', 'recurse', 'include']).path || null;
+                                    const recurse = parseArgs(toolCall.args, ['path', 'recurse', 'include']).recurse || 1;
                                     label = `${path ? '✔' : '✘'}  ${action}: ${path ? `${path === '.' ? `./${recurse > 1 ? '*' : ''}` : `${path.replaceAll('\\', '/')}${recurse > 1 ? `${path.endsWith('/') ? `*` : `/*`}` : `${path.endsWith('/') ? '' : '/'}`}`}` : 'No Folder Selected'}`;
                                 } else if (normToolName === 'find_file') {
-                                    const p = parseArgs(toolCall.args);
+                                    const p = parseArgs(toolCall.args, ['basename', 'name', 'path', 'file', 'query']);
                                     const name = p.basename || p.name || p.path || p.file || p.query || '';
                                     label = `${name ? '✔' : '✘'}  Located: ${name ? name : 'No Query'}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                    const parsedToolArgs = parseArgs(toolCall.args);
+                                    const parsedToolArgs = parseArgs(toolCall.args, ['path', 'content', 'allowMultiple', 'searchContent*', 'replaceContent*', 'newContent*']);
                                     const path = parsedToolArgs.path || null;
                                     const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && v.startsWith('^LINE:'));
                                     const sep = hasLineAnchor ? '፡' : ':';
                                     label = `${path ? '✔' : '✘'}  ${action}${sep} ${path ? path.replaceAll('\\', '/') : 'No File Changes'}`;
                                 } else if (normToolName === 'write_pdf') {
-                                    const path = parseArgs(toolCall.args).path || null;
+                                    const path = parseArgs(toolCall.args, ['path', 'content', 'orientation', 'margin']).path || null;
                                     label = `${path ? '✔' : '✘'}  Generated: ${path.replaceAll('\\', '/') || 'No PDF Generated'}`;
                                 } else if (normToolName === 'write_docx') {
-                                    const path = parseArgs(toolCall.args).path || null;
+                                    const path = parseArgs(toolCall.args, ['path', 'content']).path || null;
                                     label = `${path ? '✔' : '✘'}  Generated: ${path.replaceAll('\\', '/') || 'No Docx Generated'}`;
                                 } else if (normToolName === 'file_map') {
-                                    const path = parseArgs(toolCall.args).path;
+                                    const path = parseArgs(toolCall.args, ['path']).path;
                                     label = `${path ? '✔' : '✘'}  Indexed: ${path.replaceAll('\\', '/') ? '' + path : 'File Not Found'}`;
                                 } else if (normToolName.toLowerCase() === 'search_keyword' || normToolName.toLowerCase() === 'todo') {
                                     label = '';
                                 } else if (normToolName.toLowerCase() === 'generate_image') {
-                                    const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
+                                    const { path: argPath, outputPath, output } = parseArgs(toolCall.args, ['path', 'prompt', 'text', 'outputPath', 'output', 'ratio']);
                                     label = `✔  Generated: ${argPath || outputPath || output || 'generated_image.png'}`;
                                 } else if (normToolName === 'invoke_sync' || normToolName === 'InvokeSync') {
                                     const detail = getToolDetail(normToolName, toolCall.args);
@@ -4305,11 +4305,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const detail = getToolDetail(normToolName, toolCall.args);
                                     label = `✔  Steered${detail ? `: ${detail}` : ''}`;
                                 } else if (normToolName === 'EmergencyRollback') {
-                                    const { method } = parseArgs(toolCall.args);
+                                    const { method } = parseArgs(toolCall.args, ['method', 'id']);
                                     // forceRevert feedback is shown post-execution (see below), getCheckpoint is immediate
                                     label = method === 'forceRevert' ? '' : '✔  Rollback Point Checked';
                                 } else if (normToolName === 'await' || normToolName === 'Await' || normToolName === 'wait' || normToolName === 'Wait') {
-                                    const { time, timeout, seconds, sec: sVal } = parseArgs(toolCall.args);
+                                    const { time, timeout, seconds, sec: sVal } = parseArgs(toolCall.args, ['time', 'timeout', 'seconds', 'sec']);
                                     let sec = parseFloat(seconds || sVal || timeout || time) || 45;
                                     const maxCap = (normToolName === 'wait' || normToolName === 'Wait') ? 120 : 180;
                                     if (sec < 10) sec = 10;
@@ -4373,7 +4373,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 // EXECUTION LOGIC
                                 if (normToolName === 'exec_command') {
-                                    const { command } = parseArgs(toolCall.args);
+                                    const { command } = parseArgs(toolCall.args, ['command', 'background', 'timeout', 'usePowershell', 'forcePowershell', 'useCwd', 'useCmd', 'forceCwd', 'forceCmd']);
                                     if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
                                         const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
                                         const currentDrive = path.resolve(process.cwd()).substring(0, 3).toLowerCase();
@@ -4520,7 +4520,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     yield { type: 'exec_start' };
                                 }
 
-                                const parsedArgs = parseArgs(toolCall.args);
+                                const fileRelatedTools = ['write_file', 'update_file', 'view_file', 'read_folder', 'list_files', 'file_map'];
+                                const fileKeys = ['path', 'targetPath', 'file', 'content', 'searchContent*', 'replaceContent*', 'newContent*', 'recurse', 'include', 'StartLine', 'EndLine', 'start_line', 'end_line', 'startLine', 'endLine'];
+                                const parsedArgs = fileRelatedTools.includes(normToolName)
+                                    ? parseArgs(toolCall.args, fileKeys)
+                                    : parseArgs(toolCall.args);
                                 const targetPath = parsedArgs.path || parsedArgs.targetPath || null;
                                 if (targetPath) {
                                     const isExternalOff = settings.systemSettings && settings.systemSettings.allowExternalAccess === false;
@@ -4555,7 +4559,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     let isAlwaysAskFile = false;
                                     let askFilePath = '';
                                     if (normToolName === 'view_file') {
-                                        const parsedArgs = parseArgs(toolCall.args);
+                                        const parsedArgs = parseArgs(toolCall.args, ['path', 'targetPath', 'file', 'StartLine', 'EndLine', 'start_line', 'end_line', 'startLine', 'endLine']);
                                         askFilePath = parsedArgs.path || parsedArgs.targetPath || parsedArgs.file || '';
                                         if (askFilePath) {
                                             const patternList = systemSettings.alwaysAskFiles || '.env, .env.*, *.env';
@@ -4578,7 +4582,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             forcePrompt = true;
                                             decision = null;
                                         } else if (normToolName === 'exec_command') {
-                                            const { command } = parseArgs(toolCall.args);
+                                            const { command } = parseArgs(toolCall.args, ['command', 'background', 'timeout', 'usePowershell', 'forcePowershell', 'useCwd', 'useCmd', 'forceCwd', 'forceCmd']);
                                             const cmdTrimmed = (command || '').trim();
 
                                             const splitChainedCommands = (cmdString) => {
@@ -4728,7 +4732,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             let requiresOverwriteApproval = false;
                                             if (normToolName === 'write_file' && systemSettings.overwriteProtection !== false && autoExec) {
                                                 try {
-                                                    const { path: owPath } = parseArgs(toolCall.args);
+                                                    const { path: owPath } = parseArgs(toolCall.args, ['path', 'content']);
                                                     if (owPath && fs.existsSync(path.resolve(process.cwd(), owPath))) {
                                                         requiresOverwriteApproval = true;
                                                         isOverwritePrompt = true;
@@ -4774,7 +4778,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (!approval) {
                                             if (!isOverwritePrompt && (normToolName === 'write_file' || normToolName === 'update_file')) {
                                                 try {
-                                                    const toolArgs = parseArgs(toolCall.args);
+                                                    const toolArgs = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
                                                     let { path: filePath } = toolArgs;
                                                     if (filePath) {
                                                         const { resolvedPath } = resolvePathWithTilde(filePath);
@@ -4918,7 +4922,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             registerSecurityListener(null);
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
-                                                const toolArgs = parseArgs(toolCall.args);
+                                                const toolArgs = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
                                                 let { path: filePath } = toolArgs;
                                                 if (filePath) {
                                                     const { resolvedPath } = resolvePathWithTilde(filePath);
@@ -4940,7 +4944,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                         if (approval === 'allow' && diffOpened && isBridgeConnected()) {
                                             // SUCCESS: The changes are already in the IDE buffer and we told it to save.
-                                            const toolArgs = parseArgs(toolCall.args);
+                                            const toolArgs = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
                                             let { path: filePath } = toolArgs;
                                             const { resolvedPath, isTildeResolved } = resolvePathWithTilde(filePath);
                                             filePath = resolvedPath;
@@ -4991,7 +4995,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 const diffReport = generateHighFidelityDiff(originalContentForReporting, finalContent, patchResults, 12, settings?.compressToolResults || globalSettings?.systemSettings?.compressToolResults);
 
                                                 // 1. Evaluate each patch requested by the model
-                                                const { patchPairs: originalPatches } = parsePatchPairs(parseArgs(toolCall.args));
+                                                const { patchPairs: originalPatches } = parsePatchPairs(parseArgs(toolCall.args, ['path', 'searchContent*', 'replaceContent*', 'newContent*']));
                                                 const totalBlocks = originalPatches?.length || requestedPatchCount || 1;
                                                 let appliedBlocks = 0;
                                                 let rejectedBlocks = 0;
@@ -5133,7 +5137,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             // Restore UI feedback
                                             const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                            const parsedToolArgs = parseArgs(toolCall.args);
+                                            const parsedToolArgs = parseArgs(toolCall.args, ['path', 'content', 'allowMultiple', 'searchContent*', 'replaceContent*', 'newContent*']);
                                             const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && v.startsWith('^LINE:'));
                                             const sep = hasLineAnchor ? '፡' : ':';
                                             const feedbackLabel = `${filePath ? '✔' : '✘'} ${action}${sep} ${filePath ? filePath.replaceAll('\\', '/') : 'No File Changes'}`;
@@ -5213,7 +5217,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
 
                                             if (normToolName === 'view_file') {
-                                                const deniedLabel = `✘ Read Denied: ${parseArgs(toolCall.args).path?.replaceAll('\\', '/') || '.env'}`;
+                                                const deniedLabel = `✘ Read Denied: ${parseArgs(toolCall.args, ['path', 'targetPath', 'file']).path?.replaceAll('\\', '/') || '.env'}`;
                                                 let terminalWidth = 115;
                                                 if (process.stdout.isTTY) {
                                                     terminalWidth = process.stdout.columns - 5 || 120;
@@ -5224,7 +5228,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 thisIsFirstToolFeedback = false;
                                             } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
-                                                const deniedLabel = `✘ ${action}: ${parseArgs(toolCall.args).path.replaceAll('\\', '/') || '...'}`;
+                                                const deniedLabel = `✘ ${action}: ${parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']).path.replaceAll('\\', '/') || '...'}`;
                                                 // Get terminal physical width
                                                 let terminalWidth = 115;
                                                 if (process.stdout.isTTY) {
@@ -5297,7 +5301,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 if (normToolName === 'write_file' || normToolName === 'update_file') {
                                     try {
-                                        const { path: filePath } = parseArgs(toolCall.args);
+                                        const { path: filePath } = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
                                         if (filePath) {
                                             const absPath = path.resolve(process.cwd(), filePath);
                                             const currentIDE = await getIDEContext();
@@ -5313,7 +5317,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 // yield { type: 'spinner', content: true }; // [Obsolete]
 
                                 if ((normToolName === 'write_file' || normToolName === 'update_file') && !result.startsWith('ERROR:')) {
-                                    const { path: filePath } = parseArgs(toolCall.args);
+                                    const { path: filePath } = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
                                     if (filePath) {
                                         const { resolvedPath } = resolvePathWithTilde(filePath);
                                         const absPath = path.resolve(process.cwd(), resolvedPath);
@@ -5338,7 +5342,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 if (normToolName === 'search_keyword') {
-                                    const { keyword, path: rawPath } = parseArgs(toolCall.args);
+                                    const { keyword, path: rawPath } = parseArgs(toolCall.args, ['keyword', 'path', 'fuzzy', 'subString', 'regex']);
                                     // Detect and strip the hidden [DIR] or [GLOB] token emitted by search_keyword
                                     const _isGlob = typeof result === 'string' && result.startsWith('[GLOB]');
                                     if (_isGlob) result = result.slice(6).trimStart();
@@ -5379,7 +5383,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 if (normToolName === 'EmergencyRollback') {
-                                    const { method } = parseArgs(toolCall.args);
+                                    const { method } = parseArgs(toolCall.args, ['method', 'id']);
                                     if (method === 'forceRevert') {
                                         let totalFiles = 0;
                                         if (result) {
@@ -5409,7 +5413,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 if (normToolName === 'todo') {
-                                    const { method, tasks, markDone } = parseArgs(toolCall.args);
+                                    const { method, tasks, markDone } = parseArgs(toolCall.args, ['method', 'tasks', 'markDone']);
                                     let uiTitle = '';
                                     let listItems = [];
 
@@ -6190,7 +6194,7 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 - WebScrape(url=string)
 
 **Workspace**
-- CodeSearch(keyword=string, path?="file/glob, inclusion !exclusion ;-separated"). Regex auto detected
+- CodeSearch(keyword="regex", path?="file/glob, inclusion !exclusion ;-separated")
 - ReadFolder(path=string, recurse?=int[1..3])
 - FindFile(basename=string)
 - ReadFile(path=string, startLine?=int, endLine?=int)
@@ -6341,7 +6345,7 @@ Current Time: ${time}
 
             // Command safety validation for subagents (groundwork for terminal execution)
             if (normalizedToolName === 'exec_command' || normalizedToolName === 'execcommand' || normalizedToolName === 'run') {
-                const cmdArg = parseArgs(toolCall.args).command || '';
+                const cmdArg = parseArgs(toolCall.args, ['command', 'background', 'timeout']).command || '';
                 const cmdCheck = isSubagentCommandAllowed(cmdArg);
                 if (!cmdCheck.allowed) {
                     const blockMsg = `ERROR: [SECURITY RESTRICTION] Subagent execution blocked command: ${cmdCheck.reason}`;
@@ -6354,46 +6358,46 @@ Current Time: ${time}
             // fs.writeFileSync("SUBAGENT-DEBUG.txt", normalizedToolName);
             let label = '';
             if (normalizedToolName === 'web_search' || normalizedToolName === 'websearch') {
-                const query = parseArgs(toolCall.args).query || '';
+                const query = parseArgs(toolCall.args, ['query', 'limit', 'aiMode']).query || '';
                 label = `✔ \x1b[95mSearched\x1b[0m: ${query}`;
             }
 
             else if (normalizedToolName === 'web_scrape' || normalizedToolName === 'webscrape') {
-                const url = parseArgs(toolCall.args).url || '';
+                const url = parseArgs(toolCall.args, ['url']).url || '';
                 label = `✔ \x1b[95mScraped\x1b[0m: ${url}`;
             }
 
             else if (normalizedToolName === 'search_keyword' || normalizedToolName === 'searchkeyword' || normalizedToolName === 'codesearch' || normalizedToolName === 'code_search') {
-                const pArgs = parseArgs(toolCall.args);
+                const pArgs = parseArgs(toolCall.args, ['keyword', 'path', 'fuzzy', 'subString', 'regex']);
                 const keyword = pArgs.keyword || '';
                 const keywordPath = pArgs.path || '';
                 label = `${keyword ? '✔' : '✘'} \x1b[95mSearched\x1b[0m: ${keyword || 'No Query'}${keywordPath ? ` → ${keywordPath.replaceAll('\\', '/')}` : ''}`;
             }
 
             else if (normalizedToolName === 'view_file' || normalizedToolName === 'viewfile' || normalizedToolName === 'readfile') {
-                const path = parseArgs(toolCall.args).path || '';
+                const path = parseArgs(toolCall.args, ['path', 'targetPath', 'file', 'StartLine', 'EndLine', 'start_line', 'end_line', 'startLine', 'endLine']).path || '';
                 label = `✔ \x1b[95mRead\x1b[0m: ${path.replaceAll('\\', '/')}`;
             }
 
             else if (normalizedToolName === 'find_file' || normalizedToolName === 'findfile') {
-                const pArgs = parseArgs(toolCall.args);
+                const pArgs = parseArgs(toolCall.args, ['basename', 'name', 'path', 'file', 'query']);
                 const name = pArgs.basename || pArgs.name || pArgs.path || pArgs.file || pArgs.query || '';
                 label = `${name ? '✔' : '✘'} \x1b[95mLocated\x1b[0m: ${name || 'No Query'}`;
             }
 
             else if (normalizedToolName === 'list_files' || normalizedToolName === 'read_folder' || normalizedToolName === 'readfolder') {
-                const path = parseArgs(toolCall.args).path || null;
-                const recurse = parseArgs(toolCall.args).recurse || 0;
+                const path = parseArgs(toolCall.args, ['path', 'recurse', 'include']).path || null;
+                const recurse = parseArgs(toolCall.args, ['path', 'recurse', 'include']).recurse || 0;
                 label = `${path ? '✔' : '✘'} \x1b[95mBrowsed\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}` : ''}`;
             }
 
             else if (normalizedToolName === 'write_file' || normalizedToolName === 'writefile') {
-                const path = parseArgs(toolCall.args).path || null;
+                const path = parseArgs(toolCall.args, ['path', 'content']).path || null;
                 label = `${path ? '✔' : '✘'} \x1b[95mCreated\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}` : 'No File Changes'}`;
             }
 
             else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file') {
-                const parsedToolArgs = parseArgs(toolCall.args);
+                const parsedToolArgs = parseArgs(toolCall.args, ['path', 'allowMultiple', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
                 const path = parsedToolArgs.path || null;
                 const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && v.startsWith('^LINE:'));
                 const sep = hasLineAnchor ? '፡' : ':';
@@ -6401,17 +6405,17 @@ Current Time: ${time}
             }
 
             else if (normalizedToolName === 'exec_command' || normalizedToolName === 'execcommand' || normalizedToolName === 'run') {
-                const command = parseArgs(toolCall.args).command || null;
+                const command = parseArgs(toolCall.args, ['command', 'background', 'timeout']).command || null;
                 label = `${command ? '✔' : '✘'} \x1b[95mExecuted\x1b[0m: ${command ? command.slice(0, 100) + (command.length > 100 ? '...' : '') : 'No Command'}`;
             }
 
             else if (normalizedToolName === 'file_map' || normalizedToolName === 'filemap') {
-                const path = parseArgs(toolCall.args).path || '';
+                const path = parseArgs(toolCall.args, ['path']).path || '';
                 label = `${path ? '✔' : '✘'} \x1b[95mIndexed\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}` : 'File Not Found'}`;
             }
 
             else if (normalizedToolName === 'await') {
-                const { time } = parseArgs(toolCall.args);
+                const { time } = parseArgs(toolCall.args, ['time', 'timeout', 'seconds', 'sec']);
                 let sec = parseFloat(time) || 0;
                 if (sec < 10) sec = 10;
                 if (sec > 180) sec = 180;

@@ -12,7 +12,7 @@ import { recordCodeChange } from '../utils/usage.js';
  * Creates or overwrites a file with the provided content.
  */
 export const write_file = async (args, context = {}) => {
-    let { path: targetPath, content } = parseArgs(args);
+    let { path: targetPath, content } = parseArgs(args, ['path', 'content']);
 
     if (!targetPath) return 'ERROR: Missing "path" argument for WriteFile.';
     if (content === undefined) return 'ERROR: Missing "content" argument for WriteFile.';

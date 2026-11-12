@@ -1,10 +1,27 @@
 /**
- * Smart Argument Parser for Tool Signals (Fidelity v2.0)
+ * Smart Argument Parser for Tool Signals (Fidelity v3.0)
  * Handles unescaped quotes by using heuristic end-of-string detection.
+ * @param {string} argsString - Raw arguments string from model tool call.
+ * @param {string[]} [knownKeys=[]] - Optional array of expected parameter names.
  */
-export const parseArgs = (argsString) => {
+export const parseArgs = (argsString, knownKeys = []) => {
     const args = {};
     if (!argsString) return args;
+
+    // Helper to match key against knownKeys (supports exact string, 'prefix*', or RegExp)
+    const isKeyAllowed = (keyName) => {
+        if (!Array.isArray(knownKeys) || knownKeys.length === 0) return true;
+        return knownKeys.some(pattern => {
+            if (pattern instanceof RegExp) return pattern.test(keyName);
+            if (typeof pattern === 'string') {
+                if (pattern.endsWith('*')) {
+                    return keyName.startsWith(pattern.slice(0, -1));
+                }
+                return pattern === keyName;
+            }
+            return false;
+        });
+    };
 
     let i = 0;
     while (i < argsString.length) {
@@ -14,8 +31,8 @@ export const parseArgs = (argsString) => {
 
         // 1. Capture Key
         let keyMatch = argsString.substring(i).match(/^(\w+)\s*=\s*/);
-        if (!keyMatch) {
-            i++; // Skip noise
+        if (!keyMatch || !isKeyAllowed(keyMatch[1])) {
+            i++; // Skip noise or unexpected keys
             continue;
         }
         const key = keyMatch[1];
@@ -53,11 +70,72 @@ export const parseArgs = (argsString) => {
 
                 // STRICTER LOGICAL END:
                 // A quote is ONLY a logical end if it's followed by:
-                // 1. A comma AND then another key= (e.g. "path", content=)
+                // 1. A comma AND then another valid key= (e.g. "path", content=) - must match allowedKeys if provided
                 // 2. A closing parenthesis that marks the end of the tool call (e.g. "path") ]]
+                let nextArgValid = false;
+                const nextKeyMatch = after.match(/^,\s*(\w+)\s*=/);
+                if (nextKeyMatch) {
+                    const nextKeyName = nextKeyMatch[1];
+                    // If key is not in allowedKeys OR has already been captured, it CANNOT be a real argument boundary!
+                    if (!isKeyAllowed(nextKeyName)) {
+                        nextArgValid = false;
+                    } else if (args[nextKeyName] !== undefined) {
+                        nextArgValid = false; // Already captured earlier!
+                    } else {
+                        // 1. Highest Index Encounter: Check if this same key appears again later downstream.
+                        // If it appears again later, this current occurrence is premature (inside text).
+                        const downstreamText = after.substring(nextKeyMatch[0].length);
+                        const nextOccurrence = downstreamText.search(new RegExp(`,\\s*${nextKeyName}\\s*=`, 'i'));
+                        if (nextOccurrence !== -1) {
+                            nextArgValid = false;
+                        } else {
+                            // 2. Candidate Argument Well-Formedness Check:
+                            // Check the candidate value immediately after ", <nextKey>="
+                            const candidateRest = downstreamText.trim();
+                            if (candidateRest.startsWith('"') || candidateRest.startsWith("'") || candidateRest.startsWith('`')) {
+                                // Quoted value candidate: must have a matching non-escaped closing quote
+                                const qChar = candidateRest[0];
+                                let foundClosing = false;
+                                for (let p = 1; p < candidateRest.length; p++) {
+                                    if (candidateRest[p] === qChar) {
+                                        let bs = 0;
+                                        for (let b = p - 1; b >= 0 && candidateRest[b] === '\\'; b--) bs++;
+                                        if (bs % 2 === 0) {
+                                            foundClosing = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                nextArgValid = foundClosing;
+                            } else if (candidateRest.startsWith('[')) {
+                                // Array literal candidate: check for matching closing ']'
+                                let balance = 0;
+                                let foundClosingBracket = false;
+                                for (let p = 0; p < candidateRest.length; p++) {
+                                    if (candidateRest[p] === '[') balance++;
+                                    else if (candidateRest[p] === ']') {
+                                        balance--;
+                                        if (balance === 0) {
+                                            foundClosingBracket = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                nextArgValid = foundClosingBracket;
+                            } else {
+                                // Unquoted value candidate: if it contains dangling quotes or code delimiters (e.g. World"),
+                                // it indicates this is part of the outer string where model forgot real parameter!
+                                const firstToken = candidateRest.split(/[,\)\s]/)[0] || '';
+                                const hasDanglingQuote = /["'`]/.test(firstToken);
+                                nextArgValid = !hasDanglingQuote;
+                            }
+                        }
+                    }
+                }
+
                 const isLogicalEnd =
                     after === '' ||                    // End of entire string
-                    /^,\s*\w+\s*=/.test(after) ||       // Next argument separator (comma followed by key=)
+                    nextArgValid ||                    // Next valid argument separator
                     (after.startsWith(')') && (after.length === 1 || /^\)\s*([,\]\s]|\[\[?tool:)/i.test(after))); // Robust Tool End
 
                 // ADDITIONAL CHECK: If there is a newline right after the quote, and the next line doesn't look like a NEW argument, it's probably NOT the end

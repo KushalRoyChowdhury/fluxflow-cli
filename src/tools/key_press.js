@@ -6,7 +6,7 @@ import { executeKeyboardAction } from '../utils/computer_use.js';
  * Accepts key or ;-separated key combination (e.g., "enter", "ctrl;c", "alt;tab").
  */
 export const key_press = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['key', 'keys', 'input', 'shortcut']);
     const key = parsed.key || parsed.keys || parsed.input || parsed.shortcut;
 
     if (!key) {

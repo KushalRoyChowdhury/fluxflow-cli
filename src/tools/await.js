@@ -7,7 +7,7 @@ import { parseArgs } from '../utils/arg_parser.js';
  * [tool:functions.await(time="seconds")]
  */
 export const awaitTool = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['time']);
     const timeStr = parsed.time ?? 45;
 
     let seconds = parseFloat(timeStr);

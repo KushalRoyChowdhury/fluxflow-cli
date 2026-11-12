@@ -12,7 +12,7 @@ export const write_docx = async (args) => {
     const {
         path: targetPath,
         content
-    } = parseArgs(args);
+    } = parseArgs(args, ['path', 'content']);
 
     if (!targetPath) return 'ERROR: Missing "path" argument for write_docx.';
     if (!content) return 'ERROR: Missing "content" (HTML) for write_docx.';

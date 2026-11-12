@@ -8,7 +8,7 @@ import { parseArgs } from '../utils/arg_parser.js';
  * [tool:functions.wait(seconds="45")]
  */
 export const wait = async (args, context = {}) => {
-    const parsed = parseArgs(args);
+    const parsed = parseArgs(args, ['seconds', 'sec', 'time', 'timeout']);
     const secVal = parsed.seconds ?? parsed.sec ?? parsed.time ?? parsed.timeout ?? 45;
 
     let seconds = parseFloat(secVal);
