@@ -33,6 +33,7 @@ const DEFAULT_SETTINGS = {
             Infron: 'Free',
             APInex: 'Free',
             xKiro: 'Free',
+            CoArena: 'Free',
             c_openai: 'Free'
         }
     },
@@ -115,6 +116,7 @@ export const PROVIDER_BASE_URLS = {
     'Infron': 'https://llm.onerouter.pro/v1/chat/completions',
     'APInex': 'https://api.apinex.bond/v1/chat/completions',
     'xKiro': 'https://api.xkiro.com/v1/chat/completions',
+    'CoArena': 'https://coarena.ai/api/v1/chat/completions',
     'AIHubMix': 'https://aihubmix.com/v1/chat/completions',
     // Google: CLI path uses the SDK directly; this endpoint is only used by the
     // extension's direct OpenAI-compatible fetch path.

@@ -58,6 +58,7 @@ export const getProviderAPIKey = async (provider, opts = {}) => {
         if (provider === 'Infron' || provider === 'infron') return secrets.INFRON_API_KEY || null;
         if (provider === 'APInex' || provider === 'apinex' || provider === 'apx') return secrets.APINEX_API_KEY || null;
         if (provider === 'xKiro' || provider === 'xkiro' || provider === 'kiro') return secrets.XKIRO_API_KEY || null;
+        if (provider === 'CoArena' || provider === 'coarena') return secrets.COARENA_API_KEY || null;
         if (provider === 'c_openai' || provider === 'Custom (OpenAI)') return secrets.CUSTOM_OPENAI_API_KEY || secrets.C_OPENAI_API_KEY || null;
     } catch (e) {}
     return null;
@@ -110,6 +111,8 @@ export const saveProviderAPIKey = async (provider, key) => {
         await saveSecret('APINEX_API_KEY', key);
     } else if (provider === 'xKiro' || provider === 'xkiro' || provider === 'kiro') {
         await saveSecret('XKIRO_API_KEY', key);
+    } else if (provider === 'CoArena' || provider === 'coarena') {
+        await saveSecret('COARENA_API_KEY', key);
     } else if (provider === 'c_openai' || provider === 'Custom (OpenAI)') {
         await saveSecret('CUSTOM_OPENAI_API_KEY', key);
     }

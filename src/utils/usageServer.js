@@ -1261,7 +1261,13 @@ function generateDashboardHtml() {
 
         function getProviderBrandIcon(providerName, size = 20) {
             const p = (providerName || '').toLowerCase().trim();
-            if (p.includes('xkiro') || p.includes('kiro')) {
+            if (p.includes('coarena')) {
+                return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.5" fill="none" stroke-dasharray="50 15" stroke-linecap="round"/>
+                    <rect x="10" y="7" width="2.5" height="3.5" rx="1" fill="currentColor"/>
+                    <rect x="10" y="13.5" width="2.5" height="3.5" rx="1" fill="currentColor"/>
+                </svg>\`;
+            } else if (p.includes('xkiro') || p.includes('kiro')) {
                 return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                     <rect width="24" height="24" rx="7" fill="#16A34A"/>
                     <path d="M7 6.5C9.5 8 10.5 9 12 11.2C13.5 9 14.5 8 17 6.5C15 8.5 13.8 9.8 12 12.6C10.2 9.8 9 8.5 7 6.5Z" fill="#FFFFFF"/>

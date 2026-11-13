@@ -113,7 +113,7 @@ export default function SettingsMenu({
 
     useEffect(() => {
         const checkKeys = async () => {
-            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'xKiro', 'c_openai'];
+            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'xKiro', 'CoArena', 'c_openai'];
             const keyMap = {};
             for (const p of providers) {
                 try {
@@ -127,7 +127,7 @@ export default function SettingsMenu({
     }, []);
 
     const allSubAgentItems = React.useMemo(() => {
-        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'xKiro', 'c_openai'];
+        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs', 'TokenHarbor', 'Infron', 'APInex', 'xKiro', 'CoArena', 'c_openai'];
         const hasEnv = !!(process.env.SUBAGENT_MODEL && process.env.SUBAGENT_MODEL.trim());
         const envLabel = hasEnv ? `ENV (${process.env.SUBAGENT_MODEL.trim()})` : 'ENV';
 

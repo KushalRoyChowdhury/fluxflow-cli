@@ -57,6 +57,7 @@ const PROVIDER_LOADERS = {
     Infron: () => import('./providers/infron.js').then(m => m.getInfronStream),
     APInex: () => import('./providers/apinex.js').then(m => m.getAPInexStream),
     xKiro: () => import('./providers/xkiro.js').then(m => m.getXKiroStream),
+    CoArena: () => import('./providers/coarena.js').then(m => m.getCoArenaStream),
     c_openai: () => import('./providers/custom_openai.js').then(m => m.getCustomOpenAIStream),
 };
 const _providerCache = {};
@@ -1585,6 +1586,8 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
                 stream = (await loadProvider('APInex'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'xKiro' || aiProvider === 'xkiro' || aiProvider === 'kiro') {
                 stream = (await loadProvider('xKiro'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === 'CoArena' || aiProvider === 'coarena') {
+                stream = (await loadProvider('CoArena'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
                 let cBaseUrl = settings.systemSettings?.customOpenAIBaseUrl || '';
                 try { cBaseUrl = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl; } catch (e) { }
@@ -3331,6 +3334,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         );
                     } else if (aiProvider === 'xKiro' || aiProvider === 'xkiro' || aiProvider === 'kiro') {
                         stream = (await loadProvider('xKiro'))(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0
+                        );
+                    } else if (aiProvider === 'CoArena' || aiProvider === 'coarena') {
+                        stream = (await loadProvider('CoArena'))(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -6096,6 +6111,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'infron') return 'Infron';
         if (lower === 'apinex' || lower === 'apx') return 'APInex';
         if (lower === 'xkiro' || lower === 'kiro') return 'xKiro';
+        if (lower === 'coarena' || lower === 'coarena_ai') return 'CoArena';
         if (lower === 'c_openai' || lower === 'custom_openai' || lower === 'custom (openai)' || lower === 'custom') return 'c_openai';
         return null;
     };

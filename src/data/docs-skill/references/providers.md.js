@@ -2,7 +2,7 @@
 export const PROVIDERS_MD = `# FluxFlow AI Providers & Setup
 
 ## Supported Providers
-* Gemini | NVIDIA NIM | DeepSeek | Mistral | Ollama Local/Cloud | InferX | SenseNova | Poolside | OpenRouter | AIHubMix | Experiential Labs | TokenHarbor | APInex | Infron
+* Gemini | NVIDIA NIM | DeepSeek | Mistral | Ollama Local/Cloud | InferX | SenseNova | Poolside | OpenRouter | AIHubMix | Experiential Labs | TokenHarbor | APInex | Infron | Coarena
 * Proxy: 9router. Can use OAuth subscription like Codex, Claude Code, GitHub Copilot etc. or any OpenAI/Anthropic API that FluxFlow dont have natively
 * Custom: Native custom OpenAI chat completions integration, no external package needed → references/SETTINGS.md, for more details
 

@@ -49,6 +49,7 @@ export const PROVIDER_DEFS = [
     { canonical: 'Infron',      secret: ['INFRON_API_KEY'],                      aliases: ['infron'] },
     { canonical: 'APInex',      secret: ['APINEX_API_KEY'],                      aliases: ['apinex', 'apx'] },
     { canonical: 'xKiro',       secret: ['XKIRO_API_KEY'],                       aliases: ['xkiro', 'kiro'] },
+    { canonical: 'CoArena',     secret: ['COARENA_API_KEY'],                     aliases: ['coarena', 'coarena_ai'] },
     { canonical: 'c_openai',    secret: ['CUSTOM_OPENAI_API_KEY', 'C_OPENAI_API_KEY'], aliases: ['custom', 'custom (openai)', 'custom openai'] },
 ];
 

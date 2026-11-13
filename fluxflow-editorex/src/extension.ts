@@ -605,7 +605,7 @@ export function getCompletionApiKey(provider: string): string | null {
                     'custom': 'c_openai', 'custom (openai)': 'c_openai',
                     'deepseek-ai': 'DeepSeek', '9router': '9router', '9-router': '9router',
                     'explabs': 'ExpLabs', 'tokenharbor': 'TokenHarbor', 'apinex': 'APInex',
-                    'xkiro': 'xKiro', 'infron': 'Infron', 'sensenova': 'SenseNova'
+                    'xkiro': 'xKiro', 'coarena': 'CoArena', 'coarena_ai': 'CoArena', 'infron': 'Infron', 'sensenova': 'SenseNova'
                 };
                 const lower = provider.toLowerCase();
                 const canonical = canonMap[lower] || provider;
@@ -656,6 +656,7 @@ export function getCompletionApiKey(provider: string): string | null {
     if (p === 'Infron') return s.INFRON_API_KEY || null;
     if (p === 'APInex' || p === 'apinex' || p === 'apx') return s.APINEX_API_KEY || null;
     if (p === 'xKiro' || p === 'xkiro' || p === 'kiro') return s.XKIRO_API_KEY || null;
+    if (p === 'CoArena' || p === 'coarena') return s.COARENA_API_KEY || null;
     if (p === 'c_openai' || p === 'Custom (OpenAI)') return s.CUSTOM_OPENAI_API_KEY || s.C_OPENAI_API_KEY || null;
     // Generic fallback (e.g. AIHubMix → AIHUBMIX_API_KEY).
     return s[`${p.toUpperCase()}_API_KEY`] || null;
