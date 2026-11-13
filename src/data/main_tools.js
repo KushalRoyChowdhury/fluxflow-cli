@@ -132,11 +132,11 @@ Default to using subagents whenever helpful, no user nudge needed
 Invocations:
 • Invoke, async/background, ≤7 parallel. Parallelize tasks
 • InvokeSync, sync/blocking. Sequential, repetitive or delegated tasks
-- InvokeSync/Invoke(title=string, task=string, id?=string). task: detailed steps & file paths. id: unique=new subagent, existing=resume subagent
+- InvokeSync/Invoke(title=string, task=string, id?=string). task: detailed steps & file paths. id: unique=new, existing=resume subagent
 - Await(id=string, timeout?=int[..180])
 - GetProgress(id=string). Poll sparingly; Work or await
 - Steer(id=string, message=string). Inject additional instruction into active async subagent
-- Cancel(id=string). Cancel async task ONLY if stalled for 2m+ or incorrect` : ''}`;
+- Cancel(id=string). Cancel async task ONLY if stalled or incorrect` : ''}`;
 
     // =====================================================================================================
 

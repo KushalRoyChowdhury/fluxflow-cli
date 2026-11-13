@@ -7,7 +7,7 @@ import { ABOUT_SKILL_MANIFEST } from '../data/about-data.js';
  * Initializes and auto-synchronizes the 'about-fluxflow' skill files.
  * Force-syncs any modified/new files and cleans up removed references.
  */
-export const createAboutSkill = () => {
+export const createAboutSkill = (activeModel = null) => {
     try {
         const aboutSkillDir = path.join(FLUXFLOW_DIR, 'skills', 'fluxflow');
         const referencesDir = path.join(aboutSkillDir, 'references');
@@ -24,6 +24,23 @@ export const createAboutSkill = () => {
         // Track valid relative paths defined in the manifest for cleanup
         const validRelPaths = new Set(Object.keys(ABOUT_SKILL_MANIFEST).map(p => path.normalize(p)));
 
+        // Resolve current model (passed argument or env fallback)
+        let currentModel = activeModel || '';
+
+            const cleanRawModel = (currentModel || '')
+                .replace(/^.*::/, '')
+                .split(':')[0]
+                .replace(/\/free$/, '')
+                .trim();
+            const formattedModelName = path.basename(cleanRawModel)
+                .replace(/-free$/, '')
+                .replace(/_free$/, '')
+                .replace(/^free_/, '')
+                .replace(/(\d)-(\d)/g, '$1.$2')
+                .replaceAll('-', ' ')
+                .replaceAll('_', ' ')
+                .replace(/\b\w/g, char => char.toUpperCase().trim());
+
         // 1. Sync all manifest files (write/update if content differs)
         for (const [relPath, rawContent] of Object.entries(ABOUT_SKILL_MANIFEST)) {
             const targetFile = path.join(aboutSkillDir, relPath);
@@ -33,7 +50,15 @@ export const createAboutSkill = () => {
                 fs.mkdirSync(parentDir, { recursive: true });
             }
 
-            const normalizedContent = rawContent.trim() + '\n';
+            let fileContent = rawContent;
+            if (relPath === 'SKILL.md' && formattedModelName) {
+                fileContent = fileContent.replace(
+                    /Public Docs: [^\n]*/,
+                    `Public Docs: ${fileContent.match(/Public Docs: ([^\n]*)/)?.[1] || ''}\nActive Model: ${formattedModelName}`
+                );
+            }
+
+            const normalizedContent = fileContent.trim() + '\n';
             let currentContent = null;
             if (fs.existsSync(targetFile)) {
                 currentContent = fs.readFileSync(targetFile, 'utf8');

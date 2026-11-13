@@ -73,7 +73,7 @@ export const ABOUT_SKILL_MANIFEST = {
 
     'SKILL.md': `---
 name: fluxflow
-description: System Generated Documentation. Read this if asked anything regarding FluxFlow Harness
+description: System Generated Documentation. Read this if asked anything regarding FluxFlow Harness, model info
 ---
 
 # FluxFlow, by Kushal Roy Chowdhury
@@ -95,8 +95,6 @@ Public Docs: https://fluxflow-cli.onrender.com
 * IDE Companion Extension & Real-time Context → references/IDE.md
 * Priority Instructions (AGENTS.md/FLUXFLOW.md) & Skill System → references/PLUGINS.md
 * Agent Architecture & Memory System → references/ARCHITECTURE.md
-
-Default Context Length: 256k Tokens. Can be changed via ENV/In-app Settings → references/{SETTINGS,ENV}.md
 
 Docs missing required info? Say you are not sure enough to answer. Dont give wrong info`,
 

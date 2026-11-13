@@ -56,7 +56,7 @@ Open in chat via /settings
 ### 7. Miscellaneous
 * Directory Tree Design → Modern (Saves Tokens) | Legacy (More Tokens, No extra benefit)
 * Compact Large Tool Results → Compress large tool outputs to save tokens (model might miss subtle indentation/syntax errors)
-* Context Length → Set usable context window size in FluxFlow. 16k, 32k, 64k, 128k, 256k, 512k, 1M. After Limit reached: Start new chat
+* Context Length → Set usable context window size in FluxFlow. 16k, 32k, 64k, 128k, 256k (default), 512k, 1M. After Limit reached: Start new chat
 * Auto Truncate Results → Auto-truncate tool results after task finished to save token and improve caching
 * Image History for CU → Number of images to keep in context for Computer Use. Low / Standard / Extended
 * Keep Reasoning Content → Keeps the exact reasoning of model in context. More tokens. Might improve planning accuracy for few models
