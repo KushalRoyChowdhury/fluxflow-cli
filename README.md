@@ -33,6 +33,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **Poolside** (*Removed due to provider inference shutdown*)
   - **Token Harbor**
   - **APInex**
+  - **CoArena AI**
   - **Infron**
   - **xKiro**
   - **9Router**
