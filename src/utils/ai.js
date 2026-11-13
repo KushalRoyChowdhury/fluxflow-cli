@@ -14,6 +14,7 @@ import { parseArgs } from './arg_parser.js';
 import { fileURLToPath } from 'url';
 import path, { normalize } from 'path';
 import fs from 'fs';
+import os from 'os';
 import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { view_file } from '../tools/view_file.js';
@@ -3140,7 +3141,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         fs.writeFileSync(path.join(chatDir, 'system.md'), `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n--------------------------------------------------------------------\n\n${currentSystemInstruction}`);
                     }
 
-                    // fs.writeFileSync(`contents_context. json`, `${JSON.stringify({ contents }, null, 2)}`);
+                    // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
                     // fs.writeFileSync(`contents.txt`, `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n\n${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // break;
 
@@ -6269,6 +6270,8 @@ Current Time: ${time}
             ? thinkingOveride
             : 'Low';
 
+        // fs.writeFileSync(`contents_context_subagent.json`, `${JSON.stringify({ contents }, null, 2) }`);
+
         const response = await generateSimpleContent(
             mergedSettings,
             targetModel,
@@ -6450,12 +6453,48 @@ Current Time: ${time}
             try {
                 const result = await dispatchTool(toolCall.toolName, toolCall.args, { ...settings, mode: 'Flux' });
                 if (logCallback) logCallback(`[Action Result]\n${result}\n`);
-                toolResultsStr += `[ACTION RESULT for ${toolCall.toolName}]: ${result}\n\n`;
+
+                const rawResult = (result || '').toString()
+                    .replaceAll('═'.repeat(88), '='.repeat(35))
+                    .replaceAll('[UI_CONTEXT]', '');
+                let processedResult = rawResult;
+                if (processedResult.includes('[[VERIFIED]]')) {
+                    processedResult = processedResult.replace(/\[\[VERIFIED\]\][\s\S]*?\[\[\/VERIFIED\]\]/g, '[SYSTEM NOTE]: Patch Block matched & applied successfully. Large Block omitted to save tokens.\n');
+                }
+
+                let aiContent;
+                if ((normalizedToolName === 'write_file' || normalizedToolName === 'writefile') && !processedResult.startsWith('ERROR:')) {
+                    const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
+                    const tildeNoteMatch = cleanText.match(/\n\s*(\[Note:\s*'~'\s*resolved\s*to\s*user\s*home\s*directory[\s\S]*?\])\s*$/);
+                    const tildeSuffix = tildeNoteMatch ? `\n\n${tildeNoteMatch[1]}` : '';
+                    if (/- Stats:.*\r?\nOld File contents:/s.test(cleanText)) {
+                        // Overwrite: keep header + old content, strip Content Preview and new content
+                        const contentPreviewIdx = cleanText.search(/^- Content Preview:/m);
+                        const trimmed = contentPreviewIdx !== -1 ? cleanText.slice(0, contentPreviewIdx).trimEnd() : cleanText;
+                        aiContent = `[ACTION RESULT]: ${trimmed}\n\n[Old file content for reversal reference. Replaced with new write request]${tildeSuffix}`;
+                    } else {
+                        // New file write: just header + stats, no content echoing
+                        const lines = cleanText.split(/\r?\n/);
+                        const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
+                        const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
+                        aiContent = `[ACTION RESULT]: ${headerPart}${tildeSuffix}`;
+                    }
+                } else if (processedResult.startsWith('[[SAME]]')) {
+                    const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
+                    const lines = cleanText.split(/\r?\n/);
+                    const successLines = lines.filter(l => l.startsWith('File ') || l.trim().startsWith('- Stats:'));
+                    const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
+                    aiContent = `[ACTION RESULT]: ${headerPart}`;
+                } else {
+                    aiContent = `[ACTION RESULT]: ${processedResult}`;
+                }
+
+                toolResultsStr += `${aiContent}\n\n`;
                 await incrementUsage('toolSuccess');
             } catch (e) {
                 const errorMsg = `ERROR: Execution failed for [${toolCall.toolName}]: ${e.message}`;
                 if (logCallback) logCallback(`[Tool Error] ${errorMsg}\n`);
-                toolResultsStr += `${errorMsg}\n\n`;
+                toolResultsStr += `[ACTION RESULT]: ${errorMsg}\n\n`;
                 await incrementUsage('toolFailure');
             }
         }
@@ -6481,6 +6520,102 @@ Current Time: ${time}
 
     if (settings?.onHistoryUpdate && typeof settings.onHistoryUpdate === 'function') {
         settings.onHistoryUpdate(subagentHistory);
+    }
+
+    // Automatic result truncation for subagent history to conserve tokens across turns
+    if (mergedSettings?.systemSettings?.autoTruncateResults) {
+        for (let i = 0; i < subagentHistory.length; i++) {
+            const m = subagentHistory[i];
+            const fullTextStr = m.text || '';
+            if (!fullTextStr.startsWith('[ACTION RESULT]: ') && !fullTextStr.startsWith('[TOOL RESULT]: ')) {
+                continue;
+            }
+            if (
+                fullTextStr.startsWith('[ACTION RESULT]: Goal') ||
+                fullTextStr.includes('[ACTION RESULT]: ...Old result truncated') ||
+                fullTextStr.includes('[ACTION RESULT]: Diff result ') ||
+                fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') ||
+                fullTextStr.startsWith('[ACTION RESULT]: Skill:') ||
+                fullTextStr.startsWith('[ACTION RESULT]: DOCs:') ||
+                fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') ||
+                fullTextStr.startsWith('[ACTION RESULT]: Search results for [') ||
+                fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed') ||
+                fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') ||
+                fullTextStr.startsWith('[ACTION RESULT]: Subagent task') ||
+                /^\[ACTION RESULT\]: File \[.*?\] saved/s.test(fullTextStr)
+            ) {
+                continue;
+            }
+
+            if (mergedSettings?.systemSettings?.overwriteProtection !== false) {
+                const fileUpdateMatch = fullTextStr.match(/^\[ACTION RESULT\]:\s*File\s*\[(.*?)\]\s*updated(?:\s+with\s+some\s+blocks\s+failed)?\.\s*(?:\[(\d+\/\d+)\]\s*blocks\s*applied\.)?([\s\S]*)$/);
+                if (fileUpdateMatch) {
+                    try {
+                        const rawFilePath = fileUpdateMatch[1];
+                        const blocksInfo = fileUpdateMatch[2] || '';
+                        const rawDiffBody = fileUpdateMatch[3] || '';
+                        const fileName = path.basename(rawFilePath);
+
+                        let polished = rawDiffBody.replace('[DIFF_START]', '');
+                        polished = polished.replace(/\[DIFF_END\](?=[^\[]*$)/, '');
+                        polished = polished
+                            .split(/\r?\n/)
+                            .filter(line => {
+                                const trimmed = line.trim();
+                                return trimmed.startsWith('-') || trimmed.startsWith('+') || trimmed.startsWith('@@');
+                            })
+                            .join('\n')
+                            .trim();
+
+                        let totalAdded = 0;
+                        let totalRemoved = 0;
+                        const hunkHeaderMatches = rawDiffBody.matchAll(/@@\s*([^@]+?)\s*@@/g);
+                        for (const match of hunkHeaderMatches) {
+                            const headerContent = match[1];
+                            const addMatch = headerContent.match(/\+(\d+)/);
+                            const removeMatch = headerContent.match(/-(\d+)/);
+                            if (addMatch) totalAdded += parseInt(addMatch[1], 10);
+                            if (removeMatch) totalRemoved += parseInt(removeMatch[1], 10);
+                        }
+
+                        const changeParts = [];
+                        if (totalAdded > 0) changeParts.push(`+${totalAdded}`);
+                        if (totalRemoved > 0) changeParts.push(`-${totalRemoved}`);
+                        const changedCount = changeParts.length > 0 ? ` Total ${changeParts.join(' ')} changes.` : '';
+
+                        const backupDir = path.join(DATA_DIR, 'DiffBackups');
+                        if (!fs.existsSync(backupDir)) {
+                            fs.mkdirSync(backupDir, { recursive: true });
+                        }
+                        const timeSuffix = String(Date.now()).slice(-5);
+                        const randomHash = crypto.randomBytes(2).toString('hex');
+                        const backupFileName = `${fileName}-diff-${timeSuffix}-${randomHash}.txt`;
+                        const backupFilePath = path.join(backupDir, backupFileName);
+                        fs.writeFileSync(backupFilePath, polished, 'utf8');
+
+                        const displayBackupPath = `${DATA_DIR.replaceAll('\\', '/').replace(os.homedir().replaceAll('\\', '/'), '~')}/DiffBackups/${backupFileName}`;
+                        const blocksSuffix = blocksInfo ? ` ${blocksInfo} blocks.` : '';
+                        subagentHistory[i] = {
+                            ...m,
+                            text: `[ACTION RESULT]: Diff result ${fileName} saved in '${displayBackupPath}'.${blocksSuffix}${changedCount}`
+                        };
+                        continue;
+                    } catch (err) {
+                        // Fallback to default truncation if file save fails
+                    }
+                }
+            }
+
+            subagentHistory[i] = {
+                ...m,
+                text: '[ACTION RESULT]: ...Old result truncated to save tokens'
+            };
+        }
+
+        // Notify listener of the finalized truncated history
+        if (settings?.onHistoryUpdate && typeof settings.onHistoryUpdate === 'function') {
+            settings.onHistoryUpdate(subagentHistory);
+        }
     }
 
     return finalAnswer;
