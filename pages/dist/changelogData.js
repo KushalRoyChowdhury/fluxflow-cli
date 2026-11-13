@@ -1,6 +1,18 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.5.0": {
+        "note": "NOVEMBER 12",
+        "added": [
+            "Added auto-truncation support for SubAgents.",
+            "Added `resume` support for SubAgents with retained context."
+        ],
+        "changed": [
+            "Improved tool parser with intelligent contextual decision making for better reliability.",
+            "Improved Agent grep performance."
+        ],
+        "fixes": []
+    },
     "5.4.0": {
         "note": "NOVEMBER 10",
         "added": [],

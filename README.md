@@ -2,7 +2,7 @@
 ![Flux Flow Hero](https://github.com/KushalRoyChowdhury/fluxflow-cli/blob/main/fluxflow.png)
 
 <p align="left">
-  <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v4-blue?style=plastic" alt="FluxFlow Version"></a>
+  <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v5-blue?style=plastic" alt="FluxFlow Version"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=plastic" alt="License MIT"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%3E%3D22-green?style=plastic" alt="Node Compatibility"></a>
 </p>
