@@ -4,15 +4,28 @@ import fs from 'fs';
 
 export const invoke = async (args, context = {}) => {
     const { runSubagent } = await import('../utils/ai.js');
-    const parsed = parseArgs(args, ['task', 'instruction', 'prompt', 'model', 'title', 'tools']);
+    const parsed = parseArgs(args, ['task', 'instruction', 'prompt', 'model', 'title', 'tools', 'id']);
     const task = parsed.task || parsed.instruction || parsed.prompt;
     const model = parsed.model || null;
     const title = parsed.title || null;
     const toolsRaw = parsed.tools || null;
+    const requestedId = parsed.id && parsed.id !== 'null' && parsed.id !== 'undefined' && parsed.id !== '' ? String(parsed.id).trim() : null;
 
     if (!task) {
         return 'ERROR: Missing "task" argument for invoke.';
     }
+
+    // Check if resuming existing subagent session
+    let existingEntry = null;
+    let notFoundNote = '';
+    if (requestedId) {
+        existingEntry = subagentProgress.find(t => t.id === requestedId);
+    }
+
+    const isResuming = !!existingEntry;
+    // If model specified an ID, honor it! Otherwise generate random subagent- ID
+    const taskId = isResuming ? existingEntry.id : (requestedId || `subagent-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
+    const history = isResuming ? existingEntry.history || [] : [];
 
     // Parse allowed tools array if provided
     let allowedTools = null;
@@ -28,8 +41,6 @@ export const invoke = async (args, context = {}) => {
         }
     }
 
-    const taskId = `subagent-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
     let _resolveCompletion = null;
     let _rejectCompletion = null;
     const completionPromise = new Promise((res, rej) => {
@@ -37,35 +48,44 @@ export const invoke = async (args, context = {}) => {
         _rejectCompletion = rej;
     });
 
-    const taskEntry = {
-        id: taskId,
-        title: title || task.substring(0, 30),
-        task: task,
-        status: 'running',
-        startedAt: Date.now(),
-        lastChunkTime: Date.now(),
-        wps: 0,
-        questions: [],
-        pendingSteerMessages: [],
-        steer: (msg) => {
-            if (msg) {
-                taskEntry.pendingSteerMessages.push(msg);
-            }
-        },
-        completionPromise,
-        _resolveCompletion,
-        _rejectCompletion,
-        progress: [] // Array of arrays containing logs for each turn
-    };
+    let taskEntry = existingEntry;
+    if (!taskEntry) {
+        taskEntry = {
+            id: taskId,
+            title: title || task.substring(0, 30),
+            task: task,
+            status: 'running',
+            startedAt: Date.now(),
+            lastChunkTime: Date.now(),
+            wps: 0,
+            questions: [],
+            pendingSteerMessages: [],
+            steer: (msg) => {
+                if (msg) {
+                    taskEntry.pendingSteerMessages.push(msg);
+                }
+            },
+            completionPromise,
+            _resolveCompletion,
+            _rejectCompletion,
+            progress: [], // Array of arrays containing logs for each turn
+            history: []
+        };
+        subagentProgress.push(taskEntry);
+    } else {
+        taskEntry.status = 'running';
+        taskEntry.task = task;
+        if (title) taskEntry.title = title;
+        taskEntry.startedAt = Date.now();
+        taskEntry.lastChunkTime = Date.now();
+        taskEntry.completionPromise = completionPromise;
+        taskEntry._resolveCompletion = _resolveCompletion;
+        taskEntry._rejectCompletion = _rejectCompletion;
+    }
 
     // Sliding-window word stats (mirrors the main agent's streamingWordStatsRef logic)
     const wordStats = { chunks: [], totalWords: 0 };
 
-    // setInterval(() => {
-    //     fs.writeFileSync(`SUBAGENT_DEBUG_ENTRY-{${taskEntry.id}}.json`, JSON.stringify(taskEntry, null, 4));
-    // }, 1000);
-
-    subagentProgress.push(taskEntry);
     if (context.onSubagentUpdate) {
         context.onSubagentUpdate();
     }
@@ -75,6 +95,9 @@ export const invoke = async (args, context = {}) => {
     const subagentContext = {
         ...context,
         taskId: taskId,
+        onHistoryUpdate: (updatedHistory) => {
+            taskEntry.history = [...updatedHistory];
+        },
         onAskMain: async (questionText) => {
             const questionId = `q-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
             let questionResolver = null;
@@ -142,7 +165,6 @@ export const invoke = async (args, context = {}) => {
     };
     runSubagent(task, subagentContext, model, allowedTools, null, (logMessage) => {
         if (taskEntry.status === 'cancelled') return;
-
         if (logMessage.startsWith('[Subagent Turn')) {
             if (currentTurnLogs.length > 0) {
                 taskEntry.progress.push([...currentTurnLogs]);
@@ -172,7 +194,7 @@ export const invoke = async (args, context = {}) => {
         if (context.onSubagentUpdate) {
             context.onSubagentUpdate();
         }
-    }, true).then((finalAnswer) => {
+    }, true, history).then((finalAnswer) => {
         if (taskEntry.status === 'cancelled') {
             if (taskEntry._resolveCompletion) taskEntry._resolveCompletion(finalAnswer);
             return;
@@ -211,6 +233,14 @@ export const invoke = async (args, context = {}) => {
         addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" (id: ${taskId}) FAILED with error: ${err.message}. [/SYSTEM]`);
         if (taskEntry._rejectCompletion) taskEntry._rejectCompletion(err);
     });
+
+    if (isResuming) {
+        return `Background subagent ${taskId} resumed.`;
+    }
+
+    if (notFoundNote) {
+        return `Background subagent started. Task ID: ${taskId}.${notFoundNote}`;
+    }
 
     return `Background subagent started. Task ID: ${taskId}`;
 };

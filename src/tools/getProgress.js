@@ -15,7 +15,7 @@ export const getProgress = async (args, context = {}) => {
         return `ERROR: Subagent task with ID [${id}] not found.`;
     }
 
-    let output = `Subagent Task Status: ${task.status.toUpperCase()}\n`;
+    let output = `Subagent task status: ${task.status.toUpperCase()}\n`;
     output += `Title: ${task.title}\n`;
     output += `Task: ${task.task}\n`;
     if (task.startedAt) {

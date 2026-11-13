@@ -4535,7 +4535,7 @@ export default function App({ args = [] }) {
                             if (!fullTextStr.startsWith('[ACTION RESULT]: ') && !fullTextStr.startsWith('[TOOL RESULT]: ')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || fullTextStr.includes('[ACTION RESULT]: ...Old result truncated to save tokens')) {
+                            if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || fullTextStr.startsWith('[ACTION RESULT]: Subagent task') || fullTextStr.includes('[ACTION RESULT]: ...Old result truncated to save tokens')) {
                                 return m;
                             }
                             truncatedCount++;
@@ -5357,7 +5357,7 @@ export default function App({ args = [] }) {
                                         if (!fullTextStr.startsWith('[ACTION RESULT]: ') && !fullTextStr.startsWith('[TOOL RESULT]: ')) {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('[ACTION RESULT]: ...Old result truncated') || fullTextStr.includes('[ACTION RESULT]: Diff result ') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || /^\[ACTION RESULT\]: File \[.*?\] saved/s.test(fullTextStr)) {
+                                        if (fullTextStr.startsWith('[ACTION RESULT]: Goal') || fullTextStr.includes('[ACTION RESULT]: ...Old result truncated') || fullTextStr.includes('[ACTION RESULT]: Diff result ') || fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') || fullTextStr.startsWith('[ACTION RESULT]: Skill:') || fullTextStr.startsWith('[ACTION RESULT]: DOCs:') || fullTextStr.startsWith('[ACTION RESULT]: Markdown parsed') || fullTextStr.startsWith('[ACTION RESULT]: Search results for [') || fullTextStr.startsWith('[ACTION RESULT]: AI Mode temporarily failed') || fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') || fullTextStr.startsWith('[ACTION RESULT]: Subagent task') || /^\[ACTION RESULT\]: File \[.*?\] saved/s.test(fullTextStr)) {
                                             return m;
                                         }
 

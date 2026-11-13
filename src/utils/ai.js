@@ -6054,7 +6054,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     yield { type: 'status', content: null };
 };
 
-export const runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = null, logCallback = null, isAsync = false) => {
+export const runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = null, logCallback = null, isAsync = false, existingHistory = null) => {
     const savedSettings = await loadSettings();
     const mergedSettings = { ...savedSettings, ...settings };
 
@@ -6218,9 +6218,16 @@ Current Time: ${time}
 === END SYSTEM PROMPT ===`;
 
 
-    const subagentHistory = [
-        { role: 'user', text: `Complete this task: ${task}` }
-    ];
+    const subagentHistory = Array.isArray(existingHistory) && existingHistory.length > 0
+        ? existingHistory
+        : [
+            { role: 'user', text: `Complete this task: ${task}` }
+        ];
+
+    // If resuming with existing history, append the new task as follow-up instruction
+    if (Array.isArray(existingHistory) && existingHistory.length > 0) {
+        subagentHistory.push({ role: 'user', text: `Follow-up task / instruction: ${task}` });
+    }
 
     let turn = 0;
     let finalAnswer = '';
@@ -6471,6 +6478,10 @@ Current Time: ${time}
         turn++;
     }
     // fs.writeFileSync("SUBAGENT_DEBUG.txt", finalAnswer);
+
+    if (settings?.onHistoryUpdate && typeof settings.onHistoryUpdate === 'function') {
+        settings.onHistoryUpdate(subagentHistory);
+    }
 
     return finalAnswer;
 };
