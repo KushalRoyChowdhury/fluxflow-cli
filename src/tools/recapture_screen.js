@@ -13,9 +13,9 @@ export const recapture_screen = async (args, context = {}) => {
     try {
         const screenshotData = await captureGriddedScreenshot({ canvasMode });
         if (screenshotData && screenshotData.base64) {
-            const modeText = canvasMode ? ' (static canvas grid mode)' : '';
+            const modeText = canvasMode ? ' (static canvas grid mode). New action if needed: Drag(fromGridId=int, toGridId=int). Drag mouse from start grid number to target grid number' : '';
             return {
-                text: `Screen recaptured${modeText}.`,
+                text: `Screen recaptured${modeText}`,
                 binaryPart: {
                     inlineData: {
                         mimeType: screenshotData.mimeType,
