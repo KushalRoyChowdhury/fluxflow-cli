@@ -71,8 +71,8 @@ export const getTokenHarborStream = async function* (apiKey, model, contents, sy
 
     const headers = {
         'Content-Type': 'application/json',
-        'X-Title': 'Flux-Flow',
-        'User-Agent': 'Flux-Flow',
+        'X-Title': 'FluxFlow',
+        'User-Agent': 'FluxFlow',
         'HTTP-Referer': 'https://fluxflow-cli.onrender.com/'
     };
 

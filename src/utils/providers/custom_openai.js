@@ -99,8 +99,8 @@ export const getCustomOpenAIStream = async function* (apiKey, model, contents, s
     const headers = {
         'Content-Type': 'application/json',
         'Accept': 'text/event-stream, application/json',
-        'X-Title': 'Flux-Flow',
-        'User-Agent': 'Flux-Flow'
+        'X-Title': 'FluxFlow',
+        'User-Agent': 'FluxFlow'
     };
 
     // /key use --null: explicitly send no auth header (local keyless endpoints).

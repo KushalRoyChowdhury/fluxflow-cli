@@ -136,8 +136,8 @@ export const getInfronStream = async function* (apiKey, model, contents, systemI
 
     const headers = {
         'Content-Type': 'application/json',
-        'X-Title': 'Flux-Flow',
-        'User-Agent': 'Flux-Flow',
+        'X-Title': 'FluxFlow',
+        'User-Agent': 'FluxFlow',
         'HTTP-Referer': 'https://fluxflow-cli.onrender.com/'
     };
 

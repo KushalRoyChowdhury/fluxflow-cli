@@ -70,8 +70,8 @@ export const getXKiroStream = async function* (apiKey, model, contents, systemIn
 
     const headers = {
         'Content-Type': 'application/json',
-        'X-Title': 'Flux-Flow',
-        'User-Agent': 'Flux-Flow',
+        'X-Title': 'FluxFlow',
+        'User-Agent': 'FluxFlow',
         'HTTP-Referer': 'https://fluxflow-cli.onrender.com/'
     };
 
