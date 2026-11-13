@@ -6180,6 +6180,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const providedToolsSection = `-- ACTIONS (path = relative to CWD, path separator: '/') --
 In chat output the format \`[action:ActionName(arg1="value1")]\` in NEW line
 Rules:
+- Max 3 actions/turn
 - JSON escape literal sequences, backslash: \\\\, newLine: \\ n
 - Same file, multiple edits? ONE PatchFile ≤15 blocks
 - Need text or huge file? CodeSearch > Full Read
@@ -6205,7 +6206,6 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 
     const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
 Identity: FluxFlow subagent helping the main Agent
-Your task: "${task}"
 CWD: ${process.cwd()}
 
 ${providedToolsSection.trimEnd()}
@@ -6222,12 +6222,12 @@ Current Time: ${time}
     const subagentHistory = Array.isArray(existingHistory) && existingHistory.length > 0
         ? existingHistory
         : [
-            { role: 'user', text: `Complete this task: ${task}` }
+            { role: 'user', text: `Task: ${task}` }
         ];
 
     // If resuming with existing history, append the new task as follow-up instruction
     if (Array.isArray(existingHistory) && existingHistory.length > 0) {
-        subagentHistory.push({ role: 'user', text: `Follow-up task / instruction: ${task}` });
+        subagentHistory.push({ role: 'user', text: `Follow-up instruction: ${task}` });
     }
 
     let turn = 0;

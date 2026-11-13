@@ -4540,6 +4540,7 @@ export default function App({ args = [] }) {
                                 fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') ||
                                 fullTextStr.startsWith('[ACTION RESULT]: Background subagent started. Task ID:') ||
                                 fullTextStr.startsWith('[ACTION RESULT]: Subagent task') ||
+                                fullTextStr.startsWith('[ACTION RESULT]: Background subagent') ||
                                 fullTextStr.includes('[ACTION RESULT]: ...Old result truncated to save tokens')) {
                                 return m;
                             }
@@ -5365,6 +5366,7 @@ export default function App({ args = [] }) {
                                         if (
                                             fullTextStr.startsWith('[ACTION RESULT]: Goal') ||
                                             fullTextStr.includes('[ACTION RESULT]: ...Old result truncated') ||
+                                            fullTextStr.includes('[ACTION RESULT]: Background subagent') ||
                                             fullTextStr.includes('[ACTION RESULT]: Diff result ') ||
                                             fullTextStr.startsWith('[ACTION RESULT]: USER CHOOSE') ||
                                             fullTextStr.startsWith('[ACTION RESULT]: Skill:') ||

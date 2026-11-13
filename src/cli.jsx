@@ -586,6 +586,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
             .replace(/-free$/, '')
             .replace(/_free$/, '')
             .replace(/^free_/, '')
+            .replace(/(\d)-(\d)/g, '$1.$2')
             .replaceAll('-', ' ')
             .replaceAll('_', ' ')
             .replace(/\b\w/g, char => char.toUpperCase().trim());
