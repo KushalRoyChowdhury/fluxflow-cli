@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.6.0": {
+        "note": "NOVEMBER 13",
+        "added": [
+            "Added new provider: [Coarea AI](https://coarena.ai/account/api) "
+        ],
+        "changed": [
+            "Improved system prompt efficiency."
+        ],
+        "fixes": []
+    },
     "5.5.0": {
         "note": "NOVEMBER 12",
         "added": [
