@@ -18,7 +18,7 @@ export const changelogData = {
             "Added `resume` support for SubAgents with retained context."
         ],
         "changed": [
-            "Improved tool parser with intelligent contextual decision making for better reliability.",
+            "Improved tool parser *(Fidelity Engine v3)* with intelligent contextual decision making for better reliability.",
             "Improved Agent grep performance."
         ],
         "fixes": []
