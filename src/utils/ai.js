@@ -4794,7 +4794,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (!approval) {
                                             if (!isOverwritePrompt && (normToolName === 'write_file' || normToolName === 'update_file')) {
                                                 try {
-                                                    const toolArgs = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
+                                                    const toolArgs = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*', 'allowMultiple']);
                                                     let { path: filePath } = toolArgs;
                                                     if (filePath) {
                                                         const { resolvedPath } = resolvePathWithTilde(filePath);
@@ -4938,7 +4938,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             registerSecurityListener(null);
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
-                                                const toolArgs = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
+                                                const toolArgs = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*', 'allowMultiple']);
                                                 let { path: filePath } = toolArgs;
                                                 if (filePath) {
                                                     const { resolvedPath } = resolvePathWithTilde(filePath);
@@ -4960,7 +4960,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                         if (approval === 'allow' && diffOpened && isBridgeConnected()) {
                                             // SUCCESS: The changes are already in the IDE buffer and we told it to save.
-                                            const toolArgs = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
+                                            const toolArgs = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*', 'allowMultiple']);
                                             let { path: filePath } = toolArgs;
                                             const { resolvedPath, isTildeResolved } = resolvePathWithTilde(filePath);
                                             filePath = resolvedPath;
@@ -5244,7 +5244,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 thisIsFirstToolFeedback = false;
                                             } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
-                                                const deniedLabel = `✘ ${action}: ${parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']).path.replaceAll('\\', '/') || '...'}`;
+                                                const deniedLabel = `✘ ${action}: ${parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*', 'allowMultiple']).path.replaceAll('\\', '/') || '...'}`;
                                                 // Get terminal physical width
                                                 let terminalWidth = 115;
                                                 if (process.stdout.isTTY) {
@@ -5317,7 +5317,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 if (normToolName === 'write_file' || normToolName === 'update_file') {
                                     try {
-                                        const { path: filePath } = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
+                                        const { path: filePath } = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*', 'allowMultiple']);
                                         if (filePath) {
                                             const absPath = path.resolve(process.cwd(), filePath);
                                             const currentIDE = await getIDEContext();
@@ -5333,7 +5333,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 // yield { type: 'spinner', content: true }; // [Obsolete]
 
                                 if ((normToolName === 'write_file' || normToolName === 'update_file') && !result.startsWith('ERROR:')) {
-                                    const { path: filePath } = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
+                                    const { path: filePath } = parseArgs(toolCall.args, ['path', 'content', 'searchContent*', 'replaceContent*', 'newContent*', 'allowMultiple']);
                                     if (filePath) {
                                         const { resolvedPath } = resolvePathWithTilde(filePath);
                                         const absPath = path.resolve(process.cwd(), resolvedPath);
