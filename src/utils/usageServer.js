@@ -1261,7 +1261,12 @@ function generateDashboardHtml() {
 
         function getProviderBrandIcon(providerName, size = 20) {
             const p = (providerName || '').toLowerCase().trim();
-            if (p.includes('coarena')) {
+            if (p.includes('numes')) {
+                return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="24" height="24" rx="6" fill="#0F172A"/>
+                    <path d="M6 17V7h2.2l5.2 6.6V7H16v10h-2.2L8.6 10.4V17H6z" fill="#38BDF8"/>
+                </svg>\`;
+            } else if (p.includes('coarena')) {
                 return \`<svg width="\${size}" height="\${size}" viewBox="0 0 24 24" fill="none" style="vertical-align: middle; flex-shrink: 0;" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.5" fill="none" stroke-dasharray="50 15" stroke-linecap="round"/>
                     <rect x="10" y="7" width="2.5" height="3.5" rx="1" fill="currentColor"/>

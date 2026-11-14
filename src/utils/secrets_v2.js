@@ -47,6 +47,7 @@ export const PROVIDER_DEFS = [
     { canonical: 'ExpLabs',     secret: ['EXPLABS_API_KEY', 'EXPERIENTIALLABS_API_KEY'], aliases: ['explabs', 'experientiallabs', 'experimentallabs', 'experiential labs'] },
     { canonical: 'TokenHarbor', secret: ['TOKENHARBOR_API_KEY', 'TOKEN_HARBOR_API_KEY'], aliases: ['tokenharbor', 'token harbor', 'token_harbor', 'thk'] },
     { canonical: 'Infron',      secret: ['INFRON_API_KEY'],                      aliases: ['infron'] },
+    { canonical: 'Numes',       secret: ['NUMES_API_KEY'],                       aliases: ['numes'] },
     { canonical: 'APInex',      secret: ['APINEX_API_KEY'],                      aliases: ['apinex', 'apx'] },
     { canonical: 'xKiro',       secret: ['XKIRO_API_KEY'],                       aliases: ['xkiro', 'kiro'] },
     { canonical: 'CoArena',     secret: ['COARENA_API_KEY'],                     aliases: ['coarena', 'coarena_ai'] },

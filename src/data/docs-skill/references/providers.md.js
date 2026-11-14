@@ -2,7 +2,7 @@
 export const PROVIDERS_MD = `# FluxFlow AI Providers & Setup
 
 ## Supported Providers
-* Gemini | NVIDIA NIM | DeepSeek | Mistral | Ollama Local/Cloud | InferX | SenseNova | Poolside | OpenRouter | AIHubMix | Experiential Labs | TokenHarbor | APInex | Infron | Coarena
+* Gemini | NVIDIA NIM | DeepSeek | Mistral | Ollama Local/Cloud | InferX | SenseNova | Poolside | OpenRouter | AIHubMix | Experiential Labs | TokenHarbor | APInex | Infron | Coarena | Numes
 * Proxy: 9router. Can use OAuth subscription like Codex, Claude Code, GitHub Copilot etc. or any OpenAI/Anthropic API that FluxFlow dont have natively
 * Custom: Native custom OpenAI chat completions integration, no external package needed → references/SETTINGS.md, for more details
 
@@ -21,6 +21,10 @@ export const PROVIDERS_MD = `# FluxFlow AI Providers & Setup
 * Quantizations: :fp16|fp8|int8|int4. /model deepseek-v4.1-flash:fp8
 * Sorting: :throughput|latency|price|ttft. /model deepseek-v4.1-flash:price
 * Combinations (any order): /model azure::deepseek-v4.1-flash:free:fp8:ttft:flex
+
+## Numes: Routing & Sorting
+* Provider Routing: /model provider::model
+* Sorting: /model openai/gpt-6-luna:price|throughput|latency|quality
 
 ## Setup Local NVIDIA NIM (OpenAI-Compatible)
 1. Environment Variables:

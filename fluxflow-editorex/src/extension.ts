@@ -605,7 +605,7 @@ export function getCompletionApiKey(provider: string): string | null {
                     'custom': 'c_openai', 'custom (openai)': 'c_openai',
                     'deepseek-ai': 'DeepSeek', '9router': '9router', '9-router': '9router',
                     'explabs': 'ExpLabs', 'tokenharbor': 'TokenHarbor', 'apinex': 'APInex',
-                    'xkiro': 'xKiro', 'coarena': 'CoArena', 'coarena_ai': 'CoArena', 'infron': 'Infron', 'sensenova': 'SenseNova'
+                    'xkiro': 'xKiro', 'coarena': 'CoArena', 'coarena_ai': 'CoArena', 'infron': 'Infron', 'numes': 'Numes', 'sensenova': 'SenseNova'
                 };
                 const lower = provider.toLowerCase();
                 const canonical = canonMap[lower] || provider;

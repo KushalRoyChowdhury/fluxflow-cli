@@ -55,6 +55,7 @@ const PROVIDER_LOADERS = {
     ExpLabs: () => import('./providers/explabs.js').then(m => m.getExpLabsStream),
     TokenHarbor: () => import('./providers/tokenharbor.js').then(m => m.getTokenHarborStream),
     Infron: () => import('./providers/infron.js').then(m => m.getInfronStream),
+    Numes: () => import('./providers/numes.js').then(m => m.getNumesStream),
     APInex: () => import('./providers/apinex.js').then(m => m.getAPInexStream),
     xKiro: () => import('./providers/xkiro.js').then(m => m.getXKiroStream),
     CoArena: () => import('./providers/coarena.js').then(m => m.getCoArenaStream),
@@ -1580,6 +1581,8 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
                 stream = (await loadProvider('ExpLabs'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'Infron' || aiProvider === 'infron') {
                 stream = (await loadProvider('Infron'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === 'Numes' || aiProvider === 'numes') {
+                stream = (await loadProvider('Numes'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'TokenHarbor' || aiProvider === 'Token Harbor' || aiProvider === 'tokenharbor' || aiProvider === 'token_harbor' || aiProvider === 'thk') {
                 stream = (await loadProvider('TokenHarbor'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'APInex' || aiProvider === 'apinex' || aiProvider === 'apx') {
@@ -3296,6 +3299,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             isMultiModal,
                             abortController.signal,
                             1.0
+                        );
+                    } else if (aiProvider === 'Numes' || aiProvider === 'numes') {
+                        stream = (await loadProvider('Numes'))(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0,
+                            chatId
                         );
                     } else if (aiProvider === 'Infron' || aiProvider === 'infron') {
                         stream = (await loadProvider('Infron'))(
@@ -6109,6 +6125,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'explabs' || lower === 'experientiallabs' || lower === 'experimentallabs') return 'ExpLabs';
         if (lower === 'tokenharbor' || lower === 'token harbor' || lower === 'token_harbor' || lower === 'thk') return 'TokenHarbor';
         if (lower === 'infron') return 'Infron';
+        if (lower === 'numes') return 'Numes';
         if (lower === 'apinex' || lower === 'apx') return 'APInex';
         if (lower === 'xkiro' || lower === 'kiro') return 'xKiro';
         if (lower === 'coarena' || lower === 'coarena_ai') return 'CoArena';
