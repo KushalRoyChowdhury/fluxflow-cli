@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.7.0": {
+        "note": "NOVEMBER 15",
+        "added": [
+            "Added new provider: [Numes AI](https://numes.ai/dashboard)."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "5.6.3": {
         "note": "NOVEMBER 14",
         "added": [],
@@ -15,7 +23,7 @@ export const changelogData = {
     "5.6.0": {
         "note": "NOVEMBER 13",
         "added": [
-            "Added new provider: [Coarea AI](https://coarena.ai/account/api) "
+            "Added new provider: [Coarea AI](https://coarena.ai/account/api)."
         ],
         "changed": [
             "Improved system prompt efficiency."
