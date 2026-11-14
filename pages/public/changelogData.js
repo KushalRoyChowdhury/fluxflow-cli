@@ -1,14 +1,15 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-    "5.6.2": {
+    "5.6.3": {
         "note": "NOVEMBER 14",
         "added": [],
         "changed": [
             "Improved tool parser *(Fidelity Engine v3.5)* with better handling with realtime parsing during streaming."
         ],
         "fixes": [
-            "Fixed some issues with path parsing causing failure opening files in editor."
+            "Fixed some issues with path parsing causing failure opening files in editor.",
+            "Fixed critical provider nonsense SSE stream parsing."
         ]
     },
     "5.6.0": {

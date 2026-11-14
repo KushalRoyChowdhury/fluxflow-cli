@@ -75,7 +75,7 @@ export default function Parser() {
                 <li><strong>Array Literal Support</strong> — Nested quote and bracket-balance handling for array-valued arguments.</li>
             </ul>
 
-            <h2 id="v35-streaming">v3.5 — Streaming &amp; Strict-Quote Extraction (Current) <span className="ml-2 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">CLI v5.6.2</span></h2>
+            <h2 id="v35-streaming">v3.5 — Streaming &amp; Strict-Quote Extraction (Current) <span className="ml-2 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">CLI v5.6.3</span></h2>
             <p><strong>Signature:</strong> <code>parseArgs(argsString, knownKeys = [], strictQuoteKeys = [])</code></p>
             <p>
                 The current revision adds selective, deterministic quote-to-quote parsing for
@@ -87,7 +87,7 @@ export default function Parser() {
                 <li><strong>Streaming / Live Tool Sniffing</strong> — Resolves partial stream truncation, where unfinished subsequent values (e.g. an unclosed <code>content="..."</code>) previously caused earlier fields (<code>path="..."</code>) to fail lookahead validation and bleed into later content.</li>
                 <li><strong>Backwards Compatibility</strong> — All v3.0 smart heuristic capabilities are retained.</li>
             </ul>
-            
+
         </DocPage>
     )
 }
