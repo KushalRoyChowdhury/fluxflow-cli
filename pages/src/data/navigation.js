@@ -13,6 +13,7 @@ export const navItems = [
         children: [
             { title: 'Tools', path: '/tools' },
             { title: 'Architecture', path: '/architecture' },
+            { title: 'Parser (Fidelity)', path: '/parser' },
             { title: 'Models Management', path: '/models' },
             { title: 'API Keys', path: '/api-keys' },
         ],

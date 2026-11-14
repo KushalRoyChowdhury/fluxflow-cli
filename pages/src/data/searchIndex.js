@@ -218,6 +218,22 @@ export const searchIndex = [
         description: 'Access to a massive ecosystem of AI models.'
     },
 
+    // Parser (Fidelity)
+    {
+        title: 'Parser (Fidelity)',
+        path: '/parser',
+        section: 'fidelity-parser',
+        keywords: ['parser', 'fidelity', 'dsl', 'tool calling', 'signal', 'arguments', 'parseargs'],
+        description: 'Fidelity — the parser for FluxFlow\'s custom DSL-based tool-calling format.'
+    },
+    {
+        title: 'Fidelity Version History',
+        path: '/parser',
+        section: 'v35-streaming',
+        keywords: ['v1', 'v2', 'v3', 'heuristic', 'streaming', 'strict quote', 'unescape'],
+        description: 'Evolution of Fidelity from regex matcher to streaming-aware heuristic parser.'
+    },
+
     // Common Natural Language Mappings
     {
         title: 'How to install',
@@ -239,5 +255,75 @@ export const searchIndex = [
         section: 'protocol',
         keywords: ['use tools', 'run tools', 'how tools work'],
         description: 'Understanding the tool execution protocol.'
+    },
+    {
+        title: 'How does tool calling work',
+        path: '/parser',
+        section: 'fidelity-parser',
+        keywords: ['how does tool calling work', 'tool call format', 'tool syntax', 'custom dsl', 'signal format'],
+        description: 'The custom DSL tool-calling format and its parser (Fidelity).'
+    },
+    {
+        title: 'How to write documentation pages',
+        path: '/architecture',
+        section: 'docpage',
+        keywords: ['write docs', 'add a page', 'documentation guide', 'new page', 'docpage component'],
+        description: 'How documentation pages are structured using DocPage.'
+    },
+    {
+        title: 'Where are the commands',
+        path: '/app-commands',
+        section: 'command-list',
+        keywords: ['commands list', 'slash commands', 'what commands exist', 'command reference'],
+        description: 'Full reference of application commands.'
+    },
+    {
+        title: 'How to configure the project',
+        path: '/getting-started',
+        section: 'configuration',
+        keywords: ['configure', 'config file', 'settings', 'environment variables', 'customize'],
+        description: 'Configuration options and environment setup.'
+    },
+    {
+        title: 'How to fix parsing errors',
+        path: '/parser',
+        section: 'v3-fidelity',
+        keywords: ['parsing errors', 'parse fail', 'unescaped quotes', 'malformed arguments', 'fix tool call'],
+        description: 'How Fidelity handles malformed tool-call arguments.'
+    },
+    {
+        title: 'What is streaming',
+        path: '/parser',
+        section: 'v35-streaming',
+        keywords: ['what is streaming', 'partial args', 'live parsing', 'peek', 'strict quote keys'],
+        description: 'Streaming-aware parsing and strict-quote extraction in Fidelity v3.5.'
+    },
+    {
+        title: 'Where is the sidebar defined',
+        path: '/architecture',
+        section: 'navigation',
+        keywords: ['sidebar', 'navigation menu', 'add nav link', 'nav structure'],
+        description: 'Where and how the docs sidebar navigation is defined.'
+    },
+    {
+        title: 'How to add a route',
+        path: '/architecture',
+        section: 'routing',
+        keywords: ['add route', 'react router', 'new route', 'routing setup'],
+        description: 'Registering new page routes in the app.'
+    },
+    {
+        title: 'What version is FluxFlow',
+        path: '/getting-started',
+        section: 'overview',
+        keywords: ['version', 'latest version', 'changelog', 'release', '5.6.2'],
+        description: 'Current FluxFlow version and release info.'
+    },
+    {
+        title: 'How to search the docs',
+        path: '/getting-started',
+        section: 'overview',
+        keywords: ['search', 'find docs', 'search bar', 'look up'],
+        description: 'Using the documentation search feature.'
     }
 ];

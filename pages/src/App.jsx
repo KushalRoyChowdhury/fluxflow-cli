@@ -8,6 +8,7 @@ import StableModels from './pages/StableModels'
 import ApiKeys from './pages/ApiKeys'
 import Architecture from './pages/Architecture'
 import Tools from './pages/Tools'
+import Parser from './pages/Parser'
 
 function App() {
     return (
@@ -21,6 +22,7 @@ function App() {
                 <Route path="api-keys" element={<ApiKeys />} />
                 <Route path="architecture" element={<Architecture />} />
                 <Route path="tools" element={<Tools />} />
+                <Route path="parser" element={<Parser />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
         </Routes>

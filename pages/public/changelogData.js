@@ -2,7 +2,7 @@ export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
     "5.6.2": {
-        "note": "NOVEMBER 13",
+        "note": "NOVEMBER 14",
         "added": [],
         "changed": [
             "Improved tool parser *(Fidelity Engine v3.5)* with better handling with realtime parsing during streaming."
