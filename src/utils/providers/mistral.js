@@ -1,4 +1,4 @@
-import { fetchWithBackoff, hash, convertChannelThinkTags } from './_shared.js';
+import { fetchWithBackoff, hash, convertChannelThinkTags , extractSseLines} from './_shared.js';
 import { hasModelReasoning } from '../../data/model_config.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
@@ -145,8 +145,8 @@ export const getMistralStream = async function* (apiKey, model, contents, system
         }
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
+        const { lines, uncompleted } = extractSseLines(buffer);
+        buffer = uncompleted;
 
         for (const line of lines) {
             const cleanLine = line.trim();
@@ -159,9 +159,6 @@ export const getMistralStream = async function* (apiKey, model, contents, system
                     const json = JSON.parse(cleanLine.substring(6));
                     const delta = json.choices?.[0]?.delta;
                     const usage = json.usage;
-                    if (json.choices?.[0]?.finish_reason) {
-                        isDone = true;
-                    }
 
                     if (usage) {
                         latestUsageMetadata = {

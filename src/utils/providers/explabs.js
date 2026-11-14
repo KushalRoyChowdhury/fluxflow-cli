@@ -1,4 +1,4 @@
-import { fetchWithBackoff } from './_shared.js';
+import { fetchWithBackoff , extractSseLines} from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 import fs from 'fs';
 
@@ -110,8 +110,8 @@ export const getExpLabsStream = async function* (apiKey, model, contents, system
         }
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
+        const { lines, uncompleted } = extractSseLines(buffer);
+        buffer = uncompleted;
 
         // fs.appendFileSync("./debug.log", JSON.stringify(lines) + "\n\n");
 

@@ -1,4 +1,4 @@
-import { fetchWithBackoff } from './_shared.js';
+import { fetchWithBackoff , extractSseLines} from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getInferXStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
@@ -111,7 +111,9 @@ export const getInferXStream = async function* (apiKey, model, contents, systemI
         }
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
+        const { lines, uncompleted } = extractSseLines(buffer);
+        buffer = uncompleted;
+
         // fs.appendFileSync("DEBUG.txt", `${lines}\n\n`);
         buffer = lines.pop();
 

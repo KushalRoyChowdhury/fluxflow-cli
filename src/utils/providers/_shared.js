@@ -65,3 +65,24 @@ export const convertChannelThinkTags = (str) => {
         .replace(/<\|channel>thought/gi, '<think_fluxflow>')
         .replace(/<channel\|>/gi, '</think_fluxflow>');
 };
+
+/**
+ * Robust SSE line splitter: handles \r\n, \n, and \r, plus splits
+ * multiple concatenated `data: ` events on the same line.
+ */
+export const extractSseLines = (buffer) => {
+    const rawLines = buffer.split(/\r?\n|\r/);
+    const uncompleted = rawLines.pop() || '';
+    const lines = [];
+    for (const rLine of rawLines) {
+        if (rLine.includes('data: ')) {
+            const parts = rLine.split(/(?=data: )/);
+            for (const p of parts) {
+                if (p.trim()) lines.push(p);
+            }
+        } else if (rLine.trim()) {
+            lines.push(rLine);
+        }
+    }
+    return { lines, uncompleted };
+};

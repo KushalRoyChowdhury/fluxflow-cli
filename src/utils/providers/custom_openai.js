@@ -1,4 +1,4 @@
-import { fetchWithBackoff } from './_shared.js';
+import { fetchWithBackoff , extractSseLines} from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 import { NULL_KEY_SENTINEL } from '../secrets_v2.js';
 
@@ -301,14 +301,14 @@ export const getCustomOpenAIStream = async function* (apiKey, model, contents, s
         }
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
+        const { lines, uncompleted } = extractSseLines(buffer);
+        buffer = uncompleted;
 
         for (const line of lines) {
             const cleanLine = line.trim();
             if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
             let isDone = false;
-            if (cleanLine === 'data: [DONE]' || cleanLine === 'data: [DONE]\r') {
+            if (cleanLine === 'data: [DONE]') {
                 isDone = true;
                 flushContentHold();
             } else {
@@ -321,10 +321,6 @@ export const getCustomOpenAIStream = async function* (apiKey, model, contents, s
 
                     const choice = json.choices?.[0];
                     const delta = choice?.delta;
-
-                    if (choice?.finish_reason && choice.finish_reason !== 'null') {
-                        isDone = true;
-                    }
 
                     const usageMeta = extractUsage(json);
                     if (usageMeta) {

@@ -1,4 +1,4 @@
-import { fetchWithBackoff } from './_shared.js';
+import { fetchWithBackoff , extractSseLines} from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getAPInexStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
@@ -112,8 +112,8 @@ export const getAPInexStream = async function* (apiKey, model, contents, systemI
         }
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
+        const { lines, uncompleted } = extractSseLines(buffer);
+        buffer = uncompleted;
 
         for (const line of lines) {
             const cleanLine = line.trim();

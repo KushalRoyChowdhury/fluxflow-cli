@@ -1,4 +1,4 @@
-import { fetchWithBackoff } from './_shared.js';
+import { fetchWithBackoff , extractSseLines} from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
 export const getCoArenaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
@@ -104,8 +104,10 @@ export const getCoArenaStream = async function* (apiKey, model, contents, system
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop(); // Keep uncompleted line in buffer
+        const { lines, uncompleted } = extractSseLines(buffer);
+        buffer = uncompleted;
+
+        // Keep uncompleted line in buffer
 
         for (const line of lines) {
             const trimmed = line.trim();
@@ -134,7 +136,16 @@ export const getCoArenaStream = async function* (apiKey, model, contents, system
                             latestUsageMetadata = {
                                 promptTokenCount: parsed.usage.prompt_tokens,
                                 candidatesTokenCount: parsed.usage.completion_tokens,
-                                totalTokenCount: parsed.usage.total_tokens
+                                totalTokenCount: parsed.usage.total_tokens,
+                                cachedContentTokenCount: parsed.usage.prompt_tokens_details?.cached_tokens
+                                    || parsed.usage.prompt_tokens_details?.cache_read_input_tokens
+                                    || parsed.usage.cachedContentTokenCount
+                                    || parsed.usage.cache_read_input_tokens
+                                    || 0,
+                                thoughtsTokenCount: parsed.usage.completion_tokens_details?.reasoning_tokens
+                                    || parsed.usage.thoughtsTokenCount
+                                    || parsed.usage.reasoning_tokens
+                                    || 0
                             };
                         }
 

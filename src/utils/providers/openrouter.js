@@ -1,4 +1,4 @@
-import { fetchWithBackoff, hash } from './_shared.js';
+import { fetchWithBackoff, hash , extractSseLines} from './_shared.js';
 import fs from 'fs';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
@@ -175,7 +175,9 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
         }
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
+        const { lines, uncompleted } = extractSseLines(buffer);
+        buffer = uncompleted;
+
         // fs.appendFileSync('debug.txt', `${lines}\n\n`);
         buffer = lines.pop();
 
@@ -194,9 +196,6 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
                     }
                     const delta = json.choices?.[0]?.delta;
                     const usage = json.usage;
-                    if (json.choices?.[0]?.finish_reason) {
-                        isDone = true;
-                    }
 
                     if (usage) {
                         latestUsageMetadata = {

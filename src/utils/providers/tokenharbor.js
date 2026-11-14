@@ -1,4 +1,4 @@
-import { fetchWithBackoff } from './_shared.js';
+import { fetchWithBackoff , extractSseLines} from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 // import fs from 'fs';
 
@@ -129,7 +129,9 @@ export const getTokenHarborStream = async function* (apiKey, model, contents, sy
         }
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
+        const { lines, uncompleted } = extractSseLines(buffer);
+        buffer = uncompleted;
+
         // fs.appendFileSync('debug.txt', `${lines}\n\n`);
         buffer = lines.pop();
 

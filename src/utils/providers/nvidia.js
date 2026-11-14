@@ -1,4 +1,4 @@
-import { fetchWithBackoff } from './_shared.js';
+import { fetchWithBackoff, extractSseLines } from './_shared.js';
 import { isModelMultimodal } from '../../data/model_config.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 
@@ -217,7 +217,8 @@ export const getNVIDIAStream = async function* (apiKey, model, contents, systemI
                 }
 
                 buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
+                const { lines, uncompleted } = extractSseLines(buffer);
+                buffer = uncompleted;
                 // fs.appendFileSync("NVIDIA_STREAM_DEBUG.txt", `${decoder.decode(value)}\n\n`); // [DEBUGGING POINT]
                 buffer = lines.pop();
 

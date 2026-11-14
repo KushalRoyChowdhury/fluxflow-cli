@@ -1,4 +1,4 @@
-import { fetchWithBackoff } from './_shared.js';
+import { fetchWithBackoff , extractSseLines} from './_shared.js';
 import { getMappedThinkingLevel } from '../../data/thinking_config.js';
 import fs from 'fs';
 
@@ -119,8 +119,8 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
         }
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
+        const { lines, uncompleted } = extractSseLines(buffer);
+        buffer = uncompleted;
 
         for (const line of lines) {
             const cleanLine = line.trim();
@@ -135,9 +135,6 @@ export const getNineRouterStream = async function* (apiKey, model, contents, sys
                     const delta = json.choices?.[0]?.delta;
                     const usage = json.usage;
 
-                    if (json.choices?.[0]?.finish_reason) {
-                        isDone = true;
-                    }
 
                     if (usage) {
                         latestUsageMetadata = {
