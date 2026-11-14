@@ -570,7 +570,23 @@
         document.addEventListener('DOMContentLoaded', () => {
              renderChangelog();
              setupModalEvents();
+             openVersionFromUrl();
         });
+
+        // Deep link: /changelog/5.6.0 (or /5.6.0) opens that version's modal directly
+        // Short versions fall back: /5 → 5.0.0, /5.4 → 5.4.0
+        function openVersionFromUrl() {
+            const match = window.location.pathname.match(/\/(\d+(?:\.\d+){0,2})(?:\.html)?\/?$/);
+            if (!match) return;
+            const raw = match[1];
+            // Pad missing segments: "5" → "5.0.0", "5.4" → "5.4.0"
+            const segments = raw.split('.');
+            while (segments.length < 3) segments.push('0');
+            const version = segments.join('.');
+            if (!changelogData[version]) return;
+            const card = document.querySelector(`.version-card[data-version="${version}"]`);
+            openModal(version, card);
+        }
 
         function parseMarkdown(text) {
             if (!text) return '';
@@ -624,6 +640,12 @@
         function openModal(version, sourceCardEl) {
             const data = changelogData[version];
             if (!data) return;
+
+            // Reflect the open version in the URL: /changelog/5.6.0
+            const targetPath = `/changelog/${version}`;
+            if (window.location.pathname !== targetPath) {
+                history.replaceState(null, '', targetPath);
+            }
 
             const modal = document.getElementById('changelog-modal');
             const modalCardEl = modal.querySelector('.modal-card');
@@ -758,6 +780,11 @@
             modal.classList.remove('active');
             modal.setAttribute('aria-hidden', 'true');
             document.body.style.overflow = '';
+
+            // Strip the version deep-link from the URL once the modal closes
+            if (window.location.pathname.match(/\/(\d+\.\d+(?:\.\d+)?)(?:\.html)?\/?$/)) {
+                history.replaceState(null, '', '/changelog');
+            }
 
             // Clean up after transition.
             // NOTE: transitionend fires once PER property (transform, opacity, box-shadow...).
