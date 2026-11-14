@@ -1,10 +1,11 @@
 /**
- * Smart Argument Parser for Tool Signals (Fidelity v3.0)
+ * Smart Argument Parser for Tool Signals (Fidelity v3.5)
  * Handles unescaped quotes by using heuristic end-of-string detection.
  * @param {string} argsString - Raw arguments string from model tool call.
  * @param {string[]} [knownKeys=[]] - Optional array of expected parameter names.
+ * @param {string[]} [strictQuoteKeys=[]] - Optional keys that strictly end at the very first unescaped quote.
  */
-export const parseArgs = (argsString, knownKeys = []) => {
+export const parseArgs = (argsString, knownKeys = [], strictQuoteKeys = []) => {
     const args = {};
     if (!argsString) return args;
 
@@ -61,6 +62,12 @@ export const parseArgs = (argsString, knownKeys = []) => {
                 if (backslashCount % 2 !== 0) {
                     searchIndex = qIdx + 1;
                     continue;
+                }
+
+                // If key is marked for strict quote-to-quote matching, the first unescaped quote IS the end!
+                if (Array.isArray(strictQuoteKeys) && strictQuoteKeys.includes(key)) {
+                    end = qIdx;
+                    break;
                 }
 
                 // CHECK BOUNDARY: Is this quote likely the END of the argument?

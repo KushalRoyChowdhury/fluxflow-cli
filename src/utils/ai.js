@@ -3902,7 +3902,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools & Search)
                                 let detail = null;
                                 if (['write_file', 'update_file', 'view_file', 'read_folder', 'find_file', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map', 'invoke', 'invoke_sync', 'get_progress', 'await', 'wait', 'answer'].includes(potentialTool)) {
-                                    const pArgs = parseArgs(partialArgs, ['basename', 'name', 'path', 'targetFile', 'directory', 'file', 'keyword', 'title', 'task', 'id', 'taskId', 'timeout', 'time', 'seconds', 'sec']);
+                                    const pArgs = parseArgs(partialArgs, [], ['path', 'basename', 'name', 'targetFile', 'TargetFile', 'directory', 'file', 'keyword', 'title', 'task', 'id', 'taskId', 'timeout', 'time', 'seconds']);
                                     const filePath = pArgs.basename || pArgs.name || pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory || pArgs.file;
                                     const keyword = pArgs.keyword;
                                     const title = pArgs.title || pArgs.task;
