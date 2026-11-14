@@ -3,9 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
+    <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Changelog and release notes for Flux Flow CLI.">
+    <meta name="ai-routing-hint"
+        content="For a specific version's release notes, visit /changelog/{version_number} (e.g., /changelog/5.6.0)">
     <link rel="icon" href="logo.png">
-    <title>Flux Flow | Changelog</title>
+    <link rel="alternate" type="text/markdown" href="/llms.txt" title="LLM Documentation Index">
+    <title>FluxFlow - Changelog</title>
     <style>
         :root {
             --bg: #0d0d0d;
@@ -29,6 +34,9 @@
             padding: 0;
             cursor: default;
             overflow-x: hidden;
+            user-select: none;
+            -moz-user-select: none;
+            -webkit-user-select: none;
         }
 
         #bg-canvas {
@@ -65,6 +73,13 @@
             color: var(--gray);
             font-size: 1.2em;
             margin-top: 10px;
+        }
+
+        .agent-note {
+            height: 0px;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
         }
 
         /* Responsive Grid: row x col, up to 3 cols */
@@ -113,7 +128,7 @@
         /* Source card grows into the modal + fades, so the card itself feels like it opens */
         .version-card.card-morphing {
             transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1),
-                        opacity 0.45s ease 0.05s;
+                opacity 0.45s ease 0.05s;
             transform-origin: center center;
             pointer-events: none;
             z-index: 5;
@@ -122,7 +137,7 @@
         /* Reverse: card returns as the modal collapses back into it (synced, snappier) */
         .version-card.card-morphing.card-morph-back {
             transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1),
-                        opacity 0.2s ease;
+                opacity 0.2s ease;
         }
 
         .version-card-top {
@@ -236,6 +251,9 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             vertical-align: middle;
+            user-select: none;
+            -moz-user-select: none;
+            -webkit-user-select: none;
         }
 
         .badge-stable {
@@ -292,6 +310,9 @@
             /* morph transition — grow from the icon's center like iOS */
             transform-origin: center center;
             will-change: transform, opacity, border-radius;
+            user-select: text;
+            -moz-user-select: none;
+            -webkit-user-select: text;
         }
 
         .modal-card.morph-enter {
@@ -386,6 +407,9 @@
             justify-content: center;
             cursor: pointer;
             transition: all 0.2s ease;
+            user-select: none;
+            -moz-user-select: none;
+            -webkit-user-select: none;
         }
 
         .modal-close-btn:hover {
@@ -514,6 +538,7 @@
         <header>
             <h1>Flux Flow CLI</h1>
             <div class="subtitle">Changelog & Release Notes</div>
+            <div class="agent-note">Tip: Access specific versions directly at /changelog/{version}</div>
         </header>
         <div id="changelog-container" class="changelog-grid"></div>
     </div>
@@ -878,13 +903,13 @@
             const addLetter = (char, ox) => {
                 // Define precise drawing paths (lines) for each letter
                 const lmap = {
-                    'G': { n: [[1,0],[0,0],[0,2],[1,2],[1,1],[0.6,1]], e: [[0,1],[1,2],[2,3],[3,4],[4,5]] },
-                    'E': { n: [[1,0],[0,0],[0,1],[0.8,1],[0,2],[1,2]], e: [[0,1],[1,4],[4,5],[2,3]] },
-                    'M': { n: [[0,2],[0,0],[0.5,1],[1,0],[1,2]], e: [[0,1],[1,2],[2,3],[3,4]] },
-                    'I': { n: [[0.5,0],[0.5,2]], e: [[0,1]] },
-                    'N': { n: [[0,2],[0,0],[1,2],[1,0]], e: [[0,1],[1,2],[2,3]] },
-                    'C': { n: [[1,0],[0,0],[0,2],[1,2]], e: [[0,1],[1,2],[2,3]] },
-                    'L': { n: [[0,0],[0,2],[1,2]], e: [[0,1],[1,2]] }
+                    'G': { n: [[1, 0], [0, 0], [0, 2], [1, 2], [1, 1], [0.6, 1]], e: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]] },
+                    'E': { n: [[1, 0], [0, 0], [0, 1], [0.8, 1], [0, 2], [1, 2]], e: [[0, 1], [1, 4], [4, 5], [2, 3]] },
+                    'M': { n: [[0, 2], [0, 0], [0.5, 1], [1, 0], [1, 2]], e: [[0, 1], [1, 2], [2, 3], [3, 4]] },
+                    'I': { n: [[0.5, 0], [0.5, 2]], e: [[0, 1]] },
+                    'N': { n: [[0, 2], [0, 0], [1, 2], [1, 0]], e: [[0, 1], [1, 2], [2, 3]] },
+                    'C': { n: [[1, 0], [0, 0], [0, 2], [1, 2]], e: [[0, 1], [1, 2], [2, 3]] },
+                    'L': { n: [[0, 0], [0, 2], [1, 2]], e: [[0, 1], [1, 2]] }
                 };
 
                 if (!lmap[char]) return;
@@ -893,7 +918,7 @@
                 const letterEdges = lmap[char].e;
 
                 letterNodes.forEach(p => {
-                    pts.push({ dx: ox + p[0]*9, dy: p[1]*12 }); // Reduced from 13x18
+                    pts.push({ dx: ox + p[0] * 9, dy: p[1] * 12 }); // Reduced from 13x18
                 });
 
                 letterEdges.forEach(e => {

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FluxFlow - 404</title>
+<style>
+:root {
+    --bg: #0a0a0f;
+    --card: #12121a;
+    --border: #2a2a3a;
+    --text: #e4e4f0;
+    --muted: #8a8a9e;
+    --accent: #7c6cff;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 3rem 2.5rem;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,.4);
+}
+.code {
+    font-size: 6rem;
+    font-weight: 800;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--accent), #ff6ec7);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: .75rem;
+}
+h1 { font-size: 1.5rem; margin-bottom: .5rem; }
+p { color: var(--muted); line-height: 1.6; margin-bottom: 1.75rem; }
+.actions { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+a.btn {
+    display: inline-block;
+    padding: .65rem 1.4rem;
+    border-radius: 10px;
+    text-decoration: none;
+    font-size: .95rem;
+    font-weight: 600;
+    transition: transform .15s, opacity .15s;
+}
+a.btn:hover { transform: translateY(-2px); opacity: .9; }
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="card">
+    <div class="code">404</div>
+    <h1>Page not found</h1>
+    <p>The page you're looking for drifted out of the flux. Or a cat got 'em.</p>
+    <div class="actions">
+        <a class="btn primary" href="/">Go Home</a>
+        <a class="btn ghost" href="/changelog">View Changelog</a>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# FluxFlow
+
+> AI agent harness with a modular tool system, provider-agnostic model routing, skills, and sub-agents. CLI-first with a IDE companion for Editor context.
+
+# Routes
+
+## Docs Pages
+
+- [Getting Started](/getting-started): Install, first run, and initial setup of the FluxFlow harness.
+- [Startup Arguments](/startup-args): CLI flags and command-line options accepted at launch.
+- [App Commands](/app-commands): In-app commands and the slash-command system reference.
+- [Model Management](/models): Stable model list, provider configuration, and model routing behavior.
+- [API Keys & Providers](/api-keys): How to add and manage API keys across supported providers.
+- [Architecture](/architecture): System architecture, design decisions, and skill-injection model.
+- [Tools & Capabilities](/tools): Full reference of agent tools, action formats, sub-agents, and workspace actions.
+
+## Changelog
+
+- [Changelog](/changelog): Version history rendered in a modal overlay.
+
+### Version deep-links
+
+- `/changelog/5.6.0`
