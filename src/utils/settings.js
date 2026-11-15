@@ -128,13 +128,33 @@ export const PROVIDER_BASE_URLS = {
 
 
 /**
+ * In-process cache of the decrypted settings file.
+ * Coalesces concurrent loadSettings() calls into ONE disk read —
+ * prevents 'too many open files' when 5+ subagents read settings in parallel.
+ * Invalidated by saveSettings().
+ */
+let settingsCachePromise = null;
+
+const readSettingsFile = async () => {
+    if (!settingsCachePromise) {
+        settingsCachePromise = (async () => {
+            if (await fs.exists(SETTINGS_FILE)) {
+                try { return readAesEncryptedJson(SETTINGS_FILE); } catch { return null; }
+            }
+            return null;
+        })().finally(() => { });
+    }
+    return settingsCachePromise;
+};
+
+/**
  * Loads settings from the JSON file
  */
 export const loadSettings = async () => {
     let settingsObj = { ...DEFAULT_SETTINGS };
     try {
-        if (await fs.exists(SETTINGS_FILE)) {
-            const saved = readAesEncryptedJson(SETTINGS_FILE);
+        const saved = await readSettingsFile();
+        if (saved) {
 
             // SECURITY SELF-HEALING MIGRATION:
             // Extract and migrate custom Pollinations API Key from settings.json to encrypted secrets.json
@@ -147,6 +167,8 @@ export const loadSettings = async () => {
                     // Scrub immediately from settings file on disk
                     saved.imageSettings.apiKey = '';
                     writeAesEncryptedJson(SETTINGS_FILE, saved);
+                    settingsCachePromise = null; // invalidate cache after direct write
+
                 } catch (e) { }
             }
 
@@ -185,6 +207,7 @@ export const loadSettings = async () => {
         settingsObj.showFullThinking = true;
         try {
             writeAesEncryptedJson(SETTINGS_FILE, settingsObj);
+            settingsCachePromise = null; // invalidate cache after direct write
         } catch (e) { }
     }
 
@@ -246,6 +269,7 @@ export const saveSettings = async (settings) => {
 
         await fs.ensureDir(path.dirname(SETTINGS_FILE));
         writeAesEncryptedJson(SETTINGS_FILE, updated);
+        settingsCachePromise = null; // invalidate cache after save
 
         // Bust usage module's cachedBaseUrl if custom OpenAI endpoint was configured or changed
         try {
