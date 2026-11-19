@@ -147,8 +147,17 @@ export const saveModelToProvider = (provider, modelId, multimodal = false, info 
     if (!p.models) p.models = { Free: [], Paid: [] };
     if (!Array.isArray(p.models.Free)) p.models.Free = [];
 
-    const cleanBaseUrl = baseUrl ? String(baseUrl).trim().replace(/\/+$/, '') : null;
-    const existingItem = p.models.Free.find(m => (typeof m === 'string' ? m : m?.cmd) === id);
+    const isCustomOpenAI = provider === 'c_openai';
+    const cleanBaseUrl = isCustomOpenAI && baseUrl ? String(baseUrl).trim().replace(/\/+$/, '') : null;
+    // For c_openai the key includes baseUrl so the same model ID can be saved under different custom endpoints.
+    // Other providers never store baseUrl, so they match on cmd alone.
+    const keyFor = (m) => {
+        const cmd = typeof m === 'string' ? m : m?.cmd;
+        const url = (typeof m === 'object' && m?.baseUrl ? String(m.baseUrl).trim().replace(/\/+$/, '') : null) || null;
+        return `${(cmd || '').trim()}|${isCustomOpenAI ? (url || '') : ''}`;
+    };
+    const wanted = `${id}|${cleanBaseUrl || ''}`;
+    const existingItem = p.models.Free.find(m => keyFor(m) === wanted);
     if (!existingItem) {
         const newModel = { cmd: id, multimodal: !!multimodal, desc: id };
         if (info && Object.keys(info).length > 0) newModel.info = info;
