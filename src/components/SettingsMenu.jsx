@@ -352,6 +352,7 @@ export default function SettingsMenu({
             case 'secondaryModels':
                 return [
                     { label: 'Sub-Agents', value: 'subAgents', status: systemSettings.subAgents !== false ? 'ON' : 'OFF' },
+                    { label: 'SubAgent Wildcard Tooling', value: 'subAgentWildcardTooling', status: systemSettings.subAgentWildcardTooling ? 'ON' : 'OFF' },
                     { label: 'Sub-Agent Model', value: 'subAgentModel', status: (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default' },
                     { label: 'Enable Auto-Completion', value: 'autoCompletionEnabled', status: autoCompletion?.enabled ? 'ON' : 'OFF' },
                     { label: 'Auto-Completion Model', value: 'autoCompletionModel', status: (autoCompletion?.model && autoCompletion.model !== 'Default') ? autoCompletion.model : 'Default' },
@@ -785,6 +786,12 @@ export default function SettingsMenu({
         } else if (item.value === 'subAgents') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, subAgents: s.subAgents === false ? true : false };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'subAgentWildcardTooling') {
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, subAgentWildcardTooling: !s.subAgentWildcardTooling };
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });

@@ -6135,6 +6135,14 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
 
     const envSubagentProvider = normalizeProvider(envSubagentProviderRaw);
 
+    const wildcardSubagentPrompt = "You cannot execute tools. Instead write the action string in chat you WOULD have written, without markdown wrappers. Then wait for systtem response\n";
+
+    // SubAgent Wildcard Tooling: when enabled, flip the wildcardTooling flag
+    const subAgentWildcardTooling = mergedSettings?.systemSettings?.subAgentWildcardTooling === true;
+    if (subAgentWildcardTooling) {
+        mergedSettings.wildcardTooling = !mergedSettings.wildcardTooling;
+    }
+
     const configuredSubAgentModel = mergedSettings?.systemSettings?.CustomSubAgent ? mergedSettings?.systemSettings?.SubAgentModel : null;
     const configuredSubAgentProvider = mergedSettings?.systemSettings?.CustomSubAgent ? mergedSettings?.systemSettings?.SubAgentProvider : null;
 
@@ -6252,15 +6260,31 @@ Current Time: ${time}
 === END SYSTEM PROMPT ===`;
 
 
+    // Inject wildcard tooling instructions before the task when SubAgent Wildcard Tooling is enabled
+    const subagentUserText = subAgentWildcardTooling
+        ? `${wildcardSubagentPrompt}Task: ${task}`
+        : `Task: ${task}`;
+
     const subagentHistory = Array.isArray(existingHistory) && existingHistory.length > 0
         ? existingHistory
         : [
-            { role: 'user', text: `Task: ${task}` }
+            { role: 'user', text: subagentUserText }
         ];
 
     // If resuming with existing history, append the new task as follow-up instruction
     if (Array.isArray(existingHistory) && existingHistory.length > 0) {
-        subagentHistory.push({ role: 'user', text: `Follow-up instruction: ${task}` });
+        // Migrate wildcard prompt: strip it from the original first user turn (if present)
+        // and inject it on the follow-up instead. startsWith guard makes this idempotent -
+        // once removed, it won't be stripped again (no repeated mutation of history).
+        const firstUserMsg = subagentHistory.find(m => m.role === 'user');
+        if (firstUserMsg && firstUserMsg.text.startsWith(wildcardSubagentPrompt)) {
+            firstUserMsg.text = firstUserMsg.text.slice(wildcardSubagentPrompt.length)
+                .replace(/^\s*Task:/u, 'Task:');
+        }
+        const followUpText = subAgentWildcardTooling
+            ? `${wildcardSubagentPrompt}Follow-up instruction: ${task}`
+            : `Follow-up instruction: ${task}`;
+        subagentHistory.push({ role: 'user', text: followUpText });
     }
 
     let turn = 0;

@@ -53,6 +53,7 @@ const DEFAULT_SETTINGS = {
         progressiveRendering: true,
         showTPMEstimate: true,
         subAgents: false,
+        subAgentWildcardTooling: false,
         CustomSubAgent: false,
         SubAgentModel: 'Default',
         SubAgentProvider: '',
