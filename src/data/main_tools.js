@@ -107,6 +107,8 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
         runDesc = `Runs in git bash. Or force native shell`;
     }
 
+    const maxToolLimit = process.env.MAX_TOOL_LIMIT || '5';
+
     const fluxInstructions = `- JSON escape literal sequences, backslash: \\\\, newLine: \\ n
 - Same file, multiple edits? One PatchFile ≤15 blocks${autoExec ? '' : '\n- Action denied? Ask for guidance'}
 - Need text or large file? CodeSearch > Full Read
@@ -160,7 +162,7 @@ Invocations:
 -- ACTIONS --
 In chat output the format \`[action:ActionName(arg1="value1")]\` in NEW line
 Rules:
-- Max 5 actions/turn
+- Max ${maxToolLimit} actions/turn
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 **User Communication**
 - AskUser(question=string, optionA?="title::description", ...MAX4). Mid task Ambiguity Resolution

@@ -6218,10 +6218,12 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         subRunDesc = `Runs in git bash. Or force native shell`;
     }
 
+    const maxToolLimit = process.env.MAX_TOOL_LIMIT || '3';
+
     const providedToolsSection = `-- ACTIONS (path = relative to CWD, path separator: '/') --
 In chat output the format \`[action:ActionName(arg1="value1")]\` in NEW line
 Rules:
-- Max 3 actions/turn
+- Max ${maxToolLimit} actions/turn
 - JSON escape literal sequences, backslash: \\\\, newLine: \\ n
 - Same file, multiple edits? ONE PatchFile ≤15 blocks
 - Need text or huge file? CodeSearch > Full Read
