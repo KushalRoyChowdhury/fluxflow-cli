@@ -49,6 +49,7 @@ Open in chat via /settings
 ### 6. Secondary Models
 * Sub-Agents → Enable sub-agents
 * Sub-Agent Model → Dedicated model/provider for sub-agents
+* Wildcard Tooling for subagent → Helps models tha fails to call tools
 * Auto Completion in IDE → Toggle
 * Completion Model
 * Commit Msg Model

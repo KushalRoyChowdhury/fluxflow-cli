@@ -1,6 +1,20 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.8.0": {
+        "note": "NOVEMBER 20",
+        "added": [
+            "Added \"Wildcard tooling\" support for subagents. Helps when a model can't reliably call tools.",
+            "Added customizable parallel tool limit via `env.MAX_TOOL_LIMIT`."
+        ],
+        "changed": [
+            "Improved agent's grep search tool accuracy."
+        ],
+        "fixes": [
+            "Fixed issues when model use `(?i)` cuz tool is written is JS.",
+            "Fixed a bug when model can't be saved in Custom Openai endpoint mode if same model-id already exist with another baseUrl."
+        ]
+    },
     "5.7.0": {
         "note": "NOVEMBER 15",
         "added": [
