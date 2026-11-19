@@ -417,7 +417,7 @@ export const applyPatches = (content, patches, options = {}) => {
         }
 
         // --- LINE-ANCHORED PATCH SUPPORT (^LINE:startLine..endLine$ or ^LINE:startLine-endLine$) ---
-        if (rawReplace.startsWith('^LINE:') && rawReplace.endsWith('$')) {
+    if (/^\^line:/i.test(rawReplace) && rawReplace.endsWith('$')) { // case-insensitive: ^LINE: / ^line: both valid
             const body = rawReplace.slice(6, -1).trim();
             const parts = body.includes('..') ? body.split('..') : body.split('-');
             const startLine = parseInt(parts[0]);

@@ -249,7 +249,23 @@ export const search_keyword = async (args) => {
         try {
             // Auto mode: collapse '||' (JS/SQL-style OR) into single '|' regex alternation.
             // Explicit regex:true keeps '||' verbatim — model asked for raw regex.
-            const regexSource = regexExplicitlyTrue ? keyword : keyword; //.replace(/\|\|/g, '|');
+            // Auto mode: strip a leading (?i) hint (invalid in JS RegExp; case-insensitivity is already applied via the 'i' flag).
+            // strip (?i) ANYWHERE — invalid JS group; case-insensitivity is already global via 'i' flag.
+            // Then drop empty alternation branches left behind (e.g. "a|(?i)|b" → "a||b" → "a|b"):
+            // a trailing/empty branch matches EVERY line, silently turning the search into match-all.
+            let regexSource = regexExplicitlyTrue ? keyword : keyword.replace(/\(\?i\)/g, '');
+            // Auto mode: collapse '||' (JS/SQL-style OR) into single '|' regex alternation.
+            // The word-boundary fallback (wordRegex) still uses the original keyword.
+            if (!regexExplicitlyTrue && regexSource.includes('||')) {
+                regexSource = regexSource.replace(/\|\|/g, '|');
+            }
+            if (!regexExplicitlyTrue && regexSource.includes('|')) {
+                const branches = regexSource.split('|').map(b => b.trim()).filter(Boolean);
+                regexSource = branches.length > 0 ? branches.join('|') : regexSource;
+            }
+            if (!regexExplicitlyTrue && regexSource.trim() === '') {
+                throw new Error('empty regex after (?i) cleanup'); // force word-regex fallback instead of match-all ('' compiles and matches EVERY line)
+            }
             regexPattern = new RegExp(regexSource, 'i');
         } catch (e) {
             if (regexExplicitlyTrue) {
@@ -276,7 +292,20 @@ export const search_keyword = async (args) => {
             // Exclusions may be prefixed with either '!' (glob negation) or '-' (simple CLI-style); normalize '-' to '!' internally
             // so ALL downstream exclusion logic (negative-only walker, fast-glob array) works for both forms.
             const normalizeExclusion = (p) => (p.startsWith('!') || !p.startsWith('-')) ? p : '!' + p.replace(/^-+/, '');
-            const patterns = pathArg.split(';').map(p => p.trim()).filter(Boolean).map(normalizeExclusion).filter(p => p !== '!');
+            // Accept BOTH ';' and ',' as path-list separators (literal paths never legitimately contain ',').
+            let patterns = pathArg.split(/[;,]/).map(p => p.trim()).filter(Boolean).map(normalizeExclusion).filter(p => p !== '!');
+            // Preprocess bare extensions (".js") and plain "*.ext" globs into recursive globs ("**/*.js")
+            // so pattern matching hits every nested file instead of failing as a literal (non-existent) path.
+            const expandExtGlob = (p) => {
+                const isNeg = p.startsWith('!');
+                const body = isNeg ? p.slice(1) : p;
+                if (/^(\*\.)?\.[A-Za-z0-9][A-Za-z0-9._-]*$/.test(body) || /^\*\.[A-Za-z0-9][A-Za-z0-9._-]*$/.test(body)) {
+                    // ".ext" / "*.ext" / "**.ext" all mean "any file with this extension" → "**/*.ext"
+                    return (isNeg ? '!' : '') + `**/*.${body.replace(/^(\*\.|\.)/, '')}`;
+                }
+                return p;
+            };
+            patterns = patterns.map(expandExtGlob);
             const hasNegation = patterns.some(p => p.startsWith('!'));
             const isGlob = patterns.some(p => fg.isDynamicPattern(p) || /[*?{}[\]()|+]/.test(p));
             if (isGlob) {

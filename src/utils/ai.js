@@ -4304,7 +4304,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
                                     const parsedToolArgs = parseArgs(toolCall.args, ['path', 'content', 'allowMultiple', 'searchContent*', 'replaceContent*', 'newContent*']);
                                     const path = parsedToolArgs.path || null;
-                                    const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && v.startsWith('^LINE:'));
+                                    const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && /^\^line:/i.test(v));
                                     const sep = hasLineAnchor ? '፡' : ':';
                                     label = `${path ? '✔' : '✘'}  ${action}${sep} ${path ? path.replaceAll('\\', '/') : 'No File Changes'}`;
                                 } else if (normToolName === 'write_pdf') {
@@ -5170,7 +5170,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             // Restore UI feedback
                                             const action = normToolName === 'write_file' ? 'Created' : 'Edited';
                                             const parsedToolArgs = parseArgs(toolCall.args, ['path', 'content', 'allowMultiple', 'searchContent*', 'replaceContent*', 'newContent*']);
-                                            const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && v.startsWith('^LINE:'));
+                                            const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && /^\^line:/i.test(v));
                                             const sep = hasLineAnchor ? '፡' : ':';
                                             const feedbackLabel = `${filePath ? '✔' : '✘'} ${action}${sep} ${filePath ? filePath.replaceAll('\\', '/') : 'No File Changes'}`;
                                             // Get terminal physical width
@@ -6229,7 +6229,7 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 - WebScrape(url=string)
 
 **Workspace**
-- CodeSearch(keyword="regex", path?="file/glob, inclusion !exclusion ;-separated")
+- CodeSearch(keyword="regex OR word match", path?="file/glob, inclusion !exclusion ;separated")
 - ReadFolder(path=string, recurse?=int[1..3])
 - FindFile(basename=string)
 - ReadFile(path=string, startLine?=int, endLine?=int)
@@ -6442,7 +6442,7 @@ Current Time: ${time}
             else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file') {
                 const parsedToolArgs = parseArgs(toolCall.args, ['path', 'allowMultiple', 'content', 'searchContent*', 'replaceContent*', 'newContent*']);
                 const path = parsedToolArgs.path || null;
-                const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && v.startsWith('^LINE:'));
+                const hasLineAnchor = Object.entries(parsedToolArgs).some(([k, v]) => k.startsWith('searchContent') && typeof v === 'string' && /^\^line:/i.test(v));
                 const sep = hasLineAnchor ? '፡' : ':';
                 label = `${path ? '✔' : '✘'} \x1b[95mEdited\x1b[0m${sep} ${path ? `${path.replaceAll('\\', '/')}` : 'No File Changes'}`;
             }
