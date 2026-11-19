@@ -53,6 +53,22 @@
             max-width: 1200px;
             margin: 0 auto;
             padding: 50px 20px;
+            transition: opacity 0.35s ease;
+        }
+
+        /* Deep link (/changelog/5.6.0): the page is laid out but invisible,
+           so only the modal is on screen until it is closed. */
+        html.deep-link-open .container {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* While the modal collapses, the page stays hidden and only fades in once
+           the shrink is well underway — so the two never visibly overlap. */
+        html.deep-link-reveal .container {
+            opacity: 1;
+            pointer-events: none;
+            transition: opacity 0.14s ease 0.15s;
         }
 
         header {
@@ -530,6 +546,22 @@
             text-decoration: underline;
         }
     </style>
+
+    <!-- Deep-link guard: hide the page before first paint if a version is in the URL -->
+    <script>
+        (function () {
+            if (/\/(\d+(?:\.\d+){0,2})(?:\.html)?\/?$/.test(window.location.pathname)) {
+                document.documentElement.classList.add('deep-link-open');
+                // Failsafe: never leave the page hidden if the modal fails to open
+                setTimeout(function () {
+                    var modal = document.getElementById('changelog-modal');
+                    if (!modal || !modal.classList.contains('active')) {
+                        document.documentElement.classList.remove('deep-link-open');
+                    }
+                }, 2000);
+            }
+        })();
+    </script>
 </head>
 
 <body>
@@ -568,23 +600,47 @@
         const MASK_PATH = "changelog.html";
 
         document.addEventListener('DOMContentLoaded', () => {
-             renderChangelog();
              setupModalEvents();
+             // Renders the grid — or just the deep-linked card, see openVersionFromUrl()
              openVersionFromUrl();
         });
 
         // Deep link: /changelog/5.6.0 (or /5.6.0) opens that version's modal directly
         // Short versions fall back: /5 → 5.0.0, /5.4 → 5.4.0
-        function openVersionFromUrl() {
+        // Parse the version out of /changelog/5.6.0 (or /5.6.0, /5, /5.4)
+        // Returns a full "x.y.z" key, or null when the URL carries no valid version.
+        function getDeepLinkVersion() {
             const match = window.location.pathname.match(/\/(\d+(?:\.\d+){0,2})(?:\.html)?\/?$/);
-            if (!match) return;
-            const raw = match[1];
+            if (!match) return null;
             // Pad missing segments: "5" → "5.0.0", "5.4" → "5.4.0"
-            const segments = raw.split('.');
+            const segments = match[1].split('.');
             while (segments.length < 3) segments.push('0');
             const version = segments.join('.');
-            if (!changelogData[version]) return;
+            return changelogData[version] ? version : null;
+        }
+
+        function openVersionFromUrl() {
+            const version = getDeepLinkVersion();
+            if (!version) {
+                // Not (or no longer) a deep link — normal full page
+                document.documentElement.classList.remove('deep-link-open');
+                renderChangelog();
+                return;
+            }
+            _deepLinkVersion = version;
+
+            // Opened straight into the modal. Render ONLY this version's card so the
+            // served DOM is a single release — an AI scraper asking for /changelog/5.6.0
+            // never has to wade through the other 100+ versions. The full grid is
+            // built on demand when the modal is closed (see closeModal).
+            _openedFromDeepLink = true;
+            renderChangelog([version]);
+
             const card = document.querySelector(`.version-card[data-version="${version}"]`);
+            // Bring the (invisible) source card into view so the modal has a sensible
+            // morph origin — everything else fades in once the modal closes.
+            if (card) card.scrollIntoView({ block: 'center' });
+
             openModal(version, card);
         }
 
@@ -634,6 +690,10 @@
         }
 
         let _lastSourceCard = null;
+
+        let _openedFromDeepLink = false;
+
+        let _deepLinkVersion = null;
 
         let _lastSourceRect = null;
 
@@ -747,6 +807,32 @@
             const modal = document.getElementById('changelog-modal');
             const modalCardEl = modal.querySelector('.modal-card');
 
+            // Deep link: reveal the page now, so it fades in underneath while the modal
+            // morphs back into the card that opened it.
+            if (_openedFromDeepLink) {
+                _openedFromDeepLink = false;
+                // Swap the hidden guard for the delayed-reveal state: the page fades in
+                // only after the modal has begun collapsing, so they don't overlap.
+                document.documentElement.classList.remove('deep-link-open');
+                document.documentElement.classList.add('deep-link-reveal');
+                // Unlock scrolling first, otherwise scrollIntoView is a no-op.
+                document.body.style.overflow = '';
+                // The deep-link page only ever contained the one card. Build the real
+                // grid now — it stays invisible under the delayed reveal, so the swap
+                // is never seen — then morph into the freshly created card.
+                renderChangelog();
+                const freshCard = _deepLinkVersion
+                    ? document.querySelector(`.version-card[data-version="${_deepLinkVersion}"]`)
+                    : null;
+                _deepLinkVersion = null;
+                if (freshCard) {
+                    _lastSourceCard = freshCard;
+                    freshCard.scrollIntoView({ block: 'center' });
+                    // Recapture the (now visible) card rect as the morph destination
+                    _lastSourceRect = freshCard.getBoundingClientRect();
+                }
+            }
+
             // Get current modal rect
             const currentRect = modalCardEl.getBoundingClientRect();
 
@@ -804,6 +890,8 @@
                     _lastSourceCard.style.opacity = '';
                 }
                 _lastSourceCard = null;
+                // Hand the page back to its normal state once the morph is finished
+                document.documentElement.classList.remove('deep-link-reveal');
             };
             modalCardEl.addEventListener('transitionend', onEnd);
             // Safety net in case transformend is missed entirely
@@ -824,15 +912,18 @@
             });
         }
 
-        function renderChangelog() {
+        // Renders the version grid. Pass an array of versions to render only those —
+        // used by deep links so /changelog/5.6.0 serves ONE card instead of 100+.
+        function renderChangelog(onlyVersions = null) {
             const container = document.getElementById('changelog-container');
             const versions = getSortedVersions();
+            const list = onlyVersions ? versions.filter(v => onlyVersions.includes(v)) : versions;
 
             let html = '';
 
-            versions.forEach((version, index) => {
+            list.forEach((version) => {
                 const data = changelogData[version];
-                const isLatest = index === 0;
+                const isLatest = versions[0] === version;
                 const isStable = stableVersions.includes(version);
 
                 const addedCount = data.added ? data.added.length : 0;
