@@ -80,7 +80,7 @@ description: System Generated Documentation. Read this if asked anything regardi
 Open Source Terminal AI Assistant
 App Version: ${appVersion}. Check Updates: fluxflow --update check. Update: fluxflow --update
 GitHub: https://github.com/KushalRoyChowdhury/fluxflow-cli
-Public Docs: https://fluxflow-cli.onrender.com
+Public Docs: https://fluxflow-cli.onrender.com, /changelog or /changelog/{version} endpoints for release notes
 
 ## Supported Features & Documentation References
 * Operating Modes (Flux, Flow, CU, FluxCU) → references/MODES.md
