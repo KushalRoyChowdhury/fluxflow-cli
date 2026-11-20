@@ -307,11 +307,29 @@ export const search_keyword = async (args) => {
             };
             patterns = patterns.map(expandExtGlob);
             const hasNegation = patterns.some(p => p.startsWith('!'));
-            const isGlob = patterns.some(p => fg.isDynamicPattern(p) || /[*?{}[\]()|+]/.test(p));
+            const hasGlobChars = (p) => fg.isDynamicPattern(p) || /[*?{}[\]()|+]/.test(p);
+            const plainInSet = patterns.filter(p => !hasGlobChars(p));
+            const isGlob = patterns.some(hasGlobChars);
             if (isGlob) {
                 pathArgType = 'glob';
                 const posixPath = pathArg.replace(/\\/g, '/');
-                const posixPatterns = patterns.map(p => p.replace(/\\/g, '/'));
+                // Mixed input (plain paths + globs): promote plain paths to recursive
+                // globs so fast-glob yields the union, natively deduped. Plain dirs
+                // become dir/**, plain files stay literals (stat decides which).
+                let mixedPromoted = null;
+                if (plainInSet.length > 0 && plainInSet.length < patterns.length) {
+                    mixedPromoted = {};
+                    for (const p of plainInSet) {
+                        const bare = p.replace(/[\\/]+$/, '').replace(/\\/g, '/');
+                        try {
+                            const st = await fs.stat(path.resolve(rootDir, bare));
+                            mixedPromoted[p] = st.isDirectory() ? `${bare}/**` : bare;
+                        } catch {
+                            mixedPromoted[p] = `${bare}/**`;
+                        }
+                    }
+                }
+                const posixPatterns = patterns.map(p => mixedPromoted && mixedPromoted[p] !== undefined ? mixedPromoted[p] : p.replace(/\\/g, '/'));
                 const globExcludes = excludes.map(ex => ex.startsWith('.') ? `**/*${ex}` : `**/${ex}/**`);
                 const isNegativeOnly = hasNegation && !patterns.some(p => !p.startsWith('!'));
 
@@ -389,10 +407,23 @@ export const search_keyword = async (args) => {
                 const resolved = [];
                 let sawFile = false;
                 let sawDir = false;
-                for (const p of patterns) {
-                    // Strip trailing slash so both "src/utils" and "src/utils/" work
-                    const normalised = p.replace(/[\/\\]+$/, '');
-                    const fullPath = path.resolve(rootDir, normalised);
+
+                // Pass 1: resolve & normalise all paths (strip trailing slash)
+                const candidates = patterns.map(p => ({
+                    raw: p,
+                    fullPath: path.resolve(rootDir, p.replace(/[\/\\]+$/, ''))
+                }));
+
+                // Pass 2: prune nested paths — if a path is inside another given
+                // path, the parent's recursive walk already covers it, so skip it
+                const pruned = candidates.filter(c =>
+                    !candidates.some(o =>
+                        o !== c &&
+                        (c.fullPath + path.sep).startsWith(o.fullPath + path.sep)
+                    )
+                );
+
+                for (const { raw, fullPath } of pruned) {
                     try {
                         const stat = await fs.stat(fullPath);
                         if (stat.isDirectory()) {
@@ -403,10 +434,10 @@ export const search_keyword = async (args) => {
                             sawFile = true;
                             resolved.push({ fullPath, relativePath: path.relative(rootDir, fullPath) });
                         } else {
-                            return `ERROR: Path is neither a file nor a directory: ${p}`;
+                            return `ERROR: Path is neither a file nor a directory: ${raw}`;
                         }
                     } catch {
-                        return `ERROR: Path not found: ${p}`;
+                        return `ERROR: Path not found: ${raw}`;
                     }
                 }
                 filesToSearch = resolved;
