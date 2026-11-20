@@ -189,7 +189,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
             clearTempKey(provider);
             const label = provider.replace('c_openai', 'Custom Endpoints');
             lines.push(`✦ ${label} now using NO API key (persisted).`);
-            lines.push('⠀⠀└─ Saved key slots were kept, they are just ignored.\n⠀');
+            lines.push(`⠀⠀└─ Saved key slots were kept, they are just ignored.${provider === 'c_openai' ? '' : '\n⠀'}`);
             if (provider === 'c_openai') {
                 lines.push('⠀⠀└─ No Authorization header will be sent. Base URL is unchanged.\n⠀');
             }
