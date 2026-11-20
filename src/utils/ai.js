@@ -2431,7 +2431,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         let cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
 
-        const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools. Instead write the action string in chat you WOULD have written, without markdown wrappers. Then wait for systtem response\n' : '';
+        const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools. Instead write the action string in chat you WOULD have written, without markdown wrappers. Then wait for system response\n' : '';
 
         const isForceReasoning = process.env.forcedReasoning || false;
 

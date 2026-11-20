@@ -213,7 +213,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         if (!res.ok) return { lines: [`✦ ${res.error}`] };
         // Using a saved key clears any temp override for that provider.
         clearTempKey(provider);
-        lines.push(`✦ ${provider.replace('c_openai', 'Custom Endpoints')} now using slot ${res.index + 1}.\n⠀`);
+        lines.push(`✦ ${provider.replace('c_openai', 'Custom Endpoints')} now using slot ${res.index + 1}.${res.switchedBaseUrl ? '' : '\n⠀'}`);
         if (res.switchedBaseUrl) {
             lines.push(`⠀⠀\x1b[2m└─\x1b[22m Switched Base URL to: ${res.switchedBaseUrl}\n⠀`);
         }
