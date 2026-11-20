@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+Sitemap: https://fluxflow-cli.onrender.com/sitemap.xml
