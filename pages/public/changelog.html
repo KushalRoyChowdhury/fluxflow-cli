@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Changelog and release notes for Flux Flow CLI.">
     <meta name="ai-routing-hint"
-        content="For a specific version's release notes, visit /changelog/{version_number} (e.g., /changelog/5.6.0)">
+        content="For a specific version's release notes, visit /changelog/{version_number}. Or search a keyword using /changelog?search={keyword}">
     <link rel="icon" href="logo.png">
     <link rel="alternate" type="text/markdown" href="/llms.txt" title="LLM Documentation Index">
     <title>FluxFlow - Changelog</title>
@@ -61,6 +61,14 @@
         html.deep-link-open .container {
             opacity: 0;
             pointer-events: none;
+        }
+
+        /* Search mode (?search=keyword): the page is replaced by raw text output,
+           so hide the normal chrome before first paint to avoid a flash. */
+        html.search-mode .container,
+        html.search-mode #changelog-modal,
+        html.search-mode #bg-canvas {
+            display: none;
         }
 
         /* While the modal collapses, the page stays hidden and only fades in once
@@ -550,6 +558,10 @@
     <!-- Deep-link guard: hide the page before first paint if a version is in the URL -->
     <script>
         (function () {
+            // Search mode renders raw text — hide the normal UI before first paint.
+            if (new URLSearchParams(window.location.search).get('search')) {
+                document.documentElement.classList.add('search-mode');
+            }
             if (/\/(\d+(?:\.\d+){0,2})(?:\.html)?\/?$/.test(window.location.pathname)) {
                 document.documentElement.classList.add('deep-link-open');
                 // Failsafe: never leave the page hidden if the modal fails to open
@@ -570,7 +582,7 @@
         <header>
             <h1>Flux Flow CLI</h1>
             <div class="subtitle">Changelog & Release Notes</div>
-            <div class="agent-note">Tip: Access specific versions directly at /changelog/{version}</div>
+            <div class="agent-note">Tip for AI: Access specific versions directly at /changelog/{version}. Or search keywords at /changelog?search={keyword}</div>
         </header>
         <div id="changelog-container" class="changelog-grid"></div>
     </div>
@@ -600,10 +612,84 @@
         const MASK_PATH = "changelog.html";
 
         document.addEventListener('DOMContentLoaded', () => {
-             setupModalEvents();
-             // Renders the grid — or just the deep-linked card, see openVersionFromUrl()
-             openVersionFromUrl();
+            // Plain-text keyword search: /changelog/?search=keyword
+            // Not for humans — renders matching versions as raw text and stops.
+            if (renderSearchResult()) return;
+            setupModalEvents();
+            // Renders the grid — or just the deep-linked card, see openVersionFromUrl()
+            openVersionFromUrl();
         });
+
+        // ==========================================
+        // PLAIN-TEXT KEYWORD SEARCH (agent-facing)
+        // ==========================================
+        // Usage: /changelog/?search=keyword
+        // Renders the full changelog entries (as Markdown) for every version whose
+        // note/added/changed/fixes mention the keyword (case-insensitive).
+        // No cards, no styling, no modal — just raw Markdown in a <pre>.
+
+        // Returns the trimmed search keyword, or null when absent/blank.
+        function getSearchKeyword() {
+            const raw = new URLSearchParams(window.location.search).get('search');
+            if (raw === null) return null;
+            const keyword = raw.trim().toLowerCase();
+            return keyword === '' ? null : keyword;
+        }
+
+        // True when any searchable text in a version contains the keyword.
+        function versionMatchesKeyword(data, keyword) {
+            const parts = [data.note || '', ...(data.added || []), ...(data.changed || []), ...(data.fixes || [])];
+            return parts.some(text => text.toLowerCase().includes(keyword));
+        }
+
+        // Builds the Markdown block for a single version: heading, date/caption, bullet lists.
+        function versionToMarkdown(version, data) {
+            const blocks = [`# ${version}`];
+            const note = splitNote(data.note);
+
+            // Date line, e.g. "NOVEMBER 15" (note is "MONTH DATE[. caption]")
+            if (note.date) blocks.push(note.date);
+            if (note.caption) blocks.push(note.caption);
+
+            // [label, source array] — order matches the modal: Improvements, Patches, Fixes
+            const sections = [
+                ['Improvements', data.added],
+                ['Patches', data.changed],
+                ['Fixes', data.fixes]
+            ];
+
+            for (const [label, items] of sections) {
+                if (!items || items.length === 0) continue;
+                blocks.push(`${label}:\n` + items.map(item => `- ${item}`).join('\n'));
+            }
+
+            // Truly empty entry (no date, caption, or details) — keep the heading so it's still listed
+            if (blocks.length === 1) blocks.push('_No additional release details recorded._');
+
+            return blocks.join('\n');
+        }
+
+        // Renders the raw Markdown result page. Returns true when search mode was active.
+        function renderSearchResult() {
+            const keyword = getSearchKeyword();
+            if (!keyword) {
+                // Blank/missing keyword (?search=) — undo the pre-paint guard, show normal page
+                document.documentElement.classList.remove('search-mode');
+                return false;
+            }
+
+            const matches = getSortedVersions().filter(v => versionMatchesKeyword(changelogData[v], keyword));
+            const parts = [`Version containing [${keyword}]`];
+            parts.push(...matches.map(v => versionToMarkdown(v, changelogData[v])));
+            if (matches.length === 0) parts.push('(none)');
+
+            document.body.innerHTML = '';
+            const pre = document.createElement('pre');
+            pre.textContent = parts.join('\n\n');
+            document.body.appendChild(pre);
+            document.title = `Changelog search: ${keyword}`;
+            return true;
+        }
 
         // Deep link: /changelog/5.6.0 (or /5.6.0) opens that version's modal directly
         // Short versions fall back: /5 → 5.0.0, /5.4 → 5.4.0
@@ -1177,9 +1263,13 @@
             requestAnimationFrame(animate);
         }
 
-        window.addEventListener('resize', initCanvas);
-        initCanvas();
-        animate();
+        // Skip the background engine in plain-text search mode — the body is
+        // replaced with raw output, so the animation has nothing to draw on.
+        if (getSearchKeyword() === null) {
+            window.addEventListener('resize', initCanvas);
+            initCanvas();
+            animate();
+        }
     </script>
 </body>
 
