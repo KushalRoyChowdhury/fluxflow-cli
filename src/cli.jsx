@@ -635,7 +635,16 @@ Context:
 
                 const modelName = formattedModelName;
 
-                process.stdout.write(`Responding with ${cyan}${modelName}${reset} from ${magenta}${oneShotSettings.aiProvider}${reset}:\n`);
+                let providerLabel = oneShotSettings.aiProvider;
+                if (providerLabel === 'c_openai' || providerLabel === 'Custom (OpenAI)') {
+                    try {
+                        const { resolveBaseUrl } = await import('./utils/secrets_v2.js');
+                        const baseUrl = (await resolveBaseUrl('c_openai')) || (oneShotSettings.systemSettings?.customOpenAIBaseUrl || '');
+                        if (baseUrl) providerLabel = baseUrl;
+                    } catch (e) { }
+                }
+
+                process.stdout.write(`Responding with ${cyan}${modelName}${reset} from ${magenta}${providerLabel}${reset}:\n`);
             }
             const { text } = await generateSimpleContent(oneShotSettings, model, formattedContents, oneShotInstruction, oneShotSettings.thinkingLevel);
             const responseText = (text || '').trim();
