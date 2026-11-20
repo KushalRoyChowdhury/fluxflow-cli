@@ -37,7 +37,7 @@ export const changelogData = {
     "5.6.0": {
         "note": "NOVEMBER 13",
         "added": [
-            "Added new provider: [Coarea AI](https://coarena.ai/account/api)."
+            "Added new provider: [Coarena AI](https://coarena.ai/account/api)."
         ],
         "changed": [
             "Improved system prompt efficiency."

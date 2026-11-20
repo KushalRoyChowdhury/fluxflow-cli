@@ -99,6 +99,34 @@
             margin-top: 10px;
         }
 
+        .toast-notification {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--card-bg);
+            border: 1px solid var(--yellow);
+            color: var(--text);
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: auto;
+            max-width: 90%;
+            text-align: center;
+        }
+
+        .toast-notification.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast-notification a {
+            color: var(--yellow);
+        }
+
         .agent-note {
             height: 0px;
             overflow: hidden;
@@ -702,7 +730,30 @@
             const segments = match[1].split('.');
             while (segments.length < 3) segments.push('0');
             const version = segments.join('.');
-            return changelogData[version] ? version : null;
+            if (changelogData[version]) {
+                _requestedVersion = null;
+                return version;
+            }
+            // Version in URL doesn't exist — find the NEAREST known version.
+            // Compare tuple diff (major, minor, patch) lexicographically:
+            // the requested version's loaded version with the smallest major diff wins;
+            // on ties, minor, then patch. E.g. /5.9.4 with 8.9.0 & 8.9.5 → 8.9.5.
+            _requestedVersion = version;
+            const req = segments.map(Number);
+            let nearest = null;
+            let bestDiff = null;
+            for (const v of Object.keys(changelogData)) {
+                const cur = v.split('.').map(Number);
+                const diff = [Math.abs(req[0] - cur[0]), Math.abs(req[1] - cur[1]), Math.abs(req[2] - cur[2])];
+                if (!bestDiff ||
+                    diff[0] < bestDiff[0] ||
+                    (diff[0] === bestDiff[0] && (diff[1] < bestDiff[1] ||
+                        (diff[1] === bestDiff[1] && diff[2] < bestDiff[2])))) {
+                    bestDiff = diff;
+                    nearest = v;
+                }
+            }
+            return nearest;
         }
 
         function openVersionFromUrl() {
@@ -712,6 +763,10 @@
                 document.documentElement.classList.remove('deep-link-open');
                 renderChangelog();
                 return;
+            }
+            if (_requestedVersion) {
+                showToast(`Version <strong>${_requestedVersion}</strong> not found. Showing <strong>${version}</strong> instead. Or <a href="/changelog">go to /changelog</a> to see all available versions.`);
+                _requestedVersion = null;
             }
             _deepLinkVersion = version;
 
@@ -728,6 +783,20 @@
             if (card) card.scrollIntoView({ block: 'center' });
 
             openModal(version, card);
+        }
+
+        function showToast(message) {
+            let toast = document.getElementById('toast-notification');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'toast-notification';
+                toast.className = 'toast-notification';
+                document.body.appendChild(toast);
+            }
+            toast.innerHTML = message;
+            toast.classList.add('show');
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => toast.classList.remove('show'), 8000);
         }
 
         function parseMarkdown(text) {
@@ -780,6 +849,8 @@
         let _openedFromDeepLink = false;
 
         let _deepLinkVersion = null;
+        let _requestedVersion = null; // URL version that didn't exist — we substituted nearest
+
 
         let _lastSourceRect = null;
 
