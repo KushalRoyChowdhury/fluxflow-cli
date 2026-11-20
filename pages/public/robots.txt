@@ -2,6 +2,10 @@ User-agent: *
 Allow: /
 
 User-agent: ClaudeBot
+User-agent: Claude-User
+User-agent: Claude-SearchBot
+User-agent: Claude-Web
+User-agent: anthropic-ai
 Disallow: /
 
 Sitemap: https://fluxflow-cli.onrender.com/sitemap.xml
