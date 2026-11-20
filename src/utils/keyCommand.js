@@ -94,7 +94,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
     if (parsed.provider) {
         const norm = normalizeProvider(parsed.provider);
         if (!norm) {
-            return { lines: [`✦ Unknown provider: ${parsed.provider}`] };
+            return { lines: [`✦ Unknown provider: ${parsed.provider}\n⠀`] };
         }
         provider = norm;
     }
@@ -136,14 +136,14 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         });
         if (!res.ok) {
             if (res.full) {
-                return { lines: [`✦ ${res.error}`, '⠀⠀\x1b[2m└─\x1b[22m Use /key add <key> --index <n> to overwrite a slot.'] };
+                return { lines: [`✦ ${res.error}`, '⠀⠀\x1b[2m└─\x1b[22m Use /key add <key> --index <n> to overwrite a slot.\n⠀'] };
             }
-            return { lines: [`✦ Failed to add key: ${res.error}`] };
+            return { lines: [`✦ Failed to add key: ${res.error}\n⠀`] };
         }
         // A newly added provider with no active index -> make it active.
         const active = await getActiveIndex(provider);
         if (active === null) await setActiveIndex(provider, res.index);
-        lines.push(`✦ Key added to ${provider.replace('c_openai', 'Custom Endpoints')} slot ${res.index + 1}.`);
+        lines.push(`✦ Key added to ${provider.replace('c_openai', 'Custom Endpoints')} slot ${res.index + 1}.\n⠀`);
         if (parsed.url !== null && isUrlBearing(provider)) {
             lines.push(`⠀⠀\x1b[2m└─\x1b[22m Using URL: ${parsed.url}`);
         }
@@ -161,16 +161,16 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         }
 
         const res = await removeProviderKey(provider, target, { all: parsed.all });
-        if (!res.ok) return { lines: [`✦ ${res.error}`] };
+        if (!res.ok) return { lines: [`✦ ${res.error}\n⠀`] };
 
         if (res.all) {
-            lines.push(`✦ Cleared all keys for ${provider.replace('c_openai', 'Custom Endpoints') }.`);
+            lines.push(`✦ Cleared all keys for ${provider.replace('c_openai', 'Custom Endpoints') }.\n⠀`);
             return done({ promptNewKey: true });
         }
 
-        lines.push(`✦ Removed key from ${provider.replace('c_openai', 'Custom Endpoints')} slot ${res.removedIndex + 1}.`);
+        lines.push(`✦ Removed key from ${provider.replace('c_openai', 'Custom Endpoints')} slot ${res.removedIndex + 1}.\n⠀`);
         if (res.needsNewKey) {
-            lines.push(`⠀⠀\x1b[2m└─\x1b[22m No keys remain for ${provider}. Please enter a new key.`);
+            lines.push(`⠀⠀\x1b[2m└─\x1b[22m No keys remain for ${provider}. Please enter a new key.\n⠀`);
             return done({ promptNewKey: true });
         }
         return done();
@@ -183,25 +183,25 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         // --null: send NO api key at all. Persisted; saved slots are untouched.
         if (parsed.nullMode) {
             if (!supportsNullKey(provider)) {
-                return { lines: [`✦ --null is only supported for Custom Endpoints and Ollama.`] };
+                return { lines: [`✦ --null is only supported for Custom Endpoints and Ollama.\n⠀`] };
             }
             await setNullMode(provider, true);
             clearTempKey(provider);
             const label = provider.replace('c_openai', 'Custom Endpoints');
             lines.push(`✦ ${label} now using NO API key (persisted).`);
-            lines.push('⠀⠀└─ Saved key slots were kept, they are just ignored.');
+            lines.push('⠀⠀└─ Saved key slots were kept, they are just ignored.\n⠀');
             if (provider === 'c_openai') {
-                lines.push('⠀⠀└─ No Authorization header will be sent. Base URL is unchanged.');
+                lines.push('⠀⠀└─ No Authorization header will be sent. Base URL is unchanged.\n⠀');
             }
             return done({ switchedKey: NULL_KEY_SENTINEL });
         }
 
-        if (!argStr) return { lines: ['✦ Usage: /key use <index> | <key> [--temp] | /key use --null'] };
+        if (!argStr) return { lines: ['✦ Usage: /key use <index> | <key> [--temp] | /key use --null\n⠀'] };
 
         if (parsed.temp) {
             // Temp key: full key only, session-scoped in memory.
             setTempKey(provider, argStr);
-            lines.push(`✦ Temporary key set for ${provider.replace('c_openai', 'Custom Endpoints')} (session only).`);
+            lines.push(`✦ Temporary key set for ${provider.replace('c_openai', 'Custom Endpoints')} (session only).\n⠀`);
             if (isUrlBearing(provider)) {
                 lines.push('⠀⠀\x1b[2m└─\x1b[22m Will use the current Custom base URL.');
             }
@@ -213,9 +213,9 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         if (!res.ok) return { lines: [`✦ ${res.error}`] };
         // Using a saved key clears any temp override for that provider.
         clearTempKey(provider);
-        lines.push(`✦ ${provider.replace('c_openai', 'Custom Endpoints') } now using slot ${res.index + 1}.`);
+        lines.push(`✦ ${provider.replace('c_openai', 'Custom Endpoints')} now using slot ${res.index + 1}.\n⠀`);
         if (res.switchedBaseUrl) {
-            lines.push(`⠀⠀\x1b[2m└─\x1b[22m Switched Base URL to: ${res.switchedBaseUrl}`);
+            lines.push(`⠀⠀\x1b[2m└─\x1b[22m Switched Base URL to: ${res.switchedBaseUrl}\n⠀`);
         }
         return done({ switchedBaseUrl: res.switchedBaseUrl, switchedKey: res.key });
     }
@@ -226,8 +226,8 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         const scope = parsed.provider ? provider : null;
         const res = await cleanProviderKeys(scope);
         lines.push(scope
-            ? `✦ Compacted ${scope.replace('c_openai', 'Custom Endpoints') } key slots.`
-            : `✦ Compacted all key stores (${res.touched} provider(s) touched).`);
+            ? `✦ Compacted ${scope.replace('c_openai', 'Custom Endpoints') } key slots.\n⠀`
+            : `✦ Compacted all key stores (${res.touched} provider(s) touched).\n⠀`);
         return done();
     }
 

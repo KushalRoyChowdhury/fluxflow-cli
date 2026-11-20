@@ -6198,7 +6198,7 @@ export default function App({ args = [] }) {
                             if (selectedProvider === '9router') {
                                 const check = await check9RouterReachable();
                                 if (!check.ok) {
-                                    warningMsg = `\n\n\x1b[33m✦ WARNING: 9router does not appear to be running on ${check.url}.\x1b[39m\n⠀⠀\x1b[2m└─\x1b[22m To start 9router: \x1b[36mnpx 9router\x1b[39m or \x1b[36mnpm i -g 9router && 9router\x1b[39m`;
+                                    warningMsg = `\n\n\x1b[33m✦ WARNING: 9router does not appear to be running on ${check.url}.\x1b[39m\n⠀⠀\x1b[2m└─\x1b[22m To start 9router: \x1b[36mnpx 9router\x1b[39m or \x1b[36mnpm i -g 9router && 9router\x1b[39m\n⠀`;
                                 }
                             }
 
@@ -7007,7 +7007,7 @@ export default function App({ args = [] }) {
                                         if (prov === '9router') {
                                             const check = await check9RouterReachable();
                                             if (!check.ok) {
-                                                warningMsg = `\n\n\x1b[33m✦ WARNING: 9router does not appear to be running on ${check.url}.\x1b[39m\n⠀⠀\x1b[2m└─\x1b[22m To start 9router: \x1b[36mnpx 9router\x1b[39m or \x1b[36mnpm i -g 9router && 9router\x1b[39m`;
+                                                warningMsg = `\n\n\x1b[33m✦ WARNING: 9router does not appear to be running on ${check.url}.\x1b[39m\n⠀⠀\x1b[2m└─\x1b[22m To start 9router: \x1b[36mnpx 9router\x1b[39m or \x1b[36mnpm i -g 9router && 9router\x1b[39m\n⠀`;
                                             }
                                         }
 
@@ -8041,7 +8041,7 @@ export default function App({ args = [] }) {
                             const displayName = newDisplay === 0 ? 'Primary (Display 1)' : 'Secondary (Display 2)';
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `✦ Active Computer Use display set to: ${displayName}`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ Active Computer Use display set to: ${displayName}\n⠀`, isMeta: true }];
                             });
                             setActiveView('chat');
                         }}
