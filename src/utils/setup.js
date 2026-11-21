@@ -17,7 +17,7 @@ export const checkPuppeteerReady = async () => {
         }
         // Lazy-load puppeteer only when the config-based lookup cannot resolve a path.
         const { default: puppeteer } = await import('puppeteer');
-        const exePath = puppeteer.executablePath();
+        const exePath = await puppeteer.executablePath();
         const exists = exePath && fs.existsSync(exePath);
         // console.log(`[DEBUG] Puppeteer checking: ${exePath} | Exists: ${exists}`);
         if (exists) return true;
@@ -27,17 +27,19 @@ export const checkPuppeteerReady = async () => {
     return false;
 };
 
+export const CHROME_PINNED_VERSION = '158.0.8127.36';
+
 /**
- * Automates the installation of the required Chromium browser (Version 148).
+ * Automates the installation of the required Chromium browser (Version 148.0.7778.178).
  */
 export const installPuppeteerBrowser = async (onStatus) => {
-    if (onStatus) onStatus('📥 Downloading Chromium engine (chrome@148)...');
+    if (onStatus) onStatus(`📥 Downloading Chromium engine (chrome@${CHROME_PINNED_VERSION})...`);
     try {
         // Attempt pnpm exec first, fallback to npx if it fails
         try {
-            await execAsync('pnpm exec puppeteer browsers install chrome@148');
+            await execAsync(`pnpm exec puppeteer browsers install chrome@${CHROME_PINNED_VERSION}`);
         } catch (pnpmErr) {
-            await execAsync('npx -y puppeteer browsers install chrome@148');
+            await execAsync(`npx -y puppeteer browsers install chrome@${CHROME_PINNED_VERSION}`);
         }
 
         // Brief delay to allow file system to settle

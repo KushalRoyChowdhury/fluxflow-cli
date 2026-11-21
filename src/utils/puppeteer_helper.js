@@ -7,9 +7,12 @@ import { fileURLToPath } from 'url';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const DEFAULT_CHROME_VERSION = '158.0.8127.36';
+const DEFAULT_CACHE_DIR = path.join(os.homedir(), '.cache', 'puppeteer');
+
 /**
- * Programmatically resolves the Chrome/Chromium executable path based on
- * the configuration defined in .puppeteerrc.cjs at the package root.
+ * Programmatically resolves the Chrome/Chromium executable path.
+ * Checks default Puppeteer cache directory and fallback version 148.0.7778.178.
  *
  * @returns {object} { executablePath: string | undefined, cacheDirectory: string | undefined }
  */
@@ -38,43 +41,26 @@ export function getPuppeteerConfig() {
         return {};
     }
 
-    // Resolve .puppeteerrc.cjs relative to this file
-    // In source mode: src/utils/puppeteer_helper.js -> package root is "../../"
-    // In bundled mode: dist/fluxflow.js -> package root is "../"
-    let configPath = path.resolve(__dirname, '..', '..', '.puppeteerrc.cjs');
-    if (!fs.existsSync(configPath)) {
-        configPath = path.resolve(__dirname, '..', '.puppeteerrc.cjs');
-    }
-
-    if (!fs.existsSync(configPath)) {
-        return {};
-    }
-
     try {
-        const config = require(configPath);
-        const cacheDir = config.cacheDirectory;
-        const version = config.chrome?.version;
+        const cacheDir = process.env.PUPPETEER_CACHE_DIR || DEFAULT_CACHE_DIR;
+        const version = DEFAULT_CHROME_VERSION;
 
-        if (cacheDir) {
-            // Set environment variable as a fallback/hint for Puppeteer's internal logic
-            process.env.PUPPETEER_CACHE_DIR = cacheDir;
+        process.env.PUPPETEER_CACHE_DIR = cacheDir;
 
-            if (version) {
-                const expectedPath = path.join(
-                    cacheDir,
-                    'chrome',
-                    `${pptrPlatform}-${version}`,
-                    subDir,
-                    execName
-                );
+        const expectedPath = path.join(
+            cacheDir,
+            'chrome',
+            `${pptrPlatform}-${version}`,
+            subDir,
+            execName
+        );
 
-                if (fs.existsSync(expectedPath)) {
-                    return {
-                        executablePath: expectedPath,
-                        cacheDirectory: cacheDir
-                    };
-                }
-            }
+        if (fs.existsSync(expectedPath)) {
+            return {
+                executablePath: expectedPath,
+                cacheDirectory: cacheDir
+            };
+        }
 
             // Fallback: Recursively search the cache directory for the executable
             // Prioritize paths containing the target version if specified
@@ -138,7 +124,6 @@ export function getPuppeteerConfig() {
                     cacheDirectory: cacheDir
                 };
             }
-        }
     } catch (error) {
         // Fall back to default puppeteer discovery
     }

@@ -46,7 +46,7 @@ export const web_scrape = async (args) => {
             const page = await browser.newPage();
 
             // 2. Set Realistic Identity
-            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.178 Safari/537.36');
+            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.8127.36 Safari/537.36');
             await page.setViewport({ width: 1920, height: 1440 });
 
             // 3. Jitter Delay
@@ -54,7 +54,7 @@ export const web_scrape = async (args) => {
             await new Promise(r => setTimeout(r, jitter));
 
             // 4. Navigate and Wait for Hydration
-            await page.goto(url, { waitUntil: 'networkidle2', timeout: 180000 });
+            await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
 
             // 5. Deep Hydration Delay: Wait an additional 1s flat before reading data
             await new Promise(r => setTimeout(r, 1000));

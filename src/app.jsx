@@ -1266,6 +1266,7 @@ export default function App({ args = [] }) {
     const [wildercardTooling, setWildercardTooling] = useState(false);
     const [janitorModel, setJanitorModel] = useState(getFallbackValue('gemma_janitor_fallback_google') || 'gemma-4-26b-a4b-it');
     const [isInitializing, setIsInitializing] = useState(true);
+    const [installingDepsStatus, setInstallingDepsStatus] = useState(null);
     const [isAppFocused, setIsAppFocused] = useState(true);
     const lastFocusEventTime = useRef(0);
     const [apiKey, setApiKey] = useState(null);
@@ -2420,14 +2421,14 @@ export default function App({ args = [] }) {
 
             // 0. System Integrity Check (Build-in Chromium)
             if (!(await checkPuppeteerReady())) {
-                setMessages(prev => {
-                    setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'setup-' + Date.now(), role: 'system', text: '✦ Installing Required dependencies... (One-time setup)', isMeta: true }];
+                setInstallingDepsStatus('✦ Installing Required dependencies... (One-time setup)');
+                await installPuppeteerBrowser((status) => {
+                    setInstallingDepsStatus(status);
                 });
-                await installPuppeteerBrowser();
+                setInstallingDepsStatus(null);
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'setup-done-' + Date.now(), role: 'system', text: '⠀⠀\x1b[2m└─\x1b[22m All dependencies installed successfully.\n⠀', isMeta: true }];
+                    return [...prev, { id: 'setup-done-' + Date.now(), role: 'system', text: '✦ Dependencies Verified:\n⠀⠀\x1b[2m└─\x1b[22m Chromium browser installed successfully.\n⠀', isMeta: true }];
                 });
             }
 
@@ -8400,7 +8401,23 @@ export default function App({ args = [] }) {
 
     return (
         <Box flexDirection="column" width="100%">
-            {isInitializing ? null : showBridgeRejection ? (
+            {isInitializing ? (
+                <Box flexDirection="column" paddingX={1} width="100%">
+                    <Box borderStyle="round" borderColor="cyan" padding={1} flexDirection="column" flexShrink={0} width="100%">
+                        <Box flexDirection="row">
+                            <Text color="cyan">
+                                <Spinner type="dots" />
+                            </Text>
+                            <Text color="cyan" bold> {installingDepsStatus || 'Starting Flux Flow...'}</Text>
+                        </Box>
+                        {installingDepsStatus && (
+                            <Box marginTop={1}>
+                                <Text color="gray">Downloading and setting up Chromium engine in background, please wait...</Text>
+                            </Box>
+                        )}
+                    </Box>
+                </Box>
+            ) : showBridgeRejection ? (
                 <BridgeRejected width={stdout?.columns || 80} height={stdout?.rows || 24} aiProvider={aiProvider} theme={systemSettings.theme} reason={showBridgeRejection} />
             ) : showBridgePromo ? (
                 <BridgePromo width={stdout?.columns || 80} height={stdout?.rows || 24} selectedIndex={promoSelectedIndex} aiProvider={aiProvider} theme={systemSettings.theme} />
@@ -8444,11 +8461,7 @@ export default function App({ args = [] }) {
                             </Box>
                         )}
 
-                        {isInitializing ? (
-                            <Box borderStyle="double" borderColor="grey" padding={1} flexShrink={0}>
-                                <Text color="white">Starting Flux Flow...</Text>
-                            </Box>
-                        ) : (!apiKey && !(aiProvider === 'c_openai' && systemSettings.customOpenAIBaseUrl)) ? (
+                        {(!apiKey && !(aiProvider === 'c_openai' && systemSettings.customOpenAIBaseUrl)) ? (
                             <Box borderStyle="round" borderColor="white" padding={0} flexDirection="column" flexShrink={0} width="100%">
                                 <Box paddingX={1} marginBottom={1}>
                                     <Text color="gray" bold>{aiProvider === 'c_openai' ? 'CUSTOM BASE URL REQUIRED' : 'API KEY REQUIRED'}</Text>

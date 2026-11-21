@@ -15,12 +15,12 @@ export const TOOLS_MD = `# FluxFlow Tool Reference
 
 ## 2. Web & Communication
 * WebSearch(query, aiMode?, limit?) → Live web search + AI summary
-* WebScrape(url) → Extract markdown from URL
+* WebScrape(url) → Extract markdown from URL. JS hydration via Chromium v158
 * AskUser(question, optionA..D?) → Interactive prompt to user ("title::desc"); alias: Ask
 
 ## 3. Sub-Agents
-* InvokeSync(title, task) → Blocking sub-agent
-* Invoke(title, task) → Non-blocking worker (max 7 concurrent)
+* InvokeSync(title, task, id?) → Blocking sub-agent
+* Invoke(title, task, id?) → Non-blocking worker (max 7 concurrent)
 * Await(id, timeout?) → Wait for async worker
 * GetProgress(id) → Telemetry & logs
 * Steer(id, message) → Mid-flight direction
@@ -35,9 +35,10 @@ export const TOOLS_MD = `# FluxFlow Tool Reference
 
 ## 6. Computer Use (GUI)
 * Click(gridId, type?, button?, intendedClickText?) → Click coordinate + OCR snap
-* Drag(fromGridId, toGridId) → Mouse drag
 * Scroll(direction, gridId?) → Viewport scroll ("up" | "down")
 * KeyboardTyping(text, autoPressEnter?) → Type string
 * KeyPress(key) → Key/combo dispatch ("ctrl;c", "enter", etc.)
 * RecaptureScreen() → Fresh screenshot + coordinate grid
 `;
+
+// * Drag(fromGridId, toGridId) → Mouse drag

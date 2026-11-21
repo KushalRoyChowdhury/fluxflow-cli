@@ -20,19 +20,19 @@ export const web_search = async (argsString) => {
         const aiPrompt = `Query: ${query}
 
 RESPONSE RULES:
-- ANSWER CONCISELY (TL;DR style) WITH REQUIRED DETAILS UNDER 300 WORDS.
-- DO NOT CITE, REFERENCE, OR MENTION SOURCES ANYWHERE BETWEEN THE MAIN RESPONSE.
-- DO NOT USE MARKDOWN EXCEPT FOR THE SOURCES SECTION BELOW.
-- END THE RESPONSE WITH EXACTLY:
-
+* Answer concisely (TL;DR style) with required details under 300 words
+* Do not cite, reference, or mention sources anywhere within the main response
+* Do not use Markdown except for the sources section below
+* End the response with exactly:
 Sources:
 - <URL 1>
 - <URL 2>
 - <URL 3>
 
-- LIST ONE RAW URL PER BULLET.
-- DO NOT USE MARKDOWN LINKS.
-- DO NOT INCLUDE ANY TEXT, NOTES, OR EXPLANATIONS AFTER THE SOURCES SECTION.`;
+* List one raw URL per bullet
+* Do not use Markdown links
+* Do not include any text, notes, or explanations after the sources section
+* MUST end your final response with exactly: [END]`;
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             let browser = null;
@@ -50,7 +50,7 @@ Sources:
                 });
 
                 const page = await browser.newPage();
-                await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.178 Safari/537.36');
+                await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.8127.36 Safari/537.36');
                 await page.setViewport({ width: 1366, height: 768 });
 
                 const jitter = attempt === 1 ? Math.random() * 1000 + 500 : Math.random() * 2000 + 1000;
@@ -77,19 +77,8 @@ Sources:
 
                         if (text.includes('anomaly')) throw new Error("ANOMALY_DETECTED");
 
-                        // Detect active loading spinners or streaming state in assistant container / page
-                        const isStreaming = Boolean(
-                            document.querySelector('.spinner, .loading, .typing, .streaming, [data-streaming="true"], [data-state="loading"], svg.animate-spin, circle[cx], div[class*="spin"]')
-                        );
-
-                        // Check if assistant container explicitly has Finished status
-                        const assistantEl = assistantMsgs[0] || document.body;
-                        const assistantText = assistantEl ? assistantEl.innerText.trim() : '';
-                        const hasFinishedText = /^(?:[✓✔]\s*)?Finished/i.test(assistantText) ||
-                                               Boolean(assistantEl && assistantEl.querySelector('.status-finished, .finished'));
-
-                        // ONLY finished if NOT streaming AND (has finished header OR (contains Sources: and not streaming))
-                        const isFinished = !isStreaming && (hasFinishedText || (text.includes('Sources:') && !isStreaming));
+                        // Robust finish check: check for [END] or __END__
+                        const isFinished = /\[END\]|__END__/i.test(text);
 
                         // Extract full href URLs from DOM anchor elements
                         const hrefMap = {};
@@ -127,7 +116,9 @@ Sources:
                 rawText = rawText
                     .replace(/^.*?(Ctrl \+ Shift \+ O|Ask\nAll\nImages)/s, '')
                     .replace(/AI-generated answer\. Please verify critical facts\..*/s, '')
-                    .replace(/Brave Search uses private usage metrics.*/s, '');
+                    .replace(/Brave Search uses private usage metrics.*/s, '')
+                    .replace(/\[END\]|__END__/gi, '')
+                    .trim();
 
                 let mainPart = rawText;
                 let sourcesPart = '';
@@ -230,7 +221,7 @@ Sources:
             const page = await browser.newPage();
 
             // 2. Set Realistic Identity
-            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.178 Safari/537.36');
+            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.8127.36 Safari/537.36');
             await page.setViewport({ width: 1366, height: 768 });
 
             // 3. Jitter Delay
