@@ -1,6 +1,6 @@
 {
     "name": "fluxflow-cli",
-    "version": "5.9.1",
+    "version": "5.10.0",
     "date": "2026-11-22",
     "description": "One of the lightest, fastest, high-fidelity agentic CLI with sub-agents & advance computer use.",
     "keywords": [
@@ -31,7 +31,6 @@
         "TOOLS.md",
         "UI_FEATURES.md",
         "cat.txt",
-        ".puppeteerrc.cjs",
         "flux-flow.cjs",
         "model_config.json",
         "surprise.js"
@@ -69,7 +68,7 @@
         "ollama": "^0.6.3",
         "onnxruntime-node": "^1.30.0",
         "pdf-lib": "^1.17.1",
-        "puppeteer": "24.43.1",
+        "puppeteer": "25.18.1",
         "react": "^19.2.5",
         "screenshot-desktop": "^1.15.4",
         "sharp": "^0.35.3",

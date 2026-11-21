@@ -131,7 +131,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
             const uri = await star.ready;
             if (uri) {
                 lines.push('⠀');
-                lines.push(`⭐ Custom endpoints can hold 20 keys. Star [FluxFlow Repository](${uri}) to unlock.`);
+                lines.push(`⭐ Custom endpoints now hold upto 20 keys. Star [FluxFlow Repository](${uri}) to unlock.`);
             }
         }
         lines.push('⠀');

@@ -1,8 +1,19 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-    "5.9.1": {
+    "5.10.0": {
         "note": "NOVEMBER 22",
+        "added": [],
+        "changed": [
+            "Improved agent web tools security.",
+            "Updated chromium engine to `v158`."
+        ],
+        "fixes": [
+            "Fixed UI glitch during initial dependency installation."
+        ]
+    },
+    "5.9.0": {
+        "note": "NOVEMBER 21",
         "added": [
             "Added support for 20 Slot API Keys in Custom OpenAI Endpoint mode.",
             "Added user control `security_policy.md` in `~/.fluxflow/` to manage your own base policy (prompt policy)."
