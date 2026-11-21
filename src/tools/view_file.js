@@ -155,7 +155,26 @@ export const view_file = async (args, context = {}) => {
 
     // Deterministic #skill path resolution
     if (targetPath.trim().toLowerCase().startsWith('#skill')) {
-        const normalized = targetPath.trim().replace(/\\/g, '/');
+        let normalized = targetPath.trim().replace(/\\/g, '/');
+
+        // Clean up accidental '/SKILL.md/' in the middle: e.g. #skill/project/github/SKILL.md/references/SOMETHING.md -> #skill/project/github/references/SOMETHING.md
+        normalized = normalized.replace(/\/SKILL\.md\//i, '/');
+
+        // If it ends with /SKILL.md, check if the parent container is global, project, or #skill
+        // Eg: #skill/global/fluxflow/SKILL.md -> #skill/global/fluxflow
+        //     #skill/fluxflow/SKILL.md -> #skill/fluxflow
+        //     #skill/project/github/references/SKILL.md -> stays as-is
+        if (/\/SKILL\.md$/i.test(normalized)) {
+            const strippedEnding = normalized.replace(/\/SKILL\.md$/i, '');
+            const segs = strippedEnding.replace(/^#skills?\/?/i, '').split('/').filter(Boolean);
+            // segs structure:
+            // [fluxflow] -> length 1 (under #skill directly)
+            // [global, fluxflow] or [project, fluxflow] -> length 2 with global/project prefix
+            if (segs.length === 1 || (segs.length === 2 && (segs[0].toLowerCase() === 'global' || segs[0].toLowerCase() === 'project'))) {
+                normalized = strippedEnding;
+            }
+        }
+
         const rest = normalized.replace(/^#skills?\/?/i, '');
         const parts = rest.split('/').filter(Boolean);
 
