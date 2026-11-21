@@ -17,8 +17,11 @@ import {
     supportsNullKey,
     isUrlBearing,
     isHiddenFromSummary,
+    getMaxSlots,
+    hasUnlockedSlots,
     NULL_KEY_SENTINEL,
 } from './secrets_v2.js';
+import { startStarServer } from './starunlock.js';
 
 /**
  * Parse a `/key ...` argument string into structured tokens.
@@ -118,8 +121,19 @@ export const runKeyCommand = async (raw, ctx = {}) => {
             return done();
         }
         const listLines = await buildListLines(provider, { unmask: parsed.unmask });
+        const maxSlots = getMaxSlots(provider);
+        const isCustom = provider === 'c_openai';
+        const showUnlockHint = isCustom && maxSlots === 10 && !hasUnlockedSlots();
         lines.push(`✦ ${getProviderLabel(provider.replace('c_openai', 'Custom Endpoints'))} API KEYS`);
         lines.push(...listLines);
+        if (showUnlockHint) {
+            const star = startStarServer();
+            const uri = await star.ready;
+            if (uri) {
+                lines.push('⠀');
+                lines.push(`⭐ Custom endpoints can hold 20 keys. Star [FluxFlow Repository](${uri}) to unlock.`);
+            }
+        }
         lines.push('⠀');
         return done();
     }

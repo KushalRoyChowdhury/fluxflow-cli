@@ -23,7 +23,24 @@ import { SECRET_DIR } from './paths.js';
  */
 
 const SECRET_FILE_V2 = path.join(SECRET_DIR, 'secrets_v2.json');
-const SLOT_COUNT = 10;
+const BASE_SLOT_COUNT = 10;
+const UNLOCKED_SLOT_COUNT = 20;
+const GITHUB_STAR_CACHE_FILE = path.join(SECRET_DIR, '.github_starred');
+
+/** Check if user has starred the repo (cached). */
+const hasStarredRepo = () => {
+    try {
+        return fs.existsSync(GITHUB_STAR_CACHE_FILE);
+    } catch {
+        return false;
+    }
+};
+
+/** Get slot count for a provider. c_openai gets 20 if starred, else 10. */
+const getSlotCount = (provider) => {
+    if (provider === 'c_openai' && hasStarredRepo()) return UNLOCKED_SLOT_COUNT;
+    return BASE_SLOT_COUNT;
+};
 
 // Providers hidden from the no-value summary listing.
 export const HIDDEN_FROM_SUMMARY = new Set(['9router', 'c_openai']);
@@ -91,7 +108,7 @@ export const getProviderLabel = (provider) => {
 // Slot helpers
 // ---------------------------------------------------------------------------
 
-const emptySlots = () => new Array(SLOT_COUNT).fill(null);
+const emptySlots = (provider) => new Array(getSlotCount(provider)).fill(null);
 
 const isSlotFilled = (slot) => {
     if (!slot) return false;
@@ -108,10 +125,10 @@ const slotKey = (slot) => {
 };
 
 /** Normalize a raw stored value into a fixed-length 10-slot array. */
-const normalizeSlots = (raw) => {
-    const slots = emptySlots();
+const normalizeSlots = (raw, provider) => {
+    const slots = emptySlots(provider);
     if (Array.isArray(raw)) {
-        for (let i = 0; i < SLOT_COUNT && i < raw.length; i++) slots[i] = raw[i] ?? null;
+        for (let i = 0; i < getSlotCount(provider) && i < raw.length; i++) slots[i] = raw[i] ?? null;
     } else if (typeof raw === 'string' && raw.trim()) {
         slots[0] = raw; // legacy single string -> slot 1
     }
@@ -165,7 +182,7 @@ export const migrateFromLegacy = async () => {
         let changed = false;
 
         for (const def of PROVIDER_DEFS) {
-            const slots = normalizeSlots(store[def.canonical]);
+            const slots = normalizeSlots(store[def.canonical], def.canonical);
             // Only migrate if provider has no filled slots yet.
             if (slots.some(isSlotFilled)) {
                 store[def.canonical] = slots;
@@ -200,11 +217,27 @@ export const migrateFromLegacy = async () => {
 export const getProviderSlots = (provider) => {
     const canonical = normalizeProvider(provider) || provider;
     const store = readStore();
-    return normalizeSlots(store[canonical]);
+    return normalizeSlots(store[canonical], canonical);
 };
 
 /** Count of filled slots for a provider. */
 export const countProviderKeys = (provider) => getProviderSlots(provider).filter(isSlotFilled).length;
+
+/** Get max slots for a provider (for UI display). */
+export const getMaxSlots = (provider) => getSlotCount(provider);
+
+/** Check if user has unlocked extra slots via GitHub star. */
+export const hasUnlockedSlots = () => hasStarredRepo();
+
+/** Mark repo as starred (called after user confirms they starred). */
+export const markRepoStarred = () => {
+    try {
+        fs.writeFileSync(GITHUB_STAR_CACHE_FILE, new Date().toISOString(), 'utf8');
+        return true;
+    } catch {
+        return false;
+    }
+};
 
 /** All-provider summary (excludes hidden). Returns [{provider, count, hasKeys}]. */
 export const getProviderSummary = () => {
@@ -376,7 +409,7 @@ export const resolveAPIKey = async (provider, opts = {}) => {
     const slots = getProviderSlots(canonical);
     const activeIdx = await getActiveIndex(canonical);
 
-    if (Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < SLOT_COUNT) {
+    if (Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < getSlotCount(canonical)) {
         if (isSlotFilled(slots[activeIdx])) return slotKey(slots[activeIdx]);
         // Active slot empty/invalid -> fall through to auto-pick.
     }
@@ -413,7 +446,7 @@ export const resolveBaseUrl = async (provider) => {
 
     const slots = getProviderSlots(canonical);
     const activeIdx = await getActiveIndex(canonical);
-    if (Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < SLOT_COUNT) {
+    if (Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < getSlotCount(canonical)) {
         const slot = slots[activeIdx];
         if (slot && typeof slot === 'object' && slot.key) return slot.baseUrl || '';
     }
@@ -495,7 +528,7 @@ export const addProviderKey = async (provider, key, opts = {}) => {
     }
 
     const store = readStore();
-    const slots = normalizeSlots(store[canonical]);
+    const slots = normalizeSlots(store[canonical], canonical);
 
     // Duplicate exact key -> error.
     if (slots.some(s => slotKey(s) === addKey)) {
@@ -506,8 +539,8 @@ export const addProviderKey = async (provider, key, opts = {}) => {
     // Explicit index.
     if (Number.isInteger(opts.index)) {
         const i = opts.index;
-        if (i < 0 || i >= SLOT_COUNT) {
-            return { ok: false, error: `Index must be between 1 and ${SLOT_COUNT}.` };
+        if (i < 0 || i >= getSlotCount(canonical)) {
+        return { ok: false, error: `Index must be between 1 and ${getSlotCount(canonical)}.` };
         }
         // Overwrite semantics (caller is responsible for confirm).
         const existingBaseUrl = (slots[i] && typeof slots[i] === 'object') ? slots[i].baseUrl : undefined;
@@ -521,7 +554,12 @@ export const addProviderKey = async (provider, key, opts = {}) => {
     // First empty slot.
     const emptyIdx = slots.findIndex(s => !isSlotFilled(s));
     if (emptyIdx === -1) {
-        return { ok: false, error: 'All slots full. Specify an index to overwrite.', full: true };
+        const maxSlots = getSlotCount(canonical);
+        const isCustom = canonical === 'c_openai';
+        const unlockMsg = isCustom && maxSlots === BASE_SLOT_COUNT 
+        ? ' Star the repo on GitHub to unlock +10 slots (see /key list)'
+            : '';
+        return { ok: false, error: `All slots full (max ${maxSlots}).${unlockMsg} Specify an index to overwrite.`, full: true, maxSlots };
     }
     slots[emptyIdx] = await buildSlotValue(canonical, addKey, undefined, overrideBaseUrl);
     store[canonical] = slots;
@@ -552,10 +590,10 @@ export const replaceActiveProviderKey = async (provider, key, opts = {}) => {
     }
 
     const store = readStore();
-    const slots = normalizeSlots(store[canonical]);
+    const slots = normalizeSlots(store[canonical], canonical);
 
     const activeIdx = await getActiveIndex(canonical);
-    let idx = (Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < SLOT_COUNT && isSlotFilled(slots[activeIdx]))
+    let idx = (Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < getSlotCount(canonical) && isSlotFilled(slots[activeIdx]))
         ? activeIdx
         : slots.findIndex(isSlotFilled);
     if (idx === -1) idx = 0;
@@ -578,10 +616,10 @@ export const replaceActiveProviderKey = async (provider, key, opts = {}) => {
 export const removeProviderKey = async (provider, target, opts = {}) => {
     const canonical = normalizeProvider(provider) || provider;
     const store = readStore();
-    const slots = normalizeSlots(store[canonical]);
+    const slots = normalizeSlots(store[canonical], canonical);
 
     if (opts.all || target === '--all' || target === '__all__') {
-        store[canonical] = emptySlots();
+        store[canonical] = emptySlots(canonical);
         writeStore(store);
         await setActiveIndex(canonical, null);
         return { ok: true, all: true, remaining: 0, needsNewKey: true };
@@ -596,7 +634,7 @@ export const removeProviderKey = async (provider, target, opts = {}) => {
         if (idx === -1) return { ok: false, error: 'No keys to remove.' };
     } else if (Number.isInteger(target)) {
         idx = target;
-        if (idx < 0 || idx >= SLOT_COUNT) return { ok: false, error: `Index must be between 1 and ${SLOT_COUNT}.` };
+        if (idx < 0 || idx >= getSlotCount(canonical)) return { ok: false, error: `Index must be between 1 and ${getSlotCount(canonical)}.` };
         if (!isSlotFilled(slots[idx])) return { ok: false, error: `Slot ${idx + 1} is already empty.` };
     } else {
         // String exact/substring.
@@ -637,7 +675,7 @@ export const useProviderKey = async (provider, target) => {
     let idx = -1;
     if (Number.isInteger(target)) {
         idx = target;
-        if (idx < 0 || idx >= SLOT_COUNT) return { ok: false, error: `Index must be between 1 and ${SLOT_COUNT}.` };
+        if (idx < 0 || idx >= getSlotCount(canonical)) return { ok: false, error: `Index must be between 1 and ${getSlotCount(canonical)}.` };
         if (!isSlotFilled(slots[idx])) return { ok: false, error: `Slot ${idx + 1} is empty.` };
     } else {
         const matches = findMatchingSlots(slots, target);
@@ -687,7 +725,7 @@ export const cleanProviderKeys = async (provider = null) => {
 
     let touched = 0;
     for (const canonical of targets) {
-        const slots = normalizeSlots(store[canonical]);
+        const slots = normalizeSlots(store[canonical], canonical);
         const filled = slots.filter(isSlotFilled);
         if (filled.length === 0) { store[canonical] = slots; continue; }
 
@@ -701,7 +739,7 @@ export const cleanProviderKeys = async (provider = null) => {
         let newActive = Number.isInteger(activeIdx) ? activeIdx : null;
         if (activeSlot) {
             // Position of the active slot within the ordered `filled` array.
-            const posInFilled = slots.slice(0, SLOT_COUNT)
+            const posInFilled = slots.slice(0, getSlotCount(canonical))
                 .map((s, i) => ({ s, i }))
                 .filter(x => isSlotFilled(x.s))
                 .findIndex(x => x.i === activeIdx);
@@ -761,7 +799,7 @@ export const buildListLines = async (provider, opts = {}) => {
         lines.push('Mode: NO KEY (null)  <- active');
     }
 
-    for (let i = 0; i < SLOT_COUNT; i++) {
+    for (let i = 0; i < getSlotCount(canonical); i++) {
         const slot = slots[i];
         const rawKey = slotKey(slot);
         const k = rawKey && !unmask ? maskKey(rawKey) : rawKey;
