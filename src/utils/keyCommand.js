@@ -143,7 +143,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         // A newly added provider with no active index -> make it active.
         const active = await getActiveIndex(provider);
         if (active === null) await setActiveIndex(provider, res.index);
-        lines.push(`✦ Key added to ${provider.replace('c_openai', 'Custom Endpoints')} slot ${res.index + 1}.\n⠀`);
+        lines.push(`✦ Key added to ${provider.replace('c_openai', 'Custom Endpoints')} slot ${res.index + 1}.${parsed.url !== null && isUrlBearing(provider) ? '' : '\n⠀'}`);
         if (parsed.url !== null && isUrlBearing(provider)) {
             lines.push(`⠀⠀\x1b[2m└─\x1b[22m Using URL: ${parsed.url}`);
         }
@@ -168,7 +168,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
             return done({ promptNewKey: true });
         }
 
-        lines.push(`✦ Removed key from ${provider.replace('c_openai', 'Custom Endpoints')} slot ${res.removedIndex + 1}.\n⠀`);
+        lines.push(`✦ Removed key from ${provider.replace('c_openai', 'Custom Endpoints')} slot ${res.removedIndex + 1}. ${res.needsNewKey ? '' : '\n⠀'}`);
         if (res.needsNewKey) {
             lines.push(`⠀⠀\x1b[2m└─\x1b[22m No keys remain for ${provider}. Please enter a new key.\n⠀`);
             return done({ promptNewKey: true });
@@ -201,7 +201,7 @@ export const runKeyCommand = async (raw, ctx = {}) => {
         if (parsed.temp) {
             // Temp key: full key only, session-scoped in memory.
             setTempKey(provider, argStr);
-            lines.push(`✦ Temporary key set for ${provider.replace('c_openai', 'Custom Endpoints')} (session only).\n⠀`);
+            lines.push(`✦ Temporary key set for ${provider.replace('c_openai', 'Custom Endpoints')} (session only). ${isUrlBearing(provider)  ? '' : '\n⠀'}`);
             if (isUrlBearing(provider)) {
                 lines.push('⠀⠀\x1b[2m└─\x1b[22m Will use the current Custom base URL.');
             }

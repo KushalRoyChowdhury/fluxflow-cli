@@ -724,25 +724,24 @@ export const cleanProviderKeys = async (provider = null) => {
 // ---------------------------------------------------------------------------
 
 /** Mask a URL for display: ...host/path (middle-elided, keep scheme-less tail). */
-/** Mask a key for display: keep the outer thirds, hide the middle third. */
+/** Mask a key for display: keep the outer thirds (capped at 8 chars each), hide the middle third. */
 export const maskKey = (key) => {
     if (!key) return '';
     const k = String(key);
     const n = k.length;
     if (n <= 3) return '...';
+    const MAX_VISIBLE = 8;
     const third = Math.floor(n / 3);
-    const head = k.slice(0, third);
-    const tail = k.slice(n - third);
+    const headLen = Math.min(third, MAX_VISIBLE);
+    const tailLen = Math.min(third, MAX_VISIBLE);
+    const head = k.slice(0, headLen);
+    const tail = k.slice(n - tailLen);
     return head + '...' + tail;
 };
 
 export const formatBaseUrl = (url) => {
     if (!url) return '';
-    const clean = String(url).replace(/\/+$/, '');
-    if (clean.length <= 28) return clean;
-    // Drop scheme for brevity then elide the front.
-    const noScheme = clean.replace(/^https?:\/\//i, '');
-    return '...' + noScheme.slice(-24);
+    return String(url).replace(/[/]+$/, '');
 };
 
 /** Build the inline list lines for a provider. Returns array of display strings. */
