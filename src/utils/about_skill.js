@@ -54,7 +54,7 @@ export const createAboutSkill = (activeModel = null) => {
             if (relPath === 'SKILL.md' && formattedModelName) {
                 fileContent = fileContent.replace(
                     /Public Docs: [^\n]*/,
-                    `Public Docs: ${fileContent.match(/Public Docs: ([^\n]*)/)?.[1] || ''}\nActive Model: ${formattedModelName}`
+                    `Public Docs: ${fileContent.match(/Public Docs: ([^\n]*)/)?.[1] || ''}\n\nSession Model: ${formattedModelName}`
                 );
             }
 

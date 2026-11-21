@@ -18,8 +18,10 @@ export const ENV_MD = `# Env Variables
 * ENABLE_9ROUTER → Enables 9Router provider. Can use OAuth subscription like Codex, Claude Code, GitHub Copilot etc. or use providers not natively in Fluxflow. Set ENV ENABLE_9ROUTER=true, needs 9router package installed (via npm/npx etc) & running
 * NINEROUTER_URL → If different from default, Any OpenAI Compatible
 * NINEROUTER_KEY → if any
-* MAX_LOOPS - ENV control for number of max turns for main agent
+* MAX_LOOPS → ENV control for number of max turns for main agent
 * SUBAGENT_MAX_TURNS
+
+* DASHBOARD_SYSTEM_FONT → Wheather to use system font in GUI dashboard. Defaults to Plus Jakarta Sans when undefined
 
 ## Diagnostic & Optimization Flags
 * SHOW_DEBUG_GRID → (true|false, default: false) Coordinate grid overlay for Computer Use tooling

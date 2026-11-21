@@ -3904,7 +3904,7 @@ export default function App({ args = [] }) {
                                     if (res.success) {
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Removed:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m Model: \x1b[31m${modelToRemove}\x1b[0m\n⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Removed:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m Model: \x1b[31m${modelToRemove}\x1b[0m\n⠀`, isMeta: true }];
                                         });
                                     } else {
                                         setMessages(prev => {
