@@ -7,10 +7,12 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import { FLUXFLOW_DIR } from './utils/paths.js';
 
-// Ensure AGENTS.md and FLUXFLOW.md exist in FLUXFLOW_DIR
+// Ensure AGENTS.md, FLUXFLOW.md and security_policy.md exist in FLUXFLOW_DIR
 try {
     const agentsMdPath = path.join(FLUXFLOW_DIR, 'AGENTS.md');
     const fluxflowMdPath = path.join(FLUXFLOW_DIR, 'FLUXFLOW.md');
+    const securityPolicyMdPath = path.join(FLUXFLOW_DIR, 'security_policy.md');
+
 
     if (!fs.existsSync(FLUXFLOW_DIR)) {
         fs.mkdirSync(FLUXFLOW_DIR, { recursive: true });
@@ -22,6 +24,10 @@ try {
 
     if (!fs.existsSync(fluxflowMdPath)) {
         fs.writeFileSync(fluxflowMdPath, '', 'utf8');
+    }
+
+    if (!fs.existsSync(securityPolicyMdPath)) {
+        fs.writeFileSync(securityPolicyMdPath, '', 'utf8');
     }
 } catch (e) {
     // Ignore error if directory or file initialization fails
