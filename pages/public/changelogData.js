@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.11.0": {
+        "note": "NOVEMBER 22",
+        "added": [
+            "Added support to use all saved custom openai models regardless of active selected baseUrl."
+        ],
+        "changed": [
+            "Updated Fluxflow Companion to v1.9.5."
+        ],
+        "fixes": []
+    },
     "5.10.0": {
         "note": "NOVEMBER 22",
         "added": [],
