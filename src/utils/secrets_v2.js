@@ -394,9 +394,12 @@ const getCurrentCustomBaseUrl = async () => {
  * Order: temp key > saved active index > lowest non-empty slot (+notice) > null.
  * Returns the key string, or null when the provider has no keys at all.
  */
+const normSlotUrl = (u) => String(u || '').trim().replace(/\/+$/, '').toLowerCase();
+
 export const resolveAPIKey = async (provider, opts = {}) => {
     const canonical = normalizeProvider(provider) || provider;
     const silent = opts.silent === true;
+    const wantUrl = opts.matchBaseUrl ? normSlotUrl(opts.matchBaseUrl) : '';
 
     // 1. Temp key wins.
     const temp = tempKeys.get(canonical);
@@ -407,6 +410,22 @@ export const resolveAPIKey = async (provider, opts = {}) => {
 
     // 2. Saved active index.
     const slots = getProviderSlots(canonical);
+
+    // 2a. A specific base URL was requested (e.g. a sub-agent model bound to a
+    // particular endpoint). Prefer the slot that actually belongs to it, so we
+    // never send endpoint A's key to endpoint B (which yields 401).
+    if (wantUrl) {
+        const exact = slots.findIndex(s => isSlotFilled(s) && normSlotUrl(s && s.baseUrl) === wantUrl);
+        if (exact !== -1) return slotKey(slots[exact]);
+        // Not found verbatim; try host-only match before giving up.
+        const hostOf = (u) => { try { return new URL(u).host.toLowerCase(); } catch (e) { return ''; } };
+        const wantHost = hostOf(opts.matchBaseUrl);
+        if (wantHost) {
+            const byHost = slots.findIndex(s => isSlotFilled(s) && hostOf(s && s.baseUrl) === wantHost);
+            if (byHost !== -1) return slotKey(slots[byHost]);
+        }
+    }
+
     const activeIdx = await getActiveIndex(canonical);
 
     if (Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < getSlotCount(canonical)) {

@@ -102,8 +102,10 @@ export const generateAutoCompletion = async (ctx = {}) => {
             : (settings.activeModel || getDefaultModel(provider, settings.apiTier) || getDefaultModel(provider, 'paid'));
         if (!model) return '';
 
-        const apiKey = await getProviderAPIKey(provider);
-        if (!apiKey && !(provider === 'c_openai' && settings.systemSettings?.customOpenAIBaseUrl)) {
+        // Bind the key to the endpoint saved with the selected model, so an
+        // endpoint switch never pairs slot A's key with endpoint B (401).
+        const apiKey = await getProviderAPIKey(provider, ac.baseUrl ? { matchBaseUrl: ac.baseUrl } : {});
+        if (!apiKey && !(provider === 'c_openai' && (ac.baseUrl || settings.systemSettings?.customOpenAIBaseUrl))) {
             return '';
         }
 
@@ -113,6 +115,7 @@ export const generateAutoCompletion = async (ctx = {}) => {
             model,
             mode: 'flow',
             thinkingLevel: 'Fast',
+            baseUrlOverride: ac.baseUrl || '',
             systemSettings: settings.systemSettings || {}
         };
 

@@ -577,8 +577,23 @@ export function readFluxSecrets(forceReload = false): any | null {
 }
 
 /** Resolve an API key for a provider (mirrors src/utils/secrets.js). */
-export function getCompletionApiKey(provider: string): string | null {
+export function getCompletionApiKey(provider: string, matchBaseUrl?: string): string | null {
     if (!provider) return null;
+
+    // Endpoint-bound lookup: when a base URL is supplied (auto-completion model
+    // saved against a specific custom endpoint) pick the slot belonging to THAT
+    // endpoint, never whichever slot happens to be globally active (avoids 401).
+    const stripSlash = (u?: string): string => {
+        let s = String(u || '').trim();
+        while (s.endsWith('/')) s = s.slice(0, -1);
+        return s;
+    };
+    const normUrl = (u?: string): string => stripSlash(u).toLowerCase();
+    const hostOf = (u?: string): string => {
+        try { return new URL(String(u || '')).host.toLowerCase(); } catch { return ''; }
+    };
+    const wantUrl = matchBaseUrl ? normUrl(matchBaseUrl) : '';
+    const wantHost = matchBaseUrl ? hostOf(matchBaseUrl) : '';
 
     // --- /key use --null: persisted no-key mode (c_openai / Ollama only) ---
     // Saved slots are left untouched; we just return the keyless sentinel so
@@ -626,6 +641,15 @@ export function getCompletionApiKey(provider: string): string | null {
                 };
 
                 if (Array.isArray(slots)) {
+                    // Prefer the slot bound to the requested endpoint (exact URL, then host).
+                    if (wantUrl) {
+                        const exact = slots.find((s2: any) => slotKey(s2) && normUrl(s2 && s2.baseUrl) === wantUrl);
+                        if (exact) return slotKey(exact);
+                        if (wantHost) {
+                            const byHost = slots.find((s2: any) => slotKey(s2) && hostOf(s2 && s2.baseUrl) === wantHost);
+                            if (byHost) return slotKey(byHost);
+                        }
+                    }
                     if (activeIdx !== null && slotKey(slots[activeIdx])) return slotKey(slots[activeIdx]);
                     for (const s2 of slots) {
                         const k = slotKey(s2);
@@ -833,11 +857,16 @@ function requestInlineFromBridge(
 function resolveDirectEndpoint(cfg: any, settings: any): { baseUrl: string; apiKey?: string } {
     const provider = cfg.provider || '';
     const sys = settings?.systemSettings || {};
+    // Custom endpoints are per-model: the base URL saved alongside the selected
+    // auto-completion model wins over the globally active endpoint.
+    const customBase = (provider === 'c_openai' || provider === 'Custom (OpenAI)')
+        ? (cfg.baseUrl || sys.customOpenAIBaseUrl || '')
+        : '';
     let baseUrl = cfg.baseUrl || '';
-    let apiKey = getCompletionApiKey(provider) || undefined;
+    let apiKey = getCompletionApiKey(provider, customBase || undefined) || undefined;
 
     if (provider === 'c_openai') {
-        baseUrl = sys.customOpenAIBaseUrl || '';
+        baseUrl = customBase;
         // Custom OpenAI endpoints may be local/authless (e.g. LM Studio,
         // llama.cpp, vLLM): use the key when present, otherwise fire without
         // an Authorization header rather than bailing out.

@@ -1592,8 +1592,10 @@ export const generateSimpleContent = async (settings, model, contents, systemIns
             } else if (aiProvider === 'CoArena' || aiProvider === 'coarena') {
                 stream = (await loadProvider('CoArena'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
-                let cBaseUrl = settings.systemSettings?.customOpenAIBaseUrl || '';
-                try { cBaseUrl = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl; } catch (e) { }
+                let cBaseUrl = settings.baseUrlOverride || settings.systemSettings?.customOpenAIBaseUrl || '';
+                if (!settings.baseUrlOverride) {
+                    try { cBaseUrl = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl; } catch (e) { }
+                }
                 stream = (await loadProvider('c_openai'))(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, cBaseUrl);
             } else {
                 const googleClient = getGoogleClient(apiKey);
@@ -3373,8 +3375,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.0
                         );
                     } else if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
-                        let cBaseUrl2 = systemSettings?.customOpenAIBaseUrl || '';
-                        try { cBaseUrl2 = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl2; } catch (e) { }
+                        let cBaseUrl2 = settings.baseUrlOverride || systemSettings?.customOpenAIBaseUrl || '';
+                        if (!settings.baseUrlOverride) {
+                            try { cBaseUrl2 = (await resolveKeyBaseUrl('c_openai')) || cBaseUrl2; } catch (e) { }
+                        }
                         stream = (await loadProvider('c_openai'))(
                             settings.apiKey,
                             targetModel,
@@ -6163,8 +6167,19 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         }
     }
 
+    // Custom endpoint: honour the base URL saved alongside the selected sub-agent model
+    if (mergedSettings.aiProvider === 'c_openai' || mergedSettings.aiProvider === 'Custom (OpenAI)') {
+        const savedSubAgentBase = mergedSettings?.systemSettings?.SubAgentBaseUrl;
+        if (savedSubAgentBase) mergedSettings.baseUrlOverride = savedSubAgentBase;
+    }
+
     if (mergedSettings.aiProvider) {
-        const providerApiKey = await getProviderAPIKey(mergedSettings.aiProvider);
+        // When bound to a specific custom endpoint, resolve the key stored for
+        // that exact base URL rather than the currently active slot.
+        const keyOpts = (mergedSettings.baseUrlOverride && (mergedSettings.aiProvider === 'c_openai' || mergedSettings.aiProvider === 'Custom (OpenAI)'))
+            ? { matchBaseUrl: mergedSettings.baseUrlOverride }
+            : {};
+        const providerApiKey = await getProviderAPIKey(mergedSettings.aiProvider, keyOpts);
         if (providerApiKey) {
             mergedSettings.apiKey = providerApiKey;
         }

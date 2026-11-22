@@ -3,7 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { getThemeColors, THEMES } from '../utils/theme.js';
 import { setPreserveThinkingCache, renderHighlightedLine } from './ChatLayout.jsx';
-import { getModels } from '../data/model_config.js';
+import { getModels, getCustomOpenAIGroups } from '../data/model_config.js';
 import { getProviderAPIKey } from '../utils/secrets.js';
 import v8 from 'v8';
 import { DATA_DIR, FLUXFLOW_DIR } from '../utils/paths.js';
@@ -11,6 +11,17 @@ import os from 'os';
 import { PROVIDER_BASE_URLS } from '../utils/settings.js';
 
 const themeOptions = [...Object.keys(THEMES), 'Mystery'];
+
+// Human-readable endpoint label for a custom base URL (each one is its own provider).
+const endpointLabel = (url) => {
+    const clean = String(url || '').trim();
+    if (!clean) return 'default';
+    try {
+        return new URL(clean).host || clean;
+    } catch (e) {
+        return clean.replace(/^https?:\/\//i, '').replace(/\/.*$/, '') || 'default';
+    }
+};
 
 const CATEGORIES = [
     { id: 'appearance', label: 'Appearance', desc: 'Customize UI theme & rendering options' },
@@ -136,39 +147,63 @@ export default function SettingsMenu({
             { label: envLabel, value: 'ENV', isHeader: false }
         ];
 
+        const pushGroup = (headerLabel, rawModels, providerName, baseUrl = '') => {
+            const valid = [];
+            for (const m of rawModels) {
+                const name = typeof m === 'string' ? m : (m.cmd || m.name || m.id || String(m));
+                if (!name) continue;
+                const trimmed = String(name).trim();
+                if (!trimmed || trimmed.startsWith('---')) continue;
+                valid.push({
+                    label: trimmed,
+                    value: trimmed,
+                    isHeader: false,
+                    provider: providerName,
+                    baseUrl: baseUrl || ''
+                });
+            }
+            if (valid.length === 0) return;
+            items.push({ label: headerLabel, isHeader: true });
+            for (const v of valid) items.push(v);
+        };
+
+        // Custom (c_openai) models: every unique saved base URL is treated as its own provider
+        const customGroups = getCustomOpenAIGroups();
+
         // Primary: current active provider first
         const activeTier = quotas?.providerTiers?.[aiProvider] || apiTier || 'Free';
-        const currentModels = getModels(aiProvider, activeTier, systemSettings?.customOpenAIBaseUrl) || [];
-        if (currentModels.length > 0) {
-            items.push({ label: `── ${aiProvider.toUpperCase()}${activeTier !== 'Free' ? ` (${activeTier})` : ''} ──`, isHeader: true });
-            currentModels.forEach(m => {
-                const name = typeof m === 'string' ? m : (m.cmd || m.name || m.id || String(m));
-                if (name && !name.trim().startsWith('---') && !name.startsWith('\n---')) {
-                    items.push({ label: name, value: name, isHeader: false, provider: aiProvider });
-                }
-            });
+        if (aiProvider === 'c_openai' || aiProvider === 'Custom (OpenAI)') {
+            for (const g of customGroups) {
+                pushGroup(
+                    `── CUSTOM (${endpointLabel(g.baseUrl)})${activeTier !== 'Free' ? ` (${activeTier})` : ''} ──`,
+                    g.models,
+                    'c_openai',
+                    g.baseUrl
+                );
+            }
+        } else {
+            const currentModels = getModels(aiProvider, activeTier, systemSettings?.customOpenAIBaseUrl) || [];
+            pushGroup(`── ${aiProvider.toUpperCase()}${activeTier !== 'Free' ? ` (${activeTier})` : ''} ──`, currentModels, aiProvider);
         }
 
         // Other providers with saved keys
         for (const p of ALL_PROVIDERS) {
-            if (p === aiProvider) continue;
-            if (activeProviderKeys[p]) {
-                const tier = quotas?.providerTiers?.[p] || 'Free';
-                const models = getModels(p, tier) || [];
-                if (models.length > 0) {
-                    items.push({ label: `── ${p.toUpperCase()}${tier !== 'Free' ? ` (${tier})` : ''} ──`, isHeader: true });
-                    models.forEach(m => {
-                        const name = typeof m === 'string' ? m : (m.cmd || m.name || m.id || String(m));
-                        if (name && !name.trim().startsWith('---') && !name.startsWith('\n---')) {
-                            items.push({ label: name, value: name, isHeader: false, provider: p });
-                        }
-                    });
-                }
+            if (p === aiProvider || p === 'c_openai') continue;
+            if (!activeProviderKeys[p]) continue;
+            const tier = quotas?.providerTiers?.[p] || 'Free';
+            const models = getModels(p, tier) || [];
+            pushGroup(`── ${p.toUpperCase()}${tier !== 'Free' ? ` (${tier})` : ''} ──`, models, p);
+        }
+
+        // Saved custom endpoints stay visible even when another provider is active
+        if (aiProvider !== 'c_openai' && aiProvider !== 'Custom (OpenAI)') {
+            for (const g of customGroups) {
+                pushGroup(`── CUSTOM (${endpointLabel(g.baseUrl)}) ──`, g.models, 'c_openai', g.baseUrl);
             }
         }
 
         return items;
-    }, [aiProvider, apiTier, quotas, activeProviderKeys]);
+    }, [aiProvider, apiTier, quotas, activeProviderKeys, systemSettings?.customOpenAIBaseUrl]);
 
     const availableModels = React.useMemo(() => {
         if (!subAgentSearchQuery.trim()) return allSubAgentItems;
@@ -353,7 +388,7 @@ export default function SettingsMenu({
                 return [
                     { label: 'Sub-Agents', value: 'subAgents', status: systemSettings.subAgents !== false ? 'ON' : 'OFF' },
                     { label: 'SubAgent Wildcard Tooling', value: 'subAgentWildcardTooling', status: systemSettings.subAgentWildcardTooling ? 'ON' : 'OFF' },
-                    { label: 'Sub-Agent Model', value: 'subAgentModel', status: (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default' },
+                    { label: 'Sub-Agent Model', value: 'subAgentModel', status: (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? `${systemSettings.SubAgentModel}${systemSettings.SubAgentProvider === 'c_openai' ? ` @ ${endpointLabel(systemSettings.SubAgentBaseUrl)}` : ''}` : 'Default' },
                     { label: 'Enable Auto-Completion', value: 'autoCompletionEnabled', status: autoCompletion?.enabled ? 'ON' : 'OFF' },
                     { label: 'Auto-Completion Model', value: 'autoCompletionModel', status: (autoCompletion?.model && autoCompletion.model !== 'Default') ? autoCompletion.model : 'Default' },
                     { label: 'Commit Message Model', value: 'commitMessageModel', status: (systemSettings.commitMessageModel && systemSettings.commitMessageModel !== 'Default') ? systemSettings.commitMessageModel : 'Default' }
@@ -434,7 +469,7 @@ export default function SettingsMenu({
                                 ...ac,
                                 model: selectedOpt.value,
                                 provider,
-                                baseUrl: isDefault ? '' : (PROVIDER_BASE_URLS[provider] || '')
+                                baseUrl: isDefault ? '' : (selectedOpt.baseUrl || PROVIDER_BASE_URLS[provider] || '')
                             };
                             saveSettings({ autoCompletion: next, apiTier, quotas });
                             return next;
@@ -444,7 +479,8 @@ export default function SettingsMenu({
                             const newSysSettings = {
                                 ...s,
                                 commitMessageModel: isDefault ? 'Default' : selectedOpt.value,
-                                commitMessageProvider: isDefault ? '' : (selectedOpt.provider || '')
+                                commitMessageProvider: isDefault ? '' : (selectedOpt.provider || ''),
+                                commitMessageBaseUrl: isDefault ? '' : (selectedOpt.baseUrl || '')
                             };
                             saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                             return newSysSettings;
@@ -455,7 +491,8 @@ export default function SettingsMenu({
                                 ...s,
                                 CustomSubAgent: !isDefault,
                                 SubAgentModel: selectedOpt.value,
-                                SubAgentProvider: isDefault ? '' : (selectedOpt.provider || '')
+                                SubAgentProvider: isDefault ? '' : (selectedOpt.provider || ''),
+                                SubAgentBaseUrl: isDefault ? '' : (selectedOpt.baseUrl || '')
                             };
                             saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                             return newSysSettings;
@@ -797,7 +834,11 @@ export default function SettingsMenu({
             });
         } else if (item.value === 'subAgentModel') {
             const currentSubAgentModel = (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default';
-            const curIdx = availableModels.findIndex(m => m.value === currentSubAgentModel);
+            const savedSubAgentBase = String(systemSettings.SubAgentBaseUrl || '').trim().replace(/\/+$/, '');
+            const curIdx = availableModels.findIndex(m =>
+                m.value === currentSubAgentModel &&
+                (m.provider !== 'c_openai' || !m.baseUrl || String(m.baseUrl).trim().replace(/\/+$/, '') === savedSubAgentBase)
+            );
             setSubAgentModelIndex(curIdx >= 0 ? curIdx : 0);
             setModelPickerTarget('subAgent');
             setIsSelectingSubAgentModel(true);
@@ -815,13 +856,21 @@ export default function SettingsMenu({
             });
         } else if (item.value === 'autoCompletionModel') {
             const currentModel = autoCompletion?.model || 'Default';
-            const curIdx = availableModels.findIndex(m => m.value === currentModel);
+            const savedAcBase = String(autoCompletion?.baseUrl || '').trim().replace(/\/+$/, '');
+            const curIdx = availableModels.findIndex(m =>
+                m.value === currentModel &&
+                (m.provider !== 'c_openai' || !m.baseUrl || String(m.baseUrl).trim().replace(/\/+$/, '') === savedAcBase)
+            );
             setSubAgentModelIndex(curIdx >= 0 ? curIdx : 0);
             setModelPickerTarget('autoCompletion');
             setIsSelectingSubAgentModel(true);
         } else if (item.value === 'commitMessageModel') {
             const currentModel = systemSettings.commitMessageModel || 'Default';
-            const curIdx = availableModels.findIndex(m => m.value === currentModel);
+            const savedCommitBase = String(systemSettings.commitMessageBaseUrl || '').trim().replace(/\/+$/, '');
+            const curIdx = availableModels.findIndex(m =>
+                m.value === currentModel &&
+                (m.provider !== 'c_openai' || !m.baseUrl || String(m.baseUrl).trim().replace(/\/+$/, '') === savedCommitBase)
+            );
             setSubAgentModelIndex(curIdx >= 0 ? curIdx : 0);
             setModelPickerTarget('commitMessage');
             setIsSelectingSubAgentModel(true);
@@ -862,11 +911,17 @@ export default function SettingsMenu({
     const colors = getThemeColors(systemSettings.theme);
 
     if (isSelectingSubAgentModel) {
+        const normUrl = (u) => String(u || '').trim().replace(/\/+$/, '');
         const currentSavedModel = modelPickerTarget === 'autoCompletion'
             ? (autoCompletion?.model || 'Default')
             : modelPickerTarget === 'commitMessage'
                 ? (systemSettings.commitMessageModel || 'Default')
                 : ((systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default');
+        const currentSavedBaseUrl = modelPickerTarget === 'autoCompletion'
+            ? (autoCompletion?.baseUrl || '')
+            : modelPickerTarget === 'commitMessage'
+                ? (systemSettings.commitMessageBaseUrl || '')
+                : (systemSettings.SubAgentBaseUrl || '');
 
         // Proper Viewport Scroll Logic:
         // Keep window fixed while cursor moves inside [offset, offset + VISIBLE_COUNT - 1]
@@ -938,7 +993,8 @@ export default function SettingsMenu({
                             }
 
                             const isSelected = subAgentModelIndex === actualIndex && subAgentFocusMode === 'list';
-                            const isSaved = currentSavedModel === opt.value;
+                            const isSaved = currentSavedModel === opt.value &&
+                                (opt.provider !== 'c_openai' || !opt.baseUrl || normUrl(opt.baseUrl) === normUrl(currentSavedBaseUrl));
                             return (
                                 <Box key={`item-${opt.value}-${actualIndex}`} paddingX={1} backgroundColor={isSelected ? colors.highlightBg : undefined}>
                                     <Text color={isSelected ? colors.text : colors.textDim} bold={isSelected}>

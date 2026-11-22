@@ -401,6 +401,37 @@ export const getModels = (provider, apiTier, currentBaseUrl = null) => {
     return models;
 };
 
+/**
+ * Group every saved c_openai model by its base URL.
+ * Each unique base URL is its own provider endpoint.
+ * Models saved without a base URL land in a '' (default) group.
+ * @returns {Array<{baseUrl: string, models: Array<{cmd:string, multimodal:boolean}>}>}
+ */
+export const getCustomOpenAIGroups = (apiTier = null) => {
+    const p = activeConfig && activeConfig.providers ? activeConfig.providers['c_openai'] : null;
+    if (!p || !p.models) return [];
+    const tiers = apiTier ? [apiTier === 'Free' ? 'Free' : 'Paid'] : ['Free', 'Paid'];
+    const map = new Map();
+    for (const tier of tiers) {
+        const list = p.models[tier];
+        if (!Array.isArray(list)) continue;
+        for (const m of list) {
+            const rawName = typeof m === 'string' ? m : (m && (m.cmd || m.name || m.id));
+            if (!rawName || !String(rawName).trim()) continue;
+            const url = (typeof m === 'object' && m && m.baseUrl)
+                ? String(m.baseUrl).trim().replace(/\/+$/, '')
+                : '';
+            if (!map.has(url)) map.set(url, { baseUrl: url, models: [] });
+            const group = map.get(url);
+            const cmd = String(rawName).trim();
+            if (!group.models.some(x => x.cmd === cmd)) {
+                group.models.push({ cmd, multimodal: typeof m === 'object' && m ? !!m.multimodal : false });
+            }
+        }
+    }
+    return [...map.values()];
+};
+
 export const getDefaultModel = (provider, apiTier) => {
     const p = activeConfig.providers[provider];
     if (!p) return '';
