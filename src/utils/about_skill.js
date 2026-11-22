@@ -57,7 +57,7 @@ export const createAboutSkill = (activeModel = null) => {
                     /Public Docs: [^\n]*/,
                     () => {
                         const docs = fileContent.match(/Public Docs: ([^\n]*)/)?.[1] || '';
-                        const displayModel = `${activeModel} (${isModelMultimodal(activeModel) ? 'Vision Supported' : 'Text Only'})`;
+                        const displayModel = `${formattedModelName} (${isModelMultimodal(activeModel) ? 'Vision Supported' : 'Text Only'})`;
                         return `Public Docs: ${docs}\n\nSession Model: ${displayModel}`;
                     }
                 );

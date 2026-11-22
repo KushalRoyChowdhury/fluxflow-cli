@@ -184,11 +184,18 @@ export const view_file = async (args, context = {}) => {
 
         if (parts[0]?.toLowerCase() === 'global' || parts[0]?.toLowerCase() === 'project') {
             explicitScope = parts[0].toLowerCase();
-            skillName = parts[1];
+            skillName = parts[1] || '';
             subPath = parts.slice(2).join('/');
         } else {
-            skillName = parts[0];
+            skillName = parts[0] || '';
             subPath = parts.slice(1).join('/');
+        }
+
+        // Handle cases where the model appends .md to the skill folder name itself:
+        // e.g. #skills/global/fluxflow.md -> skillName: fluxflow
+        //      #skills/global/fluxflow.md/ref/doc.md -> skillName: fluxflow, subPath: ref/doc.md
+        if (skillName.toLowerCase().endsWith('.md')) {
+            skillName = skillName.slice(0, -3);
         }
 
         if (!skillName) {
