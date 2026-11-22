@@ -1459,13 +1459,13 @@ export default function App({ args = [] }) {
             setWildcardTooling(false);
             setWildercardTooling(false);
         }
-        if (process.env.forcedReasoning) {
-            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Forced Reasoning:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
-            process.env.forcedReasoning = false;
+        if (process.env.forcedReasoning === 'true') {
+            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: `${Date.now()}-forced`, role: 'system', text: `✦ Forced Reasoning:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
+            delete process.env.forcedReasoning;
         }
-        if (process.env.rawReasoning) {
-            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Raw Reasoning:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
-            process.env.rawReasoning = false;
+        if (process.env.rawReasoning === 'true') {
+            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: `${Date.now()}-raw`, role: 'system', text: `✦ Raw Reasoning:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
+            delete process.env.rawReasoning;
         }
         if (thinkingLevel === 'xHigh' && !isFirstRender.current) {
             setThinkingLevel('Medium');
@@ -3758,6 +3758,10 @@ export default function App({ args = [] }) {
                             }
                         }
 
+                        const providerDisplay = aiProvider === 'c_openai'
+                            ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
+                            : aiProvider.replace('c_openai', 'Custom Endpoint');
+
                         // Strict Mode Validation
                         if (!isBypass && mode === 'Flow' && formattedLevel === 'xHigh') {
                             setMessages(prev => {
@@ -3770,7 +3774,7 @@ export default function App({ args = [] }) {
                             const displayLevel = formattedLevel === 'xHigh'
                                 ? (getMappedThinkingLevel(aiProvider, activeModel, 'xHigh') !== null ? `Custom (${getMappedThinkingLevel(aiProvider, activeModel, 'xHigh')})` : 'Custom')
                                 : formattedLevel;
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m ${activeModel}.\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${displayLevel}.\n${forceMsg} ⠀`, isMeta: true }]; }); // isBypass ? `⠀⠀⠀⠀\x1b[2m└─\x1b[22m bypassed.\n⠀` : ''
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m ${activeModel}.\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${displayLevel}.\n${forceMsg} ⠀`, isMeta: true }]; }); // isBypass ? `⠀⠀⠀⠀\x1b[2m└─\x1b[22m bypassed.\n⠀` : ''
                         }
                     } else {
                         setActiveView('thinking');

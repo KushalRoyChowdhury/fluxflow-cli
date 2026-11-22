@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { FLUXFLOW_DIR } from './paths.js';
 import { ABOUT_SKILL_MANIFEST } from '../data/about-data.js';
+import { isModelMultimodal } from '../data/model_config.js';
 
 /**
  * Initializes and auto-synchronizes the 'about-fluxflow' skill files.
@@ -54,7 +55,11 @@ export const createAboutSkill = (activeModel = null) => {
             if (relPath === 'SKILL.md' && formattedModelName) {
                 fileContent = fileContent.replace(
                     /Public Docs: [^\n]*/,
-                    `Public Docs: ${fileContent.match(/Public Docs: ([^\n]*)/)?.[1] || ''}\n\nSession Model: ${formattedModelName}`
+                    () => {
+                        const docs = fileContent.match(/Public Docs: ([^\n]*)/)?.[1] || '';
+                        const displayModel = `${activeModel} (${isModelMultimodal(activeModel) ? 'Vision Supported' : 'Text Only'})`;
+                        return `Public Docs: ${docs}\n\nSession Model: ${displayModel}`;
+                    }
                 );
             }
 
