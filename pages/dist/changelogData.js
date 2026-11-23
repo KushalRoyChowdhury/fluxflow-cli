@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.11.2": {
+        "note": "NOVEMBER 23",
+        "added": [],
+        "changed": [
+            "Improved skill loading to be model stoopidity proof."
+        ],
+        "fixes": []
+    },
     "5.11.0": {
         "note": "NOVEMBER 22",
         "added": [
