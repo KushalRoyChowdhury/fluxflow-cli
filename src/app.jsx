@@ -8258,7 +8258,7 @@ export default function App({ args = [] }) {
                                         </Text>
                                     </Box>
                                 ) : (
-                                        <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : process.env.HALLOWEEN_EEGG === "true" ? 'Looking for shadows...' : process.env.FROSTBYTE_EEGG === "true" ? (new Date().getMonth() === 0 && new Date().getDate() <= 2) ? 'Watching Fuji...' : 'Watching snowfall...' : "Waiting for input..."}</Text>
+                                        <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : process.env.HALLOWEEN_EEGG === "true" ? 'Looking for shadows...' : process.env.FROSTBYTE_EEGG === "true" ? (new Date().getMonth() === 0 && new Date().getDate() <= 2) ? 'Watching Fuji...' : 'Waiting for snowfall...' : "Waiting for input..."}</Text>
                                 )}
                             </Box>
                             <Box>
