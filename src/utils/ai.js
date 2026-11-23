@@ -2941,6 +2941,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 text = stripToolCallWrappers(text);
                                 text = text.replace(/\[turn:\s*finish\]/gi, '').replace(/\[\[END\]\]/gi, '').trim();
                                 text = text.replaceAll('\u001b[33mⓘ Request Cancelled\u001b[0m', '*User Cancelled Response Generation*');
+                                text = text.replace(
+                                    /^<think_fluxflow>((?:```[\s\S]*?```|`[^`]*`|(?!<\/think_fluxflow>)[\s\S])*)<\/think_fluxflow>\s*/,
+                                    '<thoughts> $1 </thoughts>\n\n'
+                                  );
                             }
                             let parts = [];
                             if (Array.isArray(msg.parts) && msg.parts.length > 0) {
@@ -2954,6 +2958,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             pt = stripToolCallWrappers(pt);
                                             pt = pt.replace(/\[turn:\s*finish\]/gi, '').replace(/\[\[END\]\]/gi, '').trim();
                                             pt = pt.replaceAll('\u001b[33mⓘ Request Cancelled\u001b[0m', '*User Cancelled Response Generation*');
+                                            pt = pt.replace(
+                                                /^<think_fluxflow>((?:```[\s\S]*?```|`[^`]*`|(?!<\/think_fluxflow>)[\s\S])*)<\/think_fluxflow>\s*/,
+                                                '<thoughts> $1 </thoughts>\n\n'
+                                              );
                                         }
                                         return { text: pt };
                                     }
