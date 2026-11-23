@@ -2,7 +2,7 @@ export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
     "5.12.0": {
-        "note": "NOVEMBER 24",
+        "note": "NOVEMBER 24. Winter Special",
         "added": [
             "Added new special theme: FrostByte."
         ],
