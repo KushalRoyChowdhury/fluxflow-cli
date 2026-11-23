@@ -37,6 +37,7 @@ let _geminiQuotes = null;
 let _wittyPhrases = null;
 let _meowLines = null;
 let _spookyLines = null;
+let _frostbyteLines = null;
 
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
@@ -1615,9 +1616,15 @@ export default function App({ args = [] }) {
                     applyPhrase(_wittyPhrases);
                 } else {
                     const isHalloween = process.env.HALLOWEEN_EEGG === 'true' || process.env.HALLOWEEN_EEGG === true;
+                    const isFrostbyte = process.env.FROSTBYTE_EEGG === 'true' || process.env.FROSTBYTE_EEGG === true;
                     if (isHalloween) {
                         import('./data/halloween_witty_phrases.js').then(({ HALLOWEEN_WITTY_PHRASES }) => {
                             _wittyPhrases = HALLOWEEN_WITTY_PHRASES;
+                            applyPhrase(_wittyPhrases);
+                        });
+                    } else if (isFrostbyte) {
+                        import('./data/frostbyte_witty_phrases.js').then(({ FROSTBYTE_WITTY_PHRASES }) => {
+                            _wittyPhrases = FROSTBYTE_WITTY_PHRASES;
                             applyPhrase(_wittyPhrases);
                         });
                     } else {
@@ -2985,6 +2992,7 @@ export default function App({ args = [] }) {
         { cmd: '/gemini', desc: 'Get a happy message from Gemini CLI' },
         { cmd: '/meow', desc: 'Cat nonsense, delivered straight to the terminal' },
         ...(process.env.HALLOWEEN_EEGG === 'true' || process.env.HALLOWEEN_EEGG === true ? [{ cmd: '/trick-or-treat', desc: 'Halloween surprise: Trick or Treat!' }] : []),
+        ...(process.env.FROSTBYTE_EEGG === 'true' || process.env.FROSTBYTE_EEGG === true ? [{ cmd: '/snowball', desc: 'Frostbyte surprise: Throw a snowball!' }] : []),
         { cmd: '/save', desc: 'Force save current chat' },
         {
             cmd: '/export',
@@ -4525,6 +4533,25 @@ export default function App({ args = [] }) {
                         import('./data/meow.js').then(({ MEOW_LINES }) => {
                             _meowLines = MEOW_LINES;
                             showMeow(_meowLines);
+                        });
+                    }
+                    setInput('');
+                    break;
+                }
+                case '/snowball': {
+                    const showFrostbyte = (lines) => {
+                        const randomFrost = lines[Math.floor(Math.random() * lines.length)];
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, { id: Date.now(), role: 'system', text: `❄️ SNOWBALL\n⠀⠀ \x1b[2m└─\x1b[22m ${randomFrost}\n⠀` }];
+                        });
+                    };
+                    if (_frostbyteLines) {
+                        showFrostbyte(_frostbyteLines);
+                    } else {
+                        import('./data/frostbyte_lines.js').then(({ FROSTBYTE_LINES }) => {
+                            _frostbyteLines = FROSTBYTE_LINES;
+                            showFrostbyte(_frostbyteLines);
                         });
                     }
                     setInput('');
@@ -8231,7 +8258,7 @@ export default function App({ args = [] }) {
                                         </Text>
                                     </Box>
                                 ) : (
-                                    <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : process.env.HALLOWEEN_EEGG === "true" ? 'Listening for shadows...' : "Waiting for input..."}</Text>
+                                        <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : process.env.HALLOWEEN_EEGG === "true" ? 'Looking for shadows...' : process.env.FROSTBYTE_EEGG === "true" ? (new Date().getMonth() === 0 && new Date().getDate() <= 2) ? 'Watching Fuji...' : 'Watching snowfall...' : "Waiting for input..."}</Text>
                                 )}
                             </Box>
                             <Box>

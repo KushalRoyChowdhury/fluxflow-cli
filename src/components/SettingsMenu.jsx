@@ -1044,7 +1044,7 @@ export default function SettingsMenu({
                         {themeOptions.map((tName, index) => {
                             const isSelected = themeIndex === index;
                             const isSaved = (systemSettings.theme || 'Dark') === tName;
-                            const isSpecial = tName === 'Forest Sprite' || tName === 'Spookfest';
+                            const isSpecial = tName === 'Forest Sprite' || tName === 'Spookfest' || tName === 'Frostbyte';
                             return (
                                 <Box key={tName} paddingX={0}>
                                     <Text color={isSelected ? previewColors.text : previewColors.textDim} bold={isSelected}>

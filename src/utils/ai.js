@@ -2566,7 +2566,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const LOOP_INCREMENT = Math.floor(MAX_LOOPS / 2);
         let lastPromptedThreshold = 0;
         const MAX_RETRIES = 16;
-        yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Consulting the spirits' : 'Connecting' };
+        yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Consulting the spirits' : process.env.FROSTBYTE_EEGG === 'true' ? 'Summoning the blizzard' : 'Connecting' };
 
         TERMINATION_SIGNAL = false; // Reset at start of new interaction
 
@@ -2712,9 +2712,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             didRecaptureInLastTurn = false;
 
             if (loop > 0) {
-                yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Haunting' : 'Working' };
+                yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Haunting' : process.env.FROSTBYTE_EEGG === 'true' ? 'Freezing' : 'Working' };
             } else {
-                yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Consulting the spirits' : 'Connecting' };
+                yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Consulting the spirits' : process.env.FROSTBYTE_EEGG === 'true' ? 'Summoning the blizzard' : 'Connecting' };
             }
             if (TERMINATION_SIGNAL) {
                 try {
@@ -3849,7 +3849,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (ttft === null) {
                                 ttft = Date.now() - streamStartTime;
                             }
-                            yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Performing dark ritual' : 'Thinking' };
+                            yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Performing dark ritual' : process.env.FROSTBYTE_EEGG === 'true' ? 'Brewing hot cocoa' : 'Thinking' };
                             isFirstChunk = false;
                         }
 
@@ -5890,7 +5890,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
             const shouldContinue = toolCallPointer > 0;
 
-            yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Performing dark ritual' : 'Thinking' };
+            yield { type: 'status', content: process.env.HALLOWEEN_EEGG === "true" ? 'Performing dark ritual' : process.env.FROSTBYTE_EEGG === 'true' ? 'Brewing hot cocoa' : 'Thinking' };
 
             const cleanedTurnText = contextSafeReplace(turnText, /(\[\s*(turn\s*:)?\s*(continue|finish)\s*\]|\[\[END\]\])/gi, '')
                 .trim();

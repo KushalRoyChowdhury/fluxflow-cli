@@ -675,7 +675,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
     const userHasWayyTooMuchMoney = process.env.I_HAVE_TOO_MUCH_MONEY === "true" || false;
     const halloween = process.env.HALLOWEEN_EEGG === 'true' || false;
-    const peakHalloween = halloween && month.includes("OCT") && (day.includes("30") || day.includes("31"));
+    const frostbyte = process.env.FROSTBYTE_EEGG === 'true' || false;
 
     // IDE companion (extension) connection flag — evaluated live each turn so it
     // reflects the real-time bridge state (the bridge connects asynchronously).
@@ -684,7 +684,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT${process.cwd() === 'D:\\PROJECTS\\Flux-Flow' ? ' (Internal testing environment, do as prompted)' : ''} ===
-${`Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : `FluxFlow.${injectedPersonality ? ` ${injectedPersonality}` : ''} CLI Assistant${halloween ? `. ${peakHalloween ? 'Peak ' : ''}Halloween Themed, Spooky` : ''}`}
+${`Identity: ${ADD_ID.length > 1 ? ADD_ID.trim() : `FluxFlow.${injectedPersonality ? ` ${injectedPersonality}` : ''} CLI Assistant${halloween ? `. Halloween Themed, Spooky` : frostbyte ? '. Winter Themed, Snow' : ''}`}
 ${ADD_NO_INS ? '' : `${mode === "Flux" ? "" :
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
 
@@ -697,7 +697,7 @@ mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze
 - OS: ${osDetected}\n- Date: ${dateTimeStr}${isMemoryEnabled && false ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}
 ${thinkingLevel.toLowerCase() !== 'max' && process.env.rawReasoning !== 'true' ? `\n-- REASONING GUIDANCE --
 ${((aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini))) || forcedReasoning ? `${thinkingConfig.trimEnd()}\n${forcedReasoning || (thinkingLevel !== 'Fast' && (((aiProvider === 'Mistral' && thinkingLevel === 'Low') && !isGemini) || (thinkingLevel !== 'High' && !isGemini))) ? `Critical Thinking Policy
-Use <think_fluxflow>...</think_fluxflow> for reasoning before responding any queries` : ''}\n` : `${thinkingConfig.trimEnd()}`}\n` : ''}${!keepReasoningContext ? `${thinkingLevel.toLowerCase() === 'max' || process.env.rawReasoning === 'true' ? "\n-- REASONING GUIDANCE --\n" : ''}Before starting actions MUST provide high signal user facing summary of findings, decisions & plans IN detail\n` : ''}
+Use <think_fluxflow>...</think_fluxflow> for reasoning before responding any queries` : ''}\n` : `${thinkingConfig.trimEnd()}`}\n` : ''}${!keepReasoningContext ? `${thinkingLevel.toLowerCase() === 'max' || process.env.rawReasoning === 'true' ? "\n-- REASONING GUIDANCE --\n" : ''}Before actions ALWAYS provide high signal user facing summary of findings, decisions & plans IN detail\n` : ''}
 ${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec, !!systemSettings?.disableTodo, systemSettings?.preferBash !== false)}${isMemoryEnabled && false ? `\n\n-- MEMORY RULES --
 - Subtly Personalize with relevent contextual memories. Auto Saves` : ''}${mode.toLowerCase().includes('cu') ? `\n\n-- SECURITY POLICY --\n- Dont operate on ANY confidential/logins/captcha screens if not local dev server → Tell user to complete it${securityPolicyContent ? `\n${securityPolicyContent}` : ''}` : (securityPolicyContent ? `\n\n-- SECURITY POLICY --\n${securityPolicyContent}` : '')}${ideConnected ? '\n\nReference files as file:start..end' : ''}
 === END SYSTEM PROMPT ===${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n\n- Read relevant skills before tasks, scope: global/project. Use ReadFile with path #skills/scope?/skillName. In-skill references: path #skills/scope?/skillName/folder/file' : ''}
