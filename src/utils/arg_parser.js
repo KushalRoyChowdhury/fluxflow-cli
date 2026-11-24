@@ -1,5 +1,5 @@
 /**
- * Smart Argument Parser for Tool Signals (Fidelity v3.5)
+ * Smart Argument Parser for Tool Signals (Fidelity v3.6)
  * Handles unescaped quotes by using heuristic end-of-string detection.
  * @param {string} argsString - Raw arguments string from model tool call.
  * @param {string[]} [knownKeys=[]] - Optional array of expected parameter names.
@@ -9,9 +9,11 @@ export const parseArgs = (argsString, knownKeys = [], strictQuoteKeys = []) => {
     const args = {};
     if (!argsString) return args;
 
+    const hasKnownKeys = Array.isArray(knownKeys) && knownKeys.length > 0;
+
     // Helper to match key against knownKeys (supports exact string, 'prefix*', or RegExp)
     const isKeyAllowed = (keyName) => {
-        if (!Array.isArray(knownKeys) || knownKeys.length === 0) return true;
+        if (!hasKnownKeys) return true;
         return knownKeys.some(pattern => {
             if (pattern instanceof RegExp) return pattern.test(keyName);
             if (typeof pattern === 'string') {
@@ -31,12 +33,29 @@ export const parseArgs = (argsString, knownKeys = [], strictQuoteKeys = []) => {
         if (i >= argsString.length) break;
 
         // 1. Capture Key
-        let keyMatch = argsString.substring(i).match(/^(\w+)\s*=\s*/);
-        if (!keyMatch || !isKeyAllowed(keyMatch[1])) {
+        // Model sometimes outputs `allowMultiple?=true` or `key?=val` because prompt states `allowMultiple?=bool:false`.
+        // ONLY treat `key?=` as `key=` if `knownKeys` are provided and `key` is allowed.
+        let keyMatch = argsString.substring(i).match(/^(\w+)(\??)\s*=\s*/);
+        if (!keyMatch) {
+            i++;
+            continue;
+        }
+
+        const rawKey = keyMatch[1];
+        const hasQuestionMark = keyMatch[2] === '?';
+
+        if (hasQuestionMark && !hasKnownKeys) {
+            // When no knownKeys are passed, do NOT treat key?= specially
+            i++;
+            continue;
+        }
+
+        if (!isKeyAllowed(rawKey)) {
             i++; // Skip noise or unexpected keys
             continue;
         }
-        const key = keyMatch[1];
+
+        const key = rawKey;
         i += keyMatch[0].length;
 
         // 2. Capture Value
@@ -80,11 +99,13 @@ export const parseArgs = (argsString, knownKeys = [], strictQuoteKeys = []) => {
                 // 1. A comma AND then another valid key= (e.g. "path", content=) - must match allowedKeys if provided
                 // 2. A closing parenthesis that marks the end of the tool call (e.g. "path") ]]
                 let nextArgValid = false;
-                const nextKeyMatch = after.match(/^,\s*(\w+)\s*=/);
+                const nextKeyMatch = after.match(/^,\s*(\w+)(\??)\s*=/);
                 if (nextKeyMatch) {
                     const nextKeyName = nextKeyMatch[1];
-                    // If key is not in allowedKeys OR has already been captured, it CANNOT be a real argument boundary!
-                    if (!isKeyAllowed(nextKeyName)) {
+                    const nextKeyHasQuestion = nextKeyMatch[2] === '?';
+                    if (nextKeyHasQuestion && !hasKnownKeys) {
+                        nextArgValid = false;
+                    } else if (!isKeyAllowed(nextKeyName)) {
                         nextArgValid = false;
                     } else if (args[nextKeyName] !== undefined) {
                         nextArgValid = false; // Already captured earlier!
@@ -92,7 +113,7 @@ export const parseArgs = (argsString, knownKeys = [], strictQuoteKeys = []) => {
                         // 1. Highest Index Encounter: Check if this same key appears again later downstream.
                         // If it appears again later, this current occurrence is premature (inside text).
                         const downstreamText = after.substring(nextKeyMatch[0].length);
-                        const nextOccurrence = downstreamText.search(new RegExp(`,\\s*${nextKeyName}\\s*=`, 'i'));
+                        const nextOccurrence = downstreamText.search(new RegExp(`,\\s*${nextKeyName}\\??\\s*=`, 'i'));
                         if (nextOccurrence !== -1) {
                             nextArgValid = false;
                         } else {
@@ -243,7 +264,10 @@ export const parseArgs = (argsString, knownKeys = [], strictQuoteKeys = []) => {
         } else {
             // Unquoted value: capture everything until the next logical key= boundary or closing brackets
             let rest = argsString.substring(i);
-            let boundaryMatch = rest.match(/,\s*\w+\s*=|(?:\s*\)\s*(?:$|\]\]))/);
+            const boundaryRegex = hasKnownKeys
+                ? /,\s*\w+\??\s*=|(?:\s*\)\s*(?:$|\]\]))/
+                : /,\s*\w+\s*=|(?:\s*\)\s*(?:$|\]\]))/;
+            let boundaryMatch = rest.match(boundaryRegex);
             if (boundaryMatch) {
                 let boundaryIndex = boundaryMatch.index;
                 value = rest.substring(0, boundaryIndex).trim();
