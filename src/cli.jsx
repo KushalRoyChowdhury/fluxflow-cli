@@ -438,7 +438,8 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     }
 
     // 3.5 ONE-SHOT PROMPT: -p/--prompt or --commit_8f4a2b9c -> non-TUI, custom system instruction, no loop
-    const isCommitFlag = args.includes('--commit_8f4a2b9c');
+    // Added standard --commit to support direct terminal commit generation without IDE lockout with 4bit hash
+    const isCommitFlag = args.includes('--commit_8f4a2b9c') || args.includes('--commit');
     const promptIdx = args.findIndex(a => a === '-p' || a === '--prompt');
     if (promptIdx !== -1 || isCommitFlag) {
         const isNewChat = args.includes('--new') || args.includes('-n');
