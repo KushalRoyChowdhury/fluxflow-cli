@@ -5,7 +5,8 @@ const headings = [
     { id: 'v1-regex', text: 'v1.0 — Regex-Based Matcher & JSON Unescape', level: 2 },
     { id: 'v2-grammar', text: 'v2.0 — Grammar-Based Separation', level: 2 },
     { id: 'v3-fidelity', text: 'v3.0 — The Fidelity Smart Heuristic Parser', level: 2 },
-    { id: 'v35-streaming', text: 'v3.5 — Streaming & Strict-Quote Extraction (Current)', level: 2 },
+    { id: 'v35-streaming', text: 'v3.5 — Streaming & Strict-Quote Extraction', level: 2 },
+    { id: 'v36-optional-syntax', text: 'v3.6 — Optional Parameter Grammar Tolerance (Current)', level: 2 },
     { id: 'conclusion', text: 'Conclusion', level: 2 },
 ]
 
@@ -75,10 +76,10 @@ export default function Parser() {
                 <li><strong>Array Literal Support</strong> — Nested quote and bracket-balance handling for array-valued arguments.</li>
             </ul>
 
-            <h2 id="v35-streaming">v3.5 — Streaming &amp; Strict-Quote Extraction (Current) <span className="ml-2 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">CLI v5.6.3</span></h2>
+            <h2 id="v35-streaming">v3.5 — Streaming &amp; Strict-Quote Extraction <span className="ml-2 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">CLI v5.6.3</span></h2>
             <p><strong>Signature:</strong> <code>parseArgs(argsString, knownKeys = [], strictQuoteKeys = [])</code></p>
             <p>
-                The current revision adds selective, deterministic quote-to-quote parsing for
+                This revision added selective, deterministic quote-to-quote parsing for
                 streaming and peek scenarios in which later parameters have not yet finished
                 generating.
             </p>
@@ -86,6 +87,17 @@ export default function Parser() {
                 <li><strong><code>strictQuoteKeys</code> Parameter</strong> — Target keys (e.g. <code>path</code>, <code>basename</code>, <code>file</code>, <code>keyword</code>) strictly terminate at their first unescaped quote, bypassing multi-line and candidate lookahead heuristics for those keys only.</li>
                 <li><strong>Streaming / Live Tool Sniffing</strong> — Resolves partial stream truncation, where unfinished subsequent values (e.g. an unclosed <code>content="..."</code>) previously caused earlier fields (<code>path="..."</code>) to fail lookahead validation and bleed into later content.</li>
                 <li><strong>Backwards Compatibility</strong> — All v3.0 smart heuristic capabilities are retained.</li>
+            </ul>
+
+            <h2 id="v36-optional-syntax">v3.6 — Optional Parameter Grammar Tolerance (Current) <span className="ml-2 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">CLI v5.12.1</span></h2>
+            <p><strong>Signature:</strong> <code>parseArgs(argsString, knownKeys = [], strictQuoteKeys = [])</code></p>
+            <p>
+                Modern system prompts and tool schemas frequently define optional parameters with TypeScript-like syntax (e.g. <code>allowMultiple?=bool:false</code> or <code>recursive?=bool</code>). Language models frequently mimic this schema definition literally during invocation, generating calls like <code>tool(allowMultiple?=true, path="...")</code>.
+            </p>
+            <ul>
+                <li><strong>Safe <code>key?=</code> Demotion</strong> — Model output containing <code>key?=value</code> is seamlessly parsed and normalized to standard key-value assignments (e.g. <code>allowMultiple: true</code>).</li>
+                <li><strong>Strict <code>knownKeys</code> Guard</strong> — To eliminate false positive boundaries inside code or raw text strings, <code>key?=</code> is <strong>only</strong> recognized when <code>knownKeys</code> are explicitly provided and the key matches the whitelist. If no <code>knownKeys</code> are provided, <code>key?=</code> is not treated specially and is ignored as normal noise.</li>
+                <li><strong>Lookahead &amp; Downstream Awareness</strong> — Both quoted lookahead validators and unquoted boundary delimiters account for optional <code>?</code> markers downstream (e.g. <code>,\s*&lt;nextKey&gt;?\s*=</code>), preserving multi-line code integrity without premature truncation.</li>
             </ul>
 
         </DocPage>
