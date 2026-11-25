@@ -160,7 +160,7 @@ export const loadSettings = async () => {
         if (saved) {
 
             // SECURITY SELF-HEALING MIGRATION:
-            // Extract and migrate custom Pollinations API Key from settings.json to encrypted secrets.json
+            // Extract and migrate custom Pollinations API Key from config.json to encrypted secrets.json
             if (saved.imageSettings && saved.imageSettings.apiKey) {
                 try {
                     const legacyKey = saved.imageSettings.apiKey;
@@ -265,7 +265,7 @@ export const saveSettings = async (settings) => {
             updated.systemSettings.dynamicDirAwareness = false;
         }
 
-        // Scrub apiKey from imageSettings so it NEVER gets written to settings.json
+        // Scrub apiKey from imageSettings so it NEVER gets written to config.json
         if (updated.imageSettings) {
             updated.imageSettings = { ...updated.imageSettings, apiKey: '' };
         }

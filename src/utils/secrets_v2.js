@@ -16,7 +16,7 @@ import { SECRET_DIR } from './paths.js';
  *     "c_openai":[ { key, baseUrl }, null, ... ]  // custom carries URL
  *   }
  *
- * Active index per provider is persisted in settings.json (activeKeyIndex).
+ * Active index per provider is persisted in config.json (activeKeyIndex).
  * Temp (session-only) keys live in memory and are discarded on provider
  * switch or app close.
  * ------------------------------------------------------------------
@@ -250,7 +250,7 @@ export const getProviderSummary = () => {
 };
 
 // ---------------------------------------------------------------------------
-// Active index (persisted in settings.json)
+// Active index (persisted in config.json)
 // ---------------------------------------------------------------------------
 
 const loadActiveMap = async () => {

@@ -419,6 +419,18 @@ export function extractCompletion(raw: string): string {
 // ---------------------------------------------------------------------------
 
 const FLUXFLOW_HOME = path.join(os.homedir(), '.fluxflow');
+
+/** Config file path: config.json, falling back to legacy settings.json. */
+function getFluxConfigPath(): string {
+    const modern = path.join(FLUXFLOW_HOME, 'config.json');
+    const legacy = path.join(FLUXFLOW_HOME, 'settings.json');
+    try {
+        if (!fs.existsSync(modern) && fs.existsSync(legacy)) {
+            fs.renameSync(legacy, modern);
+        }
+    } catch { }
+    return fs.existsSync(modern) ? modern : (fs.existsSync(legacy) ? legacy : modern);
+}
 const LEGACY_AES_KEY = crypto.createHash('sha256').update('fluxflow-cli-sanctuary-key').digest();
 const VAULT_CACHE_TTL = 5000;
 
@@ -507,7 +519,7 @@ export function readFluxSettings(forceReload = false): any | null {
     }
     let data: any = null;
     try {
-        const settingsPath = path.join(FLUXFLOW_HOME, 'settings.json');
+        const settingsPath = getFluxConfigPath();
         if (fs.existsSync(settingsPath)) {
             data = parseVault(fs.readFileSync(settingsPath));
         }
@@ -524,7 +536,7 @@ export function writeFluxSettings(patch: any): boolean {
         const current = readFluxSettings(true);
         if (!current || typeof current !== 'object') return false;
         const merged = { ...current, ...patch };
-        const settingsPath = path.join(FLUXFLOW_HOME, 'settings.json');
+        const settingsPath = getFluxConfigPath();
         fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2), 'utf8');
         _settingsCache = { data: merged, at: Date.now() };
         return true;

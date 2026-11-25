@@ -9,7 +9,25 @@ import { minimatch } from 'minimatch';
  * Centralized coordinates for the ~/.fluxflow data sanctuary.
  */
 export const FLUXFLOW_DIR = path.join(os.homedir(), '.fluxflow');
-export const SETTINGS_FILE = path.join(FLUXFLOW_DIR, 'settings.json');
+
+// Config file (renamed from settings.json for immaculate vibes)
+export const CONFIG_FILE = path.join(FLUXFLOW_DIR, 'config.json');
+const LEGACY_CONFIG_FILE = path.join(FLUXFLOW_DIR, 'settings.json');
+
+// One-time migration: settings.json -> config.json.
+// Idempotent & non-destructive: only fires when the new file is absent.
+try {
+    if (!fs.existsSync(CONFIG_FILE) && fs.existsSync(LEGACY_CONFIG_FILE)) {
+        fs.renameSync(LEGACY_CONFIG_FILE, CONFIG_FILE);
+    }
+} catch (e) {
+    // Read-only home / locked file: fall through and use whatever exists.
+}
+
+// Resolve to config.json, but honour a legacy file if migration was impossible.
+export const SETTINGS_FILE = fs.existsSync(CONFIG_FILE)
+    ? CONFIG_FILE
+    : (fs.existsSync(LEGACY_CONFIG_FILE) ? LEGACY_CONFIG_FILE : CONFIG_FILE);
 
 // Read settings SYNC to determine the redirection (Anchor Strategy)
 let externalDir = null;

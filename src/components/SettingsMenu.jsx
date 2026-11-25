@@ -719,7 +719,7 @@ export default function SettingsMenu({
             if (!systemSettings.useExternalData) {
                 setInputConfig({
                     label: "Enter absolute path for External AppData:",
-                    note: "All history, logs and secrets will be stored here. ~/.fluxflow/settings.json stays as anchor.",
+                    note: "All history, logs and secrets will be stored here. ~/.fluxflow/config.json stays as anchor.",
                     key: 'externalDataPath',
                     value: systemSettings.externalDataPath || ''
                 });

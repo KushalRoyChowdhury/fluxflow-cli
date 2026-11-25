@@ -3,7 +3,7 @@ node_modules/
 GEMINI.md
 logs/
 secret/
-settings.json
+config.json
 readme-npm.md
 token_usage.txt
 readme-git.md
