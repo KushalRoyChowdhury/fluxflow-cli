@@ -164,7 +164,9 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --yolo <on|off>                          Same as --auto-exec
   --external-access <on|off>               Toggle permission for file reads outside CWD
   -p, --prompt <text> [-n|--new]           One-shot non-TUI answer (-n to start fresh conversation)
+  -c, --commit                             Generate commit message from staged git diff
   -r, --run <command>                      Execute shell command and pass output as context to -p/--prompt
+                                           (standalone, no clustering; combine: -pc, -cp)
   -v, --version                            Show installed version
   --help                                   Show this help menu
   --help commands                          Show available /commands
@@ -196,8 +198,12 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /image setup key <default|custom>        Configure image API key strategy
   /budget                                  Set or View budget limits
   /mode <flux|flow>                        Toggle Flux/Flow modes
-  /thinking <level> [--map <target>]       Set AI reasoning depth or map thinking levels
-  /model <model_id> [-sv|-rm|-rn|-df]      Switch or manage models for active provider
+  /thinking <level> [flags]                Set reasoning depth; /thinking -h for flags
+                                           -b/--bypass, -f/--force, -r/--raw, -m/--map <t>
+  /model <model_id> [flags]                Switch/manage models; /model -h for flags
+                                           -s/--save, -v/--vision, -df/--default, -rm/--remove,
+                                           -rn/-mv/--rename, -p/--price, -r/--raw
+                                           Clusters Unix-style: -sv = -s -v
   /wildcard-tooling                        Use if the model lacks Tooling Capability
   /wildercard-tooling                      Extended version of /wildcard-tooling
   /provider                                Select AI Provider
@@ -439,7 +445,16 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
     // 3.5 ONE-SHOT PROMPT: -p/--prompt or --commit_8f4a2b9c -> non-TUI, custom system instruction, no loop
     // Added standard --commit to support direct terminal commit generation without IDE lockout with 4bit hash
-    const isCommitFlag = args.includes('--commit_8f4a2b9c') || args.includes('--commit');
+    const isCommitFlag = args.includes('--commit_8f4a2b9c') || args.includes('--commit') || args.includes('-c');
+    // Unix-style clusters for p/c only: -pc == -p -c, -cp == -c -p.
+    // Explicitly NOT -r/--run: it takes a command as its next argument and must
+    // stay standalone (-r "cmd" -p "..."). --raw has no short alias.
+    for (let i = 0; i < args.length; i++) {
+        if (/^-[pc]{2,}$/.test(args[i])) {
+            args.splice(i, 1, ...args[i].slice(1).split('').map(c => `-${c}`));
+            i--;
+        }
+    }
     const promptIdx = args.findIndex(a => a === '-p' || a === '--prompt');
     if (promptIdx !== -1 || isCommitFlag) {
         const isNewChat = args.includes('--new') || args.includes('-n');

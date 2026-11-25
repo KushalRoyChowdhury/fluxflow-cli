@@ -701,6 +701,45 @@ const isSameWorkspace = (a, b) => {
     }
 };
 
+/**
+ * Unix-style short-flag clustering.
+ *   -sv       => -s -v
+ *   -bfr      => -b -f -r
+ *   -bm high  => -b -m high   (value-taking flags allowed only as last char)
+ *   -vvs      => -v -s        (duplicates collapse)
+ *
+ * Safety rails:
+ *  - semanticTokens (-rm/-rn/-mv/-df) are atomic actions, NEVER expanded. A
+ *    token that merely STARTS with one (e.g. -rmmv) is rejected as ambiguous
+ *    instead of being silently misparsed as -r -m -m -v.
+ *  - valueFlags may only appear as the final character of a cluster.
+ * Returns { ok, tokens } or { ok: false, error }.
+ */
+const expandShortFlagClusters = (tokens, { clusterable = [], semanticTokens = [], valueFlags = [] } = {}) => {
+    const semantic = new Set(semanticTokens);
+    const value = new Set(valueFlags);
+    const out = [];
+    for (const t of tokens) {
+        if (!t.startsWith('-') || t.startsWith('--') || t.length < 3) { out.push(t); continue; }
+        if (semantic.has(t)) { out.push(t); continue; }
+        const chars = t.slice(1);
+        if (!/^[a-zA-Z]+$/.test(chars)) { out.push(t); continue; }
+        const shadow = semanticTokens.find(s => t.startsWith(s) && t.length > s.length);
+        if (shadow) {
+            return { ok: false, error: `\`${t}\` is ambiguous: \`${shadow}\` is a standalone action flag and cannot be clustered. Use separate tokens, e.g. \`${shadow} -v\`.` };
+        }
+        if (![...chars].every(c => clusterable.includes(c))) { out.push(t); continue; }
+        const uniq = [...new Set(chars)];
+        for (let i = 0; i < uniq.length - 1; i++) {
+            if (value.has(uniq[i])) {
+                return { ok: false, error: `\`${t}\` is ambiguous: \`-${uniq[i]}\` takes a value, so it must be the last letter (e.g. \`-b${uniq[i]} <value>\`).` };
+            }
+        }
+        out.push(...uniq.map(c => `-${c}`));
+    }
+    return { ok: true, tokens: out };
+};
+
 export default function App({ args = [] }) {
     const lastGCTimeRef = useRef(1);
     const [confirmExit, setConfirmExit] = useState(false);
@@ -3699,7 +3738,48 @@ export default function App({ args = [] }) {
                 case '/thinking': {
                     let formattedLevel;
                     if (parts[1]) {
-                        const rawArgs = parts.slice(1);
+                        // `/thinking -h` / `--help` — inline flag reference.
+                        // Checked before clustering: 'h' is not a clusterable char, so
+                        // without this guard `-h` would be rejected as an invalid flag.
+                        if (/(?:^|\s)(?:-h|--help)(?=\s|$)/.test(parts.slice(1).join(' '))) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: 'thinking-help-' + Date.now(),
+                                    role: 'system',
+                                    isMeta: true,
+                                    text: `✦ /thinking — Flags\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-b\x1b[0m, \x1b[36m--bypass\x1b[0m   allow xHigh in Flow mode (else restricted)\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-f\x1b[0m, \x1b[36m--force\x1b[0m    CoT system prompt on non-reasoning models\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-r\x1b[0m, \x1b[36m--raw\x1b[0m      strip harness reasoning guidance\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-m\x1b[0m, \x1b[36m--map\x1b[0m \x1b[2m<target>\x1b[22m  remap this level (current provider+model only)\n` +
+                                        `⠀\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36mLevels:\x1b[0m fast low medium standard high xhigh custom max\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2mClusters: -bf = -b -f, -bfr = -b -f -r. Order-independent.\x1b[22m\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2m-m takes a value: must be LAST char (-bfm high ok, -mb high invalid).\x1b[22m\n` +
+                                        `⠀\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2m/thinking high -bf        bypass + force\x1b[22m\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2m/thinking Custom -m high  remap Custom -> high\x1b[22m\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2m/thinking Custom -m rm    unmap Custom\x1b[22m\n` +
+                                        `⠀`
+                                }];
+                            });
+                            break;
+                        }
+                        // Unix-style clustering: -bf => -b -f, -bfr => -b -f -r.
+                        // `-m` (--map) takes a value, so it is only valid as the LAST letter.
+                        const clustered = expandShortFlagClusters(parts.slice(1), {
+                            clusterable: ['b', 'f', 'r', 'm'],
+                            valueFlags: ['m']
+                        });
+                        if (!clustered.ok) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: 'flag-' + Date.now(), role: 'system', text: `✦ \x1b[31mINVALID FLAGS\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m ${clustered.error}\n⠀`, isMeta: true }];
+                            });
+                            break;
+                        }
+                        const rawArgs = clustered.tokens;
                         const isBypass = rawArgs.includes('--bypass') || rawArgs.includes('-b'); // New Alias
                         const isForce = rawArgs.includes('--force') || rawArgs.includes('-f'); // New Alias
                         const isRaw = rawArgs.includes('--raw') || rawArgs.includes('-r'); // New Alias
@@ -3844,13 +3924,65 @@ export default function App({ args = [] }) {
                     if (parts[1]) {
                         const rawCmdStr = parts.slice(1).join(' ');
 
+                        // `/model -h` / `/model --help` — inline flag reference.
+                        // Checked before any parsing so it works regardless of other tokens.
+                        if (/(?:^|\s)(?:-h|--help)(?=\s|$)/.test(rawCmdStr)) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: 'model-help-' + Date.now(),
+                                    role: 'system',
+                                    isMeta: true,
+                                    text: `✦ /model — Flags\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-s\x1b[0m, \x1b[36m--save\x1b[0m        persist a custom model ID (also --add)\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-v\x1b[0m, \x1b[36m--vision\x1b[0m      mark model image-capable (also -m, --multimodal)\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-df\x1b[0m, \x1b[36m--default\x1b[0m   set provider startup model\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-rm\x1b[0m, \x1b[36m--remove\x1b[0m    drop a model from the provider list\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-rn\x1b[0m, \x1b[36m-mv\x1b[0m, \x1b[36m--rename\x1b[0m  rename a model ID (needs old + new)\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-p\x1b[0m, \x1b[36m--price\x1b[0m     read/set pricing (\x1b[2m-i\x1b[22m alias)\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[36m-r\x1b[0m, \x1b[36m--raw\x1b[0m       bare one-liner output, pairs with --price\n` +
+                                        `⠀\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2mClusters: -sv = -s -v, -vs = -v -s, -svr = -s -v -r.\x1b[22m\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2mAtomic (never split): -rm -rn -mv -df.\x1b[22m\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2m-p takes a value: never group it. Use -sv -p "..." (not -svp).\x1b[22m\n` +
+                                        `⠀\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2m/model <id> -sv            save + mark vision\x1b[22m\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2m/model <id> -p "IN 0.15, OUT 0.6"\x1b[22m\n` +
+                                        `⠀⠀\x1b[2m└─\x1b[22m \x1b[2m/model old new -rn          rename\x1b[22m\n` +
+                                        `⠀`
+                                }];
+                            });
+                            break;
+                        }
+
                         // Extract price flag content if present: --price "..." or -p '...' or -p {...} or bare string up to next flag
                         let parsedPricing = null;
                         let isResetInfo = false;
                         let infoArgsStr = null;
                         let cleanedCmdStr = rawCmdStr;
 
-                        const infoRegex = /(?:^|\s)(?:--price|-p)(?:\s+(?:"([^"]*)"|'([^']*)'|\{([^}]*)\}|((?:(?!--[a-z]|-[a-z]\b).)+)))?(?=\s+--|\s+-[a-z]\b|$)/i;
+                        // `-p`/`--price` takes a VALUE and is parsed by infoRegex below, so it
+                        // can never be part of a short-flag group. Reject rather than rewrite:
+                        // `-svp` used to silently swallow the price string into the model ID.
+                        const badPriceGroup = rawCmdStr.split(/\s+/).find(t =>
+                            /^-[a-z]{2,}$/.test(t) && t.includes('p') &&
+                            !['-rm', '-rn', '-mv', '-df'].includes(t)
+                        );
+                        if (badPriceGroup) {
+                            const flags = badPriceGroup.slice(1).replace('p', '');
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: 'price-group-' + Date.now(),
+                                    role: 'system',
+                                    isMeta: true,
+                                    text: `✦ \x1b[31mINVALID FLAGS\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m \`${badPriceGroup}\`: \x1b[36m-p\x1b[0m is not supported inside a flag group.\n⠀⠀\x1b[2m└─\x1b[22m Use \x1b[36m${flags ? `-${flags}` : ''} -p "..."\x1b[0m instead.\n⠀`
+                                }];
+                            });
+                            break;
+                        }
+
+                        const infoRegex = /(?:^|\s)(?:--price|-p)\b(?:\s+(?:"([^"]*)"|'([^']*)'|\{([^}]*)\}|((?:(?!--[a-z]|-[a-z]\b).)+)))?(?=\s+--|\s+-[a-z]\b|$)/i;
                         const infoMatch = cleanedCmdStr.match(infoRegex);
 
                         if (infoMatch) {
@@ -3875,14 +4007,29 @@ export default function App({ args = [] }) {
                             }
                         }
 
-                        // Parse cleaned arguments without the info token
-                        const cleanedTokens = cleanedCmdStr.split(/\s+/).filter(Boolean);
+                        // Pure-Unix short-flag clusters: `-sv` == `-s -v`, `-vs` == `-v -s`.
+                        // -rm/-rn/-mv/-df are atomic ACTIONS (remove/rename/move/default) and
+                        // are never clustered; `-rmmv` is rejected instead of silently
+                        // becoming -r -m -m -v. `-p` (--price) is excluded because its value
+                        // is parsed separately by the price regex above.
+                        const clusterRes = expandShortFlagClusters(cleanedCmdStr.split(/\s+/).filter(Boolean), {
+                            clusterable: ['s', 'v', 'm', 'r'],
+                            semanticTokens: ['-rm', '-rn', '-mv', '-df']
+                        });
+                        if (!clusterRes.ok) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: 'flag-' + Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m ${clusterRes.error}`, isMeta: true }];
+                            });
+                            break;
+                        }
+                        const cleanedTokens = clusterRes.tokens;
 
-                        // Check for multimodal flag
+                        // Check for multimodal flag (--vision / -v)
                         const isMultimodalFlag = cleanedTokens.some(a => a === '--multimodal' || a === '-m' || a === '--vision' || a === '-v');
 
-                        // Check for save / remove / rename / default flags
-                        const isSave = cleanedTokens.some(a => a === '--save' || a === '-sv' || a === '--add');
+                        // Check for save / remove / rename / default flags (--save / -s)
+                        const isSave = cleanedTokens.some(a => a === '--save' || a === '-s' || a === '--add');
                         const isRemove = cleanedTokens.some(a => a === '--remove' || a === '-rm');
                         const isRename = cleanedTokens.some(a => a === '--rename' || a === '-rn' || a === '-mv');
                         const isDefault = cleanedTokens.some(a => a === '--default' || a === '-df');
@@ -3964,6 +4111,9 @@ export default function App({ args = [] }) {
                                         return [...prev, { id: Date.now(), role: 'system', text: `\x1b[31m[Error]\x1b[0m Please provide a model ID to remove. Example: /model my-custom-model --remove`, isMeta: true }];
                                     });
                                 } else {
+                                    const providerDisplay = aiProvider === 'c_openai'
+                                        ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
+                                        : aiProvider.replace('c_openai', 'Custom Endpoint');
                                     const res = removeModelFromProvider(aiProvider, modelToRemove);
                                     if (res.success) {
                                         setMessages(prev => {
@@ -3986,11 +4136,14 @@ export default function App({ args = [] }) {
                                 } else {
                                     const oldModelId = nonFlagArgs[0].trim();
                                     const newModelId = nonFlagArgs.slice(1).join(' ').trim();
+                                    const providerDisplay = aiProvider === 'c_openai'
+                                        ? (systemSettings?.customOpenAIBaseUrl || 'Custom Endpoint')
+                                        : aiProvider.replace('c_openai', 'Custom Endpoint');
                                     const res = renameModelInProvider(aiProvider, oldModelId, newModelId);
                                     if (res.success) {
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Renamed:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m Old Model: \x1b[31m${oldModelId}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m New Model: \x1b[32m${newModelId}\x1b[0m\n⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Model Renamed:\n⠀⠀\x1b[2m└─\x1b[22m Provider: ${providerDisplay}\n⠀⠀\x1b[2m└─\x1b[22m Old Model: \x1b[31m${oldModelId}\x1b[0m\n⠀⠀\x1b[2m└─\x1b[22m New Model: \x1b[32m${newModelId}\x1b[0m\n⠀`, isMeta: true }];
                                         });
                                     } else {
                                         setMessages(prev => {
