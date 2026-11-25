@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { nanoid } from 'nanoid';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
-import { HISTORY_FILE, HISTORY_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, CONTEXT_FILE } from './paths.js';
+import { HISTORY_FILE, HISTORY_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, CONTEXT_FILE, PATHS_FILE } from './paths.js';
 import { RevertManager } from './revert.js';
 
 // HIGH-FIDELITY PERSISTENCE LOCK (Prevents race conditions between foreground and janitor)
@@ -224,6 +224,16 @@ export const deleteChat = async (id) => {
             delete temp[id];
             writeEncryptedJson(TEMP_MEM_FILE, temp);
         }
+
+        // Also clean up the workspace path record (path.json) so a deleted chat
+        // can't leave a stale workspace lock / resume mismatch behind
+        try {
+            const chatPaths = readEncryptedJson(PATHS_FILE, {});
+            if (chatPaths[id]) {
+                delete chatPaths[id];
+                writeEncryptedJson(PATHS_FILE, chatPaths);
+            }
+        } catch (e) {}
 
         // Also clean up temp memory cache if it exists
         const cache = readEncryptedJson(TEMP_MEM_CHAT_FILE, {});
