@@ -19,7 +19,7 @@ export default function AppCommands() {
 
             <h2 id="session-management">Session Management</h2>
             <ul>
-                <li><strong><code>/clear</code></strong> — Clears the terminal screen.</li>
+                <li><strong><code>/new</code></strong> — Starts a new chat for the current workspace (alias: <code>/clear</code>).</li>
                 <li><strong><code>/save</code></strong> — Forces a manual save of the current chat session.</li>
                 <li><strong><code>/resume &lt;chat-id&gt;</code></strong> — Opens a modal or switches back to a previous conversation.</li>
                 <li><strong><code>/chats</code></strong> — Lists all saved chat sessions.</li>

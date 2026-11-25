@@ -184,7 +184,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /quit                                    Exit and shutdown Flux
   /kill [pid]                              Kill a process by PID or list active processes
   /help                                    Show help menu
-  /clear                                   Clear terminal screen
+  /new                                     Start a new chat (alias: /clear)
   /resume                                  Load previous session
 
   /truncate                                Truncate tool results in chat history

@@ -7,7 +7,7 @@ Trigger in chat via /command
 * /quit → Exit and shutdown FluxFlow
 * /kill pid → Kill a process by PID or show active process tree under current session
 * /help → Show help menu & actions
-* /clear → Clear terminal viewport
+* /new → Start a new chat for the current workspace (alias: /clear)
 * /chats → List stored chat sessions
 * /resume → Switch to previous session
 * /save → Force-save current session state

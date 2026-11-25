@@ -1284,7 +1284,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/help', desc: 'Show all available commands' },
     
             { cmd: '/truncate', desc: 'Truncate tool results in chat history' },
-            { cmd: '/clear', desc: 'Clear terminal screen' },
+            { cmd: '/new', desc: 'Start a new chat (alias: /clear)' },
             { cmd: '/resume', desc: 'Load previous session' },
             { cmd: '/revert', desc: 'Revert codebase to checkpoint' },
             { cmd: '/save', desc: 'Force save current chat' },

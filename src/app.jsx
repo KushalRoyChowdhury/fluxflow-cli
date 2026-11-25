@@ -1915,7 +1915,7 @@ export default function App({ args = [] }) {
                 msg: {
                     role: 'system',
                     text: `⚠️ MEMORY WARNING: CHAT IS GETTING VERY LONG`,
-                    subText: `This session has reached ${finalCompleted.length} blocks. To maintain optimal performance and prevent high memory usage, it is highly recommended to save and start a clean chat with /clear.`,
+                    subText: `This session has reached ${finalCompleted.length} blocks. To maintain optimal performance and prevent high memory usage, it is highly recommended to save and start a clean chat with /new.`,
                     isHomeWarning: true
                 },
                 type: 'full-message'
@@ -3014,7 +3014,7 @@ export default function App({ args = [] }) {
         { cmd: '/help', desc: 'Show all available commands' },
         ...(parsedArgs.playground ? [{ cmd: '/move', desc: 'Move playground directory to original CWD/playground-export' }] : []),
         { cmd: '/resume', desc: 'Load previous session' },
-        { cmd: '/clear', desc: 'Clear terminal screen' },
+        { cmd: '/new', desc: 'Start a new chat (alias: /clear)' },
 
         { cmd: '/truncate', desc: 'Truncate tool results in chat history' },
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
@@ -3174,7 +3174,7 @@ export default function App({ args = [] }) {
         if (!absoluteClean.trim()) return;
 
         // [RESUME WORKSPACE LOCK] Chat belongs to a different workspace. Only '/'
-        // commands (e.g. /clear to start fresh) may be sent; prompts are rejected
+        // commands (e.g. /new to start fresh) may be sent; prompts are rejected
         // BEFORE they reach the messages array or the model.
         if (resumePathLock && !absoluteClean.trim().startsWith('/')) {
             setInput('');
@@ -3183,7 +3183,7 @@ export default function App({ args = [] }) {
                 return [...prev, {
                     id: 'resume-lock-' + Date.now(),
                     role: 'system',
-                    text: `✦ RESTRICTED\n⠀⠀\x1b[2m└─\x1b[22m This chat was in \x1b[33m${resumePathLock}\x1b[39m.\n⠀⠀\x1b[2m└─\x1b[22m Start a new chat for this workspace (\x1b[36m/clear\x1b[39m) to send prompts.\n⠀`,
+                    text: `✦ RESTRICTED\n⠀⠀\x1b[2m└─\x1b[22m This chat was in \x1b[33m${resumePathLock}\x1b[39m.\n⠀⠀\x1b[2m└─\x1b[22m Start a new chat for this workspace (\x1b[36m/new\x1b[39m) to send prompts.\n⠀`,
                     isMeta: true
                 }];
             });
@@ -3409,6 +3409,7 @@ export default function App({ args = [] }) {
                     break;
                 }
 
+                case '/new':
                 case '/clear': {
                     if (stdout) {
                         stdout.write('\x1b[2J\x1b[3J\x1b[H');
@@ -3433,7 +3434,7 @@ export default function App({ args = [] }) {
                         chatId: chatId,
                         clearKey: clearKey + 1
                     };
-                    // /clear always exits playground mode by resetting to a fresh session
+                    // /new (alias /clear) always exits playground mode by resetting to a fresh session
                     if (parsedArgs.playground) {
                         parsedArgs.playground = false;
                         deleteChat(PLAYGROUND_CHAT_ID).catch(() => { });
@@ -8392,7 +8393,7 @@ export default function App({ args = [] }) {
                                                 {input === '' && (
                                                     <Box position="absolute" paddingLeft={0}>
                                                         {resumePathLock ? (
-                                                            <Text color={colors.warning || 'yellow'} bold>{`  ⚠ This chat was in ${resumePathLock}. Start a new chat for this workspace (/clear).`}</Text>
+                                                            <Text color={colors.warning || 'yellow'} bold>{`  ⚠ This chat was in ${resumePathLock}. Start a new chat for this workspace (/new).`}</Text>
                                                         ) : activeCommand && !isTerminalFocused ? (
                                                             <Text color="yellow">{isTerminalWaitingForInput ? "  Terminal is waiting for user input. Press TAB to interact" : "  Press TAB to interact with terminal..."}</Text>
                                                         ) : activeCommand && isTerminalFocused ? (
