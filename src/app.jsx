@@ -3030,6 +3030,7 @@ export default function App({ args = [] }) {
 
     const COMMANDS = [
         { cmd: '/quit', desc: 'Exit and shutdown Flux' },
+        { cmd: '/new', desc: 'Start a new chat (alias: /clear)' },
         {
             cmd: '/kill',
             desc: 'Kill a process by PID',
@@ -3053,7 +3054,6 @@ export default function App({ args = [] }) {
         { cmd: '/help', desc: 'Show all available commands' },
         ...(parsedArgs.playground ? [{ cmd: '/move', desc: 'Move playground directory to original CWD/playground-export' }] : []),
         { cmd: '/resume', desc: 'Load previous session' },
-        { cmd: '/new', desc: 'Start a new chat (alias: /clear)' },
 
         { cmd: '/truncate', desc: 'Truncate tool results in chat history' },
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
@@ -3243,6 +3243,17 @@ export default function App({ args = [] }) {
         if (isProcessing) {
             // STEERING HINT ENGINE
             const hintText = absoluteClean.trim();
+
+            // Clear queued steering hint: -c / --clear (exact match only)
+            if (hintText === '-c' || hintText === '--clear') {
+                if (queuedPromptRef.current) {
+                    setQueuedPrompt(null);
+                    queuedPromptRef.current = null;
+                }
+                setInput('');
+                return;
+            }
+
             if (hintText.startsWith('/btw')) {
                 const question = hintText.replace(/^\/btw\s*/, '').trim();
                 if (question.length <= 3) {
@@ -8465,7 +8476,7 @@ export default function App({ args = [] }) {
                                         </Text>
                                     </Box>
                                 ) : (
-                                        <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : process.env.HALLOWEEN_EEGG === "true" ? 'Looking for shadows...' : process.env.FROSTBYTE_EEGG === "true" ? (new Date().getMonth() === 0 && new Date().getDate() <= 2) ? 'Watching Fuji...' : 'Waiting for snowfall...' : "Waiting for input..."}</Text>
+                                    <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : process.env.HALLOWEEN_EEGG === "true" ? 'Looking for shadows...' : process.env.FROSTBYTE_EEGG === "true" ? (new Date().getMonth() === 0 && new Date().getDate() <= 2) ? 'Watching Fuji...' : 'Waiting for snowfall...' : "Waiting for input..."}</Text>
                                 )}
                             </Box>
                             <Box>
@@ -8728,7 +8739,7 @@ export default function App({ args = [] }) {
                                                         { label: 'Numes', value: 'Numes' },
                                                         { label: 'APInex', value: 'APInex' },
                                                         { label: 'xKiro', value: 'xKiro' },
-                            { label: 'CoArena', value: 'CoArena' },
+                                                        { label: 'CoArena', value: 'CoArena' },
                                                         { label: 'Ollama', value: 'Ollama' },
                                                         ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router      [Local Proxy]', value: '9router' }] : []),
                                                         { label: 'AIHubMix     [Experimental]', value: 'AIHubMix' },
