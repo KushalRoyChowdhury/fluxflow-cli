@@ -89,7 +89,7 @@ export default function Parser() {
                 <li><strong>Backwards Compatibility</strong> — All v3.0 smart heuristic capabilities are retained.</li>
             </ul>
 
-            <h2 id="v36-optional-syntax">v3.6 — Optional Parameter Grammar Tolerance (Current) <span className="ml-2 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">CLI v5.12.1</span></h2>
+            <h2 id="v36-optional-syntax">v3.6 — Optional Parameter Grammar Tolerance (Current) <span className="ml-2 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">CLI v5.13.0</span></h2>
             <p><strong>Signature:</strong> <code>parseArgs(argsString, knownKeys = [], strictQuoteKeys = [])</code></p>
             <p>
                 Modern system prompts and tool schemas frequently define optional parameters with TypeScript-like syntax (e.g. <code>allowMultiple?=bool:false</code> or <code>recursive?=bool</code>). Language models frequently mimic this schema definition literally during invocation, generating calls like <code>tool(allowMultiple?=true, path="...")</code>.
