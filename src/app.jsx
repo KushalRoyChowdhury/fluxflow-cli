@@ -48,7 +48,7 @@ import { createAboutSkill } from './utils/about_skill.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { readEncryptedJson } from './utils/crypto.js';
-import { FLUXFLOW_DIR, MEMORIES_FILE, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
+import { FLUXFLOW_DIR, MEMORIES_FILE, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE, PATHS_FILE } from './utils/paths.js';
 import { emojiSpace, getFluxLogo } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, cleanTerminalOutput } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
@@ -677,6 +677,30 @@ const SubagentRow = React.memo(({ sa, showTPMEstimate = false }) => {
     );
 });
 
+/**
+ * Returns the workspace path a chat session was last used in, or null if unknown.
+ * Backed by path.json ({ [chatId]: cwd }) written by ai.js on every turn.
+ */
+const getChatWorkspacePath = (chatId) => {
+    try {
+        const chatPaths = readEncryptedJson(PATHS_FILE, {});
+        return chatPaths?.[chatId] || null;
+    } catch (e) {
+        return null;
+    }
+};
+
+/** Normalized comparison so Windows casing / separators don't false-positive. */
+const isSameWorkspace = (a, b) => {
+    if (!a || !b) return true;
+    try {
+        return path.normalize(a).replace(/[\\/]+$/, '').toLowerCase() ===
+            path.normalize(b).replace(/[\\/]+$/, '').toLowerCase();
+    } catch (e) {
+        return a === b;
+    }
+};
+
 export default function App({ args = [] }) {
     const lastGCTimeRef = useRef(1);
     const [confirmExit, setConfirmExit] = useState(false);
@@ -685,6 +709,8 @@ export default function App({ args = [] }) {
 
     const [input, setInput] = useState('');
     const [inputKey, setInputKey] = useState(0);
+    // Non-null => resumed chat belongs to a different workspace: input is locked.
+    const [resumePathLock, setResumePathLock] = useState(null);
     // In-memory prompt history (prompts + commands). -1 = not browsing.
     const promptHistoryRef = useRef([]);
     const [historyCursor, setHistoryCursor] = useState(-1);
@@ -2571,6 +2597,9 @@ export default function App({ args = [] }) {
                 const h = await loadHistory();
                 const id = parsedArgs.resume;
                 if (h[id]) {
+                    const prevWorkspace = getChatWorkspacePath(id);
+                    const workspaceMismatch = prevWorkspace && !isSameWorkspace(prevWorkspace, process.cwd()) ? prevWorkspace : null;
+                    setResumePathLock(workspaceMismatch);
                     chatLoadingRef.current = true;
                     setChatId(id);
                     const savedData = await loadChatContext(id);
@@ -3144,6 +3173,23 @@ export default function App({ args = [] }) {
         // Prevent sending empty or whitespace-only prompts
         if (!absoluteClean.trim()) return;
 
+        // [RESUME WORKSPACE LOCK] Chat belongs to a different workspace. Only '/'
+        // commands (e.g. /clear to start fresh) may be sent; prompts are rejected
+        // BEFORE they reach the messages array or the model.
+        if (resumePathLock && !absoluteClean.trim().startsWith('/')) {
+            setInput('');
+            setMessages(prev => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, {
+                    id: 'resume-lock-' + Date.now(),
+                    role: 'system',
+                    text: `✦ RESTRICTED\n⠀⠀\x1b[2m└─\x1b[22m This chat was in \x1b[33m${resumePathLock}\x1b[39m.\n⠀⠀\x1b[2m└─\x1b[22m Start a new chat for this workspace (\x1b[36m/clear\x1b[39m) to send prompts.\n⠀`,
+                    isMeta: true
+                }];
+            });
+            return;
+        }
+
         // Record prompt history (in-memory). Skip programmatic submits.
         if (!isProgrammatic) {
             try {
@@ -3263,6 +3309,9 @@ export default function App({ args = [] }) {
                             const target = h[targetId] || Object.values(h).find(h => h.name.toLowerCase() === targetId.toLowerCase());
 
                             if (target) {
+                                const prevWorkspace = getChatWorkspacePath(targetId);
+                                const workspaceMismatch = prevWorkspace && !isSameWorkspace(prevWorkspace, process.cwd()) ? prevWorkspace : null;
+                                setResumePathLock(workspaceMismatch);
                                 stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
                                 if (process.stdout.isTTY) {
                                     const chatName = target?.name || '';
@@ -3424,6 +3473,7 @@ export default function App({ args = [] }) {
                         }));
                     }
                     setChatId(generateChatId());
+                    setResumePathLock(null);
                     setSessionStats({ tokens: 0 });
                     setIsExpanded(false);
                     setChatTokens(0);
@@ -7769,6 +7819,9 @@ export default function App({ args = [] }) {
                             onSelect={async (id) => {
                                 const h = await loadHistory();
                                 if (h[id]) {
+                                    const prevWorkspace = getChatWorkspacePath(id);
+                                    const workspaceMismatch = prevWorkspace && !isSameWorkspace(prevWorkspace, process.cwd()) ? prevWorkspace : null;
+                                    setResumePathLock(workspaceMismatch);
                                     stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
                                     if (process.stdout.isTTY) {
                                         const chatName = h[id]?.name || '';
@@ -8338,7 +8391,9 @@ export default function App({ args = [] }) {
                                             <Box flexGrow={1} position="relative">
                                                 {input === '' && (
                                                     <Box position="absolute" paddingLeft={0}>
-                                                        {activeCommand && !isTerminalFocused ? (
+                                                        {resumePathLock ? (
+                                                            <Text color={colors.warning || 'yellow'} bold>{`  ⚠ This chat was in ${resumePathLock}. Start a new chat for this workspace (/clear).`}</Text>
+                                                        ) : activeCommand && !isTerminalFocused ? (
                                                             <Text color="yellow">{isTerminalWaitingForInput ? "  Terminal is waiting for user input. Press TAB to interact" : "  Press TAB to interact with terminal..."}</Text>
                                                         ) : activeCommand && isTerminalFocused ? (
                                                             <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
