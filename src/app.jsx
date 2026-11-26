@@ -1507,6 +1507,35 @@ export default function App({ args = [] }) {
             load();
         }
     }, [activeView, quotas.resetDay]);
+
+    useEffect(() => {
+        if (!args.includes('--continue')) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const { getPromptSessionHistory, clearPromptSessionHistory } = await import('./utils/sessionDaemon.js');
+                const sessionHistory = await getPromptSessionHistory();
+                if (cancelled || !Array.isArray(sessionHistory) || sessionHistory.length === 0) return;
+
+                const injected = sessionHistory
+                    .filter(item => item && item.text)
+                    .map((item, idx) => ({
+                        id: `continue-${Date.now()}-${idx}`,
+                        role: item.role === 'model' ? 'agent' : 'user',
+                        text: item.role === 'model' ? `${item.text}\n\n⠀` : item.text
+                    }));
+
+                if (injected.length > 0) {
+                    setMessages(prev => [...prev, ...injected]);
+                    setCompletedIndex(c => c + injected.length);
+                }
+                if (!cancelled) {
+                    await clearPromptSessionHistory();
+                }
+            } catch (e) { /* ignore */ }
+        })();
+        return () => { cancelled = true; };
+    }, []);
     const [activeCommand, setActiveCommand] = useState(null);
     const [execOutput, setExecOutput] = useState('');
     const [isTerminalFocused, setIsTerminalFocused] = useState(false);

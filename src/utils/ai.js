@@ -2945,6 +2945,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     /^<think_fluxflow>((?:```[\s\S]*?```|`[^`]*`|(?!<\/think_fluxflow>)[\s\S])*)<\/think_fluxflow>\s*/,
                                     '<thoughts> $1 </thoughts>\n\n'
                                   );
+                                if (text.endsWith('\n\n⠀')) {
+                                    text = text.slice(0, -3).trim();
+                                }
                             }
                             let parts = [];
                             if (Array.isArray(msg.parts) && msg.parts.length > 0) {
@@ -2962,6 +2965,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 /^<think_fluxflow>((?:```[\s\S]*?```|`[^`]*`|(?!<\/think_fluxflow>)[\s\S])*)<\/think_fluxflow>\s*/,
                                                 '<thoughts> $1 </thoughts>\n\n'
                                               );
+                                            if (pt.endsWith('\n\n⠀')) {
+                                                pt = pt.slice(0, -3).trim();
+                                            }
                                         }
                                         return { text: pt };
                                     }
