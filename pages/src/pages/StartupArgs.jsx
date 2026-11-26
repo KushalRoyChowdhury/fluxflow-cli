@@ -112,7 +112,7 @@ export default function StartupArgs() {
                 </li>
                 <li>
                     <strong><code>-r, --review</code></strong><br />
-                    Enable code review when generating a commit message (used with <code>-c</code>/<code>--commit</code>; silently ignored otherwise).
+                    Review staged changes (or unstaged <code>git diff</code> if none staged) for typos, bugs, or severe issues. Can be used standalone or combined with <code>-c</code>/<code>--commit</code> (<code>-cr</code>).
                 </li>
                 <li>
                     <strong><code>--run &lt;command&gt;</code></strong><br />
