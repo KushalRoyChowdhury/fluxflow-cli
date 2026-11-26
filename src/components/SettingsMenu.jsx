@@ -391,7 +391,7 @@ export default function SettingsMenu({
                     { label: 'Sub-Agent Model', value: 'subAgentModel', status: (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? `${systemSettings.SubAgentModel}${systemSettings.SubAgentProvider === 'c_openai' ? ` @ ${endpointLabel(systemSettings.SubAgentBaseUrl)}` : ''}` : 'Default' },
                     { label: 'Enable Auto-Completion', value: 'autoCompletionEnabled', status: autoCompletion?.enabled ? 'ON' : 'OFF' },
                     { label: 'Auto-Completion Model', value: 'autoCompletionModel', status: (autoCompletion?.model && autoCompletion.model !== 'Default') ? autoCompletion.model : 'Default' },
-                    { label: 'Commit Message Model', value: 'commitMessageModel', status: (systemSettings.commitMessageModel && systemSettings.commitMessageModel !== 'Default') ? systemSettings.commitMessageModel : 'Default' }
+                    { label: 'Commit Msg & Review Model', value: 'commitMessageModel', status: (systemSettings.commitMessageModel && systemSettings.commitMessageModel !== 'Default') ? systemSettings.commitMessageModel : 'Default' }
                 ];
             case 'other':
                 return [

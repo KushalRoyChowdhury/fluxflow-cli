@@ -455,8 +455,9 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         }
     }
     const isCommitFlag = args.includes('--commit_8f4a2b9c') || args.includes('--commit') || args.includes('-c');
+    const isReviewFlag = args.includes('--review') || args.includes('-r');
     const promptIdx = args.findIndex(a => a === '-p' || a === '--prompt');
-    if (promptIdx !== -1 || isCommitFlag) {
+    if (promptIdx !== -1 || isCommitFlag || isReviewFlag) {
         const isNewChat = args.includes('--new') || args.includes('-n');
         // Find the prompt text (the first non-flag argument after -p/--prompt)
         const postPromptArgs = promptIdx !== -1
@@ -484,10 +485,28 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                     }
                 }
 
-                isCodeReview = args.includes('--review') || args.includes('-r');
-                const codeReviewPrompt = isCodeReview ? "\nIf see typo/severe issue, output brief headsup, issue + optional fix above message. Dont nitpick everything. If nothing severe just commit msg no headsup" : '';
+                isCodeReview = isReviewFlag;
+                const codeReviewPrompt = isCodeReview ? "\nIf see typo/severe issue, output brief headsup, issue + optional fix above message. Include file name and line ranges/context. Dont nitpick everything. If nothing severe just commit msg no headsup" : '';
 
                 promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nWrite as conventional, title + bullet description style commit msg. No markdown, emojis, fluff\nTypes: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.${codeReviewPrompt}${extraContext}`;
+            } catch (err) {
+                process.exit(0);
+            }
+        } else if (isReviewFlag) {
+            try {
+                const { execSync } = await import('child_process');
+                const diffOutput = execSync('git diff --cached', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+                if (!diffOutput) {
+                    process.stdout.write('No staged diff found.\n');
+                    process.exit(0);
+                }
+
+                let extraContext = '';
+                if (promptText && promptText.trim()) {
+                    extraContext = `\n\nHint: ${promptText.trim()}`;
+                }
+
+                promptText = `Git Diff:\n${diffOutput}\n---\n\nReview this diff for any typos, bugs, or severe issues. Be concise and provide optional fixes. Include file name and line ranges/context. Do not nitpick everything${extraContext}`;
             } catch (err) {
                 process.exit(0);
             }
