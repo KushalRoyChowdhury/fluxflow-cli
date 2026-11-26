@@ -78,6 +78,14 @@
                 "title": "FluxFlow: Disable Headless Session Context"
             },
             {
+                "command": "fluxflow-editorex.enableCodeReview",
+                "title": "FluxFlow: Enable Code Review"
+            },
+            {
+                "command": "fluxflow-editorex.disableCodeReview",
+                "title": "FluxFlow: Disable Code Review"
+            },
+            {
                 "command": "fluxflow-editorex.createComment",
                 "title": "Add Comment to Chat",
                 "icon": "$(comment-discussion)"
@@ -172,6 +180,16 @@
                     "command": "fluxflow-editorex.disableHeadlessContext",
                     "group": "9_fluxflow",
                     "when": "fluxflow.isHeadlessContextEnabled"
+                },
+                {
+                    "command": "fluxflow-editorex.enableCodeReview",
+                    "group": "9_fluxflow",
+                    "when": "!fluxflow.isCodeReviewEnabled"
+                },
+                {
+                    "command": "fluxflow-editorex.disableCodeReview",
+                    "group": "9_fluxflow",
+                    "when": "fluxflow.isCodeReviewEnabled"
                 }
             ],
             "comments/commentThread/title": [

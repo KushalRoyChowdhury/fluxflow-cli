@@ -1150,6 +1150,24 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('FluxFlow: Headless Session Context is now DISABLED (isolated clean commits).');
     }));
 
+    // Code review toggle state (persisted across sessions)
+    let useCodeReview = context.globalState.get<boolean>('fluxflow.useCodeReview', false);
+    vscode.commands.executeCommand('setContext', 'fluxflow.isCodeReviewEnabled', useCodeReview);
+
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.enableCodeReview', async () => {
+        useCodeReview = true;
+        await context.globalState.update('fluxflow.useCodeReview', true);
+        vscode.commands.executeCommand('setContext', 'fluxflow.isCodeReviewEnabled', true);
+        vscode.window.showInformationMessage('FluxFlow: Code Review is now ENABLED.');
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.disableCodeReview', async () => {
+        useCodeReview = false;
+        await context.globalState.update('fluxflow.useCodeReview', false);
+        vscode.commands.executeCommand('setContext', 'fluxflow.isCodeReviewEnabled', false);
+        vscode.window.showInformationMessage('FluxFlow: Code Review is now DISABLED.');
+    }));
+
     // Helper function to generate commit messages with or without session flag
     const generateCommit = async (scmContext?: any) => {
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -1196,9 +1214,10 @@ export function activate(context: vscode.ExtensionContext) {
             }
         } catch (e: any) { }
 
-        const notificationTitle = useHeadlessContext
+        const baseTitle = useHeadlessContext
             ? "Generating commit message (Headless Context)"
             : "Generating commit message";
+        const notificationTitle = useCodeReview ? `Reviewing & ${baseTitle}` : baseTitle;
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Window,
@@ -1211,9 +1230,10 @@ export function activate(context: vscode.ExtensionContext) {
                     promptArg = ` -p ${JSON.stringify(presetMsg.trim())}`;
                 }
 
+                const reviewArg = useCodeReview ? ' --review' : '';
                 const finalCmd = useHeadlessContext
-                    ? `fluxflow --commit_8f4a2b9c${promptArg}`
-                    : `fluxflow -n --commit_8f4a2b9c${promptArg}`;
+                    ? `fluxflow --commit${reviewArg}${promptArg}`
+                    : `fluxflow -n --commit${reviewArg}${promptArg}`;
 
                 const execOptions: any = {
                     cwd: repoCwd,

@@ -165,7 +165,8 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --external-access <on|off>               Toggle permission for file reads outside CWD
   -p, --prompt <text> [-n|--new]           One-shot non-TUI answer (-n to start fresh conversation)
   -c, --commit                             Generate commit message from staged git diff
-  -r, --run <command>                      Execute shell command and pass output as context to -p/--prompt
+  --run <command>                          Execute shell command and pass output as context to -p/--prompt
+  -r, --review                             Enable code review with -c/--commit
                                            (standalone, no clustering; combine: -pc, -cp)
   -v, --version                            Show installed version
   --help                                   Show this help menu
@@ -459,10 +460,11 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         const isNewChat = args.includes('--new') || args.includes('-n');
         // Find the prompt text (the first non-flag argument after -p/--prompt)
         const postPromptArgs = promptIdx !== -1
-            ? args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new' && a !== '-c' && a !== '--commit' && a !== '--commit_8f4a2b9c')
+            ? args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new' && a !== '-c' && a !== '--commit' && a !== '--commit_8f4a2b9c' && a !== '-r' && a !== '--review')
             : [];
         let promptText = postPromptArgs[0];
 
+        let isCodeReview = false;
         if (isCommitFlag) {
             try {
                 const { execSync } = await import('child_process');
@@ -482,16 +484,19 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                     }
                 }
 
-                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nWrite as conventional, title + bullet description style commit message. No markdown, emojis, fluff\nCommit types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.\nIf see any typo/issue, prepend a headsup with the issue and optional solution${extraContext}`;
+                isCodeReview = args.includes('--review') || args.includes('-r');
+                const codeReviewPrompt = isCodeReview ? "\nIf see typo/severe issue, output brief headsup, issue + optional fix above message. Dont nitpick everything. If nothing severe just commit msg no headsup" : '';
+
+                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nWrite as conventional, title + bullet description style commit msg. No markdown, emojis, fluff\nTypes: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.${codeReviewPrompt}${extraContext}`;
             } catch (err) {
                 process.exit(0);
             }
         }
 
-        // Support -r / --run <cmd>: execute command and feed output as context
-        const runIdx = args.findIndex(a => a === '-r' || a === '--run');
+        // Support --run <cmd>: execute command and feed output as context
+        const runIdx = args.findIndex(a => a === '--run');
         const postRunArgs = runIdx !== -1
-            ? args.slice(runIdx + 1).filter(a => a !== '-n' && a !== '--new' && a !== '-c' && a !== '--commit' && a !== '--commit_8f4a2b9c')
+            ? args.slice(runIdx + 1).filter(a => a !== '-n' && a !== '--new' && a !== '-c' && a !== '--commit' && a !== '--commit_8f4a2b9c' && a !== '-r' && a !== '--review')
             : [];
         let runCommand = null;
         let runOutput = null;
@@ -623,8 +628,8 @@ Context:
 - OS: ${osDetected}
 - Model: ${formattedModelName}
 - Approx time: ${dateTimeStr}
-- Non interactive CLI, support piped inputs
-- 'fluxflow' TUI has full agentic tools${nickname.trim().length > 0 ? `\nUser Nickname: ${nickname.trim()}` : ''}${instructions.trim().length > 0 ? `\nUser Preferences: ${instructions.trim()}` : ''}`.trim();
+- Non interactive mode, support piped inputs, no agentic tools
+- If tools are needed tell user to run \`fluxflow --continue\`${nickname.trim().length > 0 ? `\nUser Nickname: ${nickname.trim()}` : ''}${instructions.trim().length > 0 ? `\nUser Preferences: ${instructions.trim()}` : ''}`.trim();
 
         const { getPromptSessionHistory, savePromptSessionHistory, clearPromptSessionHistory } = await import('./utils/sessionDaemon.js');
 
@@ -670,11 +675,28 @@ Context:
                     } catch (e) { }
                 }
 
-                process.stdout.write(`Responding with ${cyan}${modelName}${reset} from ${magenta}${providerLabel}${reset}:\n`);
+                let prettyProvider = String(providerLabel).trim();
+                const hostStart = prettyProvider.indexOf('//');
+                const v1Index = prettyProvider.indexOf('/v1', hostStart >= 0 ? hostStart + 2 : 0);
+                if (v1Index !== -1) prettyProvider = prettyProvider.slice(0, v1Index);
+                if (prettyProvider.endsWith('/')) prettyProvider = prettyProvider.slice(0, -1);
+
+                process.stdout.write(`Responding with ${cyan}${modelName}${reset} from ${magenta}${prettyProvider}${reset}:\n`);
             }
             const { text } = await generateSimpleContent(oneShotSettings, model, formattedContents, oneShotInstruction, oneShotSettings.thinkingLevel);
             const responseText = (text || '').trim();
-            process.stdout.write(responseText + `\n${!isRaw ? '\n' : ''}`);
+            let outputText = responseText;
+            if (isCodeReview) {
+                const commitMatch = responseText.match(/^(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(?:\([^)]*\))?:/m);
+                if (commitMatch && commitMatch.index !== undefined) {
+                    const _codeReview = responseText.slice(0, commitMatch.index).trim();
+                    if (_codeReview.length > 2) {
+                        const _commitMessage = responseText.slice(commitMatch.index).trim();
+                        outputText = `${_codeReview}\n\n--------------------------------------------\n\n${_commitMessage}`;
+                    }
+                }
+            }
+            process.stdout.write(outputText + `\n${!isRaw ? '\n' : ''}`);
 
             // Persist conversation temporarily into memory daemon (with 10 min idle auto-shutdown)
             if (responseText) {
