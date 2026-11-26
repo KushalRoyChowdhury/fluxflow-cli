@@ -1,6 +1,24 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "5.13.0": {
+        "note": "NOVEMBER 26",
+        "added": [
+            "Added sesion-workspace lock. Chats created in `projects/workspaceA` can no longer be used in `projects/workspaceB`. Use `/new` to start a new chat.",
+            "Added `--commit`/`-c` for CLI inline commit message generation for staged changes. Printed to `stdout`.",
+            "Added support for UNIX style command flag grouping.\nEg. `-cpn \"...\"` = `--commit --new --prompt \"...\"`. Read [FluxFlow Documentation App Commands](https://fluxflow-cli.onrender.com/app-commands) for more details. Or just ask the agent directly.",
+            "Added `--clear`/`-c` in input box to clear any queued steering hints during agent operation."
+        ],
+        "changed": [
+            "**BREAKING** *change due to immaculate vibe shift***:** **CLI v5.13+** uses `config.json` for app data from previous `settings.json`. Update FluxFlow Companion to **v1.9.6**.",
+            "Slight improvement in parser *(Fidelity Engine v3.6)* for better stability with optional parameters.",
+            "Changed slash command `/clear` to `/new` retaining same functionality.",
+            "Improved commit message generator to optionally point out typos/logic fails in visible diff prepended before conventional commit message to take appropriate action before commiting."
+        ],
+        "fixes": [
+            "Better session cleanup handling."
+        ]
+    },
     "5.12.0": {
         "note": "NOVEMBER 24. Winter Special",
         "added": [
