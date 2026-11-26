@@ -445,21 +445,22 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
     // 3.5 ONE-SHOT PROMPT: -p/--prompt or --commit_8f4a2b9c -> non-TUI, custom system instruction, no loop
     // Added standard --commit to support direct terminal commit generation without IDE lockout with 4bit hash
-    const isCommitFlag = args.includes('--commit_8f4a2b9c') || args.includes('--commit') || args.includes('-c');
-    // Unix-style clusters for p/c only: -pc == -p -c, -cp == -c -p.
-    // Explicitly NOT -r/--run: it takes a command as its next argument and must
-    // stay standalone (-r "cmd" -p "..."). --raw has no short alias.
+    // Unix-style clusters for p/c/r/n: -pc == -p -c, -cp == -c -p, -cr == -c -r, -rc == -r -c, -cn == -c -n.
+    // --raw has no short alias.
     for (let i = 0; i < args.length; i++) {
-        if (/^-[pc]{2,}$/.test(args[i])) {
+        if (/^-[pcrn]{2,}$/.test(args[i])) {
             args.splice(i, 1, ...args[i].slice(1).split('').map(c => `-${c}`));
             i--;
         }
     }
+    const isCommitFlag = args.includes('--commit_8f4a2b9c') || args.includes('--commit') || args.includes('-c');
     const promptIdx = args.findIndex(a => a === '-p' || a === '--prompt');
     if (promptIdx !== -1 || isCommitFlag) {
         const isNewChat = args.includes('--new') || args.includes('-n');
         // Find the prompt text (the first non-flag argument after -p/--prompt)
-        const postPromptArgs = promptIdx !== -1 ? args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new') : [];
+        const postPromptArgs = promptIdx !== -1
+            ? args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new' && a !== '-c' && a !== '--commit' && a !== '--commit_8f4a2b9c')
+            : [];
         let promptText = postPromptArgs[0];
 
         if (isCommitFlag) {
@@ -481,7 +482,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                     }
                 }
 
-                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nWrite as conventional, title + bullet description style commit message. No markdown, emojis, fluff\nCommit types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert${extraContext}`;
+                promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nWrite as conventional, title + bullet description style commit message. No markdown, emojis, fluff\nCommit types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.\nIf see any typo/issue, prepend a headsup with the issue and optional solution${extraContext}`;
             } catch (err) {
                 process.exit(0);
             }
@@ -489,10 +490,13 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
         // Support -r / --run <cmd>: execute command and feed output as context
         const runIdx = args.findIndex(a => a === '-r' || a === '--run');
+        const postRunArgs = runIdx !== -1
+            ? args.slice(runIdx + 1).filter(a => a !== '-n' && a !== '--new' && a !== '-c' && a !== '--commit' && a !== '--commit_8f4a2b9c')
+            : [];
         let runCommand = null;
         let runOutput = null;
-        if (runIdx !== -1 && runIdx + 1 < args.length) {
-            runCommand = args[runIdx + 1];
+        if (runIdx !== -1 && postRunArgs.length > 0) {
+            runCommand = postRunArgs[0];
             try {
                 const { execSync } = await import('child_process');
                 runOutput = execSync(runCommand, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
