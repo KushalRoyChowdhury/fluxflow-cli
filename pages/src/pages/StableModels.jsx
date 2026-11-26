@@ -3,6 +3,7 @@ import DocPage from '../components/DocPage'
 const headings = [
     { id: 'model-selection', text: 'Model Selection & Flags', level: 2 },
     { id: 'model-flags', text: 'Supported Flags', level: 3 },
+    { id: 'short-flags', text: 'Short Flags & Clustering', level: 3 },
     { id: 'openrouter-routing', text: 'OpenRouter Routing & Syntax', level: 2 },
     { id: 'infron-routing', text: 'Infron Routing, Quantizations & Sorting', level: 2 },
     { id: 'supported-providers', text: 'Supported Providers', level: 2 },
@@ -48,10 +49,11 @@ export default function StableModels() {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
                         <tr>
                             <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--save</td>
-                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-sv</td>
+                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-s</td>
                             <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
                                 <div>Saves and persists a custom model ID to the active provider's model list.</div>
-                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-custom-model --save [-m]</code>
+                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-custom-model --save [-v]</code>
+                                <div className="text-xs text-slate-500 mt-1">Short flags cluster: <code className="font-mono">-sv</code> = <code className="font-mono">-s -v</code>.</div>
                             </td>
                         </tr>
                         <tr>
@@ -79,15 +81,23 @@ export default function StableModels() {
                             </td>
                         </tr>
                         <tr>
+                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--vision</td>
+                            <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-v</td>
+                            <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
+                                <div>Marks the model as vision / image-capable. Combine with <code>--save</code> or <code>--default</code> to persist the capability flag.</div>
+                                <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-vision-model --vision</code>
+                            </td>
+                        </tr>
+                        <tr>
                             <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--multimodal</td>
                             <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-m</td>
                             <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
-                                <div>Enables vision / image multimodal processing support for the model. Can be combined with <code>--save</code> or <code>--default</code>.</div>
+                                <div>Legacy synonym of <code>--vision</code> / <code>-v</code>. Both set the same multimodal capability flag; <code>--vision</code> is the preferred spelling. Can be combined with <code>--save</code> or <code>--default</code>.</div>
                                 <code className="text-xs text-slate-500 font-mono mt-1 block">/model my-vision-model -m</code>
                             </td>
                         </tr>
                         <tr>
-                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--price / -p</td>
+                            <td className="py-3 px-4 font-mono text-blue-600 dark:text-blue-400 font-semibold">--price</td>
                             <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">-p</td>
                             <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
                                 <div>Configures or resets per-million token pricing info (<code>IN</code>, <code>OUT</code>, <code>CR</code>, <code>CW</code>) for cost estimation and hover breakdown tooltips in the dashboard. Pass <code>0</code> (e.g. <code>-p 0</code>) to reset/remove existing pricing info.</div>
@@ -97,6 +107,51 @@ export default function StableModels() {
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <h3 id="short-flags" className="text-xl font-semibold text-slate-900 dark:text-white mt-8 mb-3">
+                Short Flags &amp; Unix Clustering
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+                Every <code className="font-mono text-blue-500">/model</code> flag has a short form. Single-letter
+                short flags may be combined into a single token, Unix-style — order does not matter:
+            </p>
+            <ul className="text-slate-700 dark:text-slate-300 space-y-1 mb-6">
+                <li><code className="font-mono">--save (alias -s)</code> — persist a custom model ID to the provider list</li>
+                <li><code className="font-mono">--vision (alias -v)</code> — mark the model as image-capable</li>
+                <li><code className="font-mono">--multimodal (alias -m)</code> — legacy synonym of <code className="font-mono">--vision</code></li>
+                <li><code className="font-mono">--default (alias -df)</code> — set the provider's startup model</li>
+                <li><code className="font-mono">--remove (alias -rm)</code> — drop a model from the provider list</li>
+                <li><code className="font-mono">--rename (aliases -rn, -mv)</code> — rename an existing model ID</li>
+                <li><code className="font-mono">--raw (alias -r)</code> — with <code className="font-mono">--price</code>, print a bare copy-friendly one-liner instead of the formatted table</li>
+                <li><code className="font-mono">--price (alias -p)</code> — set per-million token pricing</li>
+            </ul>
+            <pre className="bg-slate-900 text-slate-200 rounded-lg p-4 text-sm overflow-x-auto"><code>{`/model foo -sv            # same as: /model foo -s -v
+/model foo -vs            # same as: /model foo -v -s
+/model foo -svr           # same as: /model foo -s -v -r
+/model foo -s -v          # long-form tokens still work
+/model foo --save --vision`}</code></pre>
+            <div className="text-sm text-slate-600 dark:text-slate-400 mt-4 space-y-2">
+                <p>
+                    <strong className="text-slate-800 dark:text-slate-200">Atomic action flags.</strong>{' '}
+                    <code className="font-mono">-rm</code>, <code className="font-mono">-rn</code>,{' '}
+                    <code className="font-mono">-mv</code> and <code className="font-mono">-df</code> are whole
+                    actions, not letters. They are never split, and a token that merely <em>starts</em> with one is
+                    rejected as ambiguous rather than guessed at.
+                </p>
+                <pre className="bg-slate-900 text-slate-200 rounded-lg p-4 text-sm overflow-x-auto"><code>{`/model foo -rmmv    ✗  rejected: -rm is a standalone action flag
+/model foo -rm -v   ✓  separate tokens instead`}</code></pre>
+                <p>
+                    <strong className="text-slate-800 dark:text-slate-200">Value-taking flags.</strong>{' '}
+                    <code className="font-mono">-p</code> takes a value, so it can never appear inside a flag group.
+                    <code className="font-mono">-svp</code>, <code className="font-mono">-sp</code>,{' '}
+                    <code className="font-mono">-ps</code> and <code className="font-mono">-rmp</code> are all
+                    rejected with an error. Write it as a separate token instead:
+                </p>
+                <pre className="bg-slate-900 text-slate-200 rounded-lg p-4 text-sm overflow-x-auto"><code>{`/model foo -svp "IN 0.15"   ✗  -p cannot be grouped
+/model foo -sv -p "IN 0.15" ✓  separate token
+/model foo -p "IN 0.15"     ✓  alone
+/model foo -p 0             ✓  reset pricing`}</code></pre>
             </div>
 
             {/* OPENROUTER ROUTING */}

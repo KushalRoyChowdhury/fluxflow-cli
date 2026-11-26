@@ -26,9 +26,17 @@ Trigger in chat via /command
 * /settings → Full-screen interactive settings menu
 * /mode → Toggle Operating Mode
 * /display index → Select active screen for Computer Use mode
-* /model model-id --flags → Flags optional to customize list (--save, --remove, --default, /model old-model new-model --rename, --price/-p "IN price, OUT price, CR price, CW price"). Price lets user enter API prices for use/budget in fluxflow. --price 0 to reset, --price "metric price" to update
+* /model id flags → Switch model, or manage provider model list when a flag is present
+  Flags: --save/-s, --vision/-v, --default/-df, --remove/-rm, --rename/-mv old new, --price/-p, --help/-h
+  Pricing syntax: -p "in $$, out $$, cr $$, cw $$". -p 0 = reset. -p with no value = show saved price
+  UNIX Clustering: -sv = -s -v. -sv -p, -p needs separated
+
+* /thinking effort flags → Reasoning depth: low, medium, high, custom
+  Flags: --map/-m ... remap this level to a provider-specific value. --force/-f CoT system prompt on non-reasoning models, --raw/-r strip harness reasoning guidance
+  Unmap a level: /thinking effort -m rm
+  UNIX Clustering: -fr =-f -r. -frm, -m should be last
+
 * /provider → Switch AI provider
-* /thinking effort → Set reasoning effort. Can be mapped based on provider & model support. --map /thinking effort --map provider-effort-value/'rm' to unmap. Changes the Translation Table only for the currently selected provider and model, --force (Uses CoT system prompt on non reasoning models), --raw (Strips harness reasoning guidance)
 * /wildcard-tooling → Tool compatibility mode for non-tooling models
 * /wildercard-tooling → Extended version of /wildcard-tooling
 * /key → Manage saved API keys (10-slot array per provider)

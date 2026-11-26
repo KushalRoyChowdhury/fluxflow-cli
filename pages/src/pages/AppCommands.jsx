@@ -4,6 +4,7 @@ import DocPage from '../components/DocPage'
 const headings = [
     { id: 'session-management', text: 'Session Management', level: 2 },
     { id: 'agent-controls', text: 'Agent Controls', level: 2 },
+    { id: 'thinking-flags', text: '/thinking Flags', level: 3 },
     { id: 'system-configuration', text: 'System & Configuration', level: 2 },
     { id: 'utility-commands', text: 'Utility Commands', level: 2 },
 ]
@@ -42,7 +43,15 @@ export default function AppCommands() {
                     </ul>
                 </li>
                 <li><strong><code>/model [name]</code></strong> — Select, save, rename, and remove models, including multimodal and default-model flags. See the <Link to="/models" className="text-blue-600 dark:text-blue-400 font-medium hover:underline">Model Management</Link> page for the full guide.</li>
-                <li><strong><code>/thinking [fast|low|medium|standard|high|xhigh|custom|max]</code></strong> — Adjust reasoning depth. Supports <code>--map</code>, <code>--bypass</code>, <code>--raw</code>, and <code>--force</code>.</li>
+                <li>
+                    <strong><code>/thinking [fast|low|medium|standard|high|xhigh|custom|max]</code></strong> — Adjust reasoning depth, with optional modifier flags:
+                    <ul>
+                        <li><code>--bypass (alias -b)</code> — allow <code>xHigh</code> reasoning under strict-mode restriction in Flow mode. [DEPRECATED]</li>
+                        <li><code>--force (alias -f)</code> — force chain-of-thought reasoning on models that do not natively support it.</li>
+                        <li><code>--raw (alias -r)</code> — Strips harness reasoning guidance and falls back to the model's native reasoning.</li>
+                        <li><code>--map (alias -m) &lt;target&gt;</code> — remap a thinking level to a specific value, e.g. <code>/thinking Custom -m high</code>.</li>
+                    </ul>
+                </li>
                 <li><strong><code>/wildcard-tooling</code></strong> — Toggle compatibility mode for models without native tooling support.</li>
                 <li>
                     <strong><code>/display [index]</code></strong> — Used for Computer Use mode to set which display screen the agent can see and operate on.
@@ -51,6 +60,23 @@ export default function AppCommands() {
                     <strong><code>/btw &lt;question&gt;</code></strong> — Sends a raw inquiry to the agent mid-turn without interrupting the active loop.
                 </li>
             </ul>
+
+            <h3 id="thinking-flags" className="text-xl font-semibold text-slate-900 dark:text-white mt-8 mb-3">
+                <code className="text-blue-500 font-mono">/thinking</code> Flags &amp; Clustering
+            </h3>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+                Single-letter short flags combine into one token, Unix-style. Order does not matter:
+            </p>
+            <pre className="bg-slate-900 text-slate-200 rounded-lg p-4 text-sm overflow-x-auto"><code>{`/thinking high -bf          # same as: -b -f
+/thinking high -bfr         # same as: -b -f -r
+/thinking high -rfb         # order does not matter
+/thinking high --bypass --force`}</code></pre>
+            <p className="text-slate-600 dark:text-slate-400 mt-4 mb-2">
+                <strong className="text-slate-800 dark:text-slate-200">Exception:</strong>{' '}
+                <code className="font-mono">-m</code> takes a value, so it must be the <em>last</em> letter of a cluster.
+            </p>
+            <pre className="bg-slate-900 text-slate-200 rounded-lg p-4 text-sm overflow-x-auto"><code>{`/thinking Custom -bfm high  ✓  -b -f -m high
+/thinking Custom -mb high   ✗  rejected: -m takes a value, must be last`}</code></pre>
 
             <h2 id="system-configuration">System & Configuration</h2>
             <ul>
