@@ -111,7 +111,11 @@ export default function StartupArgs() {
                     Generate a conventional commit message from the staged git diff (<code>git diff --cached</code>).
                 </li>
                 <li>
-                    <strong><code>-r, --run &lt;command&gt;</code></strong><br />
+                    <strong><code>-r, --review</code></strong><br />
+                    Enable code review when generating a commit message (used with <code>-c</code>/<code>--commit</code>; silently ignored otherwise).
+                </li>
+                <li>
+                    <strong><code>--run &lt;command&gt;</code></strong><br />
                     Execute a shell command and pass its output as context to <code>-p</code>/<code>--prompt</code>.
                 </li>
             </ul>
