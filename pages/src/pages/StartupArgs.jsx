@@ -5,6 +5,7 @@ const headings = [
     { id: 'core-settings', text: 'Core Settings', level: 2 },
     { id: 'ai-configuration', text: 'AI & Model Configuration', level: 2 },
     { id: 'security-permissions', text: 'Security & Permissions', level: 2 },
+    { id: 'one-shot-scripting', text: 'One-Shot & Scripting', level: 2 },
     { id: 'utility-flags', text: 'Utility Flags', level: 2 },
 ]
 
@@ -94,6 +95,31 @@ export default function StartupArgs() {
                     Anchor and pivot external data sanctuary operations (logs, history) to a specified custom directory path upon startup.
                 </li>
             </ul>
+
+            <h2 id="one-shot-scripting">One-Shot & Scripting</h2>
+            <ul>
+                <li>
+                    <strong><code>-p, --prompt &lt;text&gt;</code></strong><br />
+                    Run a one-shot non-TUI prompt and print the answer directly to the terminal.
+                </li>
+                <li>
+                    <strong><code>-n, --new</code></strong><br />
+                    Start a fresh conversation instead of continuing the previous session (used with <code>-p</code>/<code>--prompt</code> or <code>-c</code>/<code>--commit</code>).
+                </li>
+                <li>
+                    <strong><code>-c, --commit</code></strong><br />
+                    Generate a conventional commit message from the staged git diff (<code>git diff --cached</code>).
+                </li>
+                <li>
+                    <strong><code>-r, --run &lt;command&gt;</code></strong><br />
+                    Execute a shell command and pass its output as context to <code>-p</code>/<code>--prompt</code>.
+                </li>
+            </ul>
+            <p>
+                Single-letter short flags (<code>p</code>, <code>c</code>, <code>r</code>, <code>n</code>) can be combined into Unix-style clusters:
+            </p>
+            <pre><code>{`fluxflow -pc "focus on auth"    # same as: -p -c
+fluxflow -cpn                   # same as: -c -p -n"`}</code></pre>
 
             <h2 id="utility-flags">Utility Flags</h2>
             <ul>
