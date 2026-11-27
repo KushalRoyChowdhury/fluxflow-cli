@@ -13,7 +13,7 @@ export default function StartupArgs() {
     return (
         <DocPage headings={headings}>
             <h1 id="startup-arguments">Startup Arguments</h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
+            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 You can customize your FluxFlow session parameters directly from the terminal
                 when launching the application. These flags temporarily override your saved
                 settings for the duration of the session.
@@ -122,8 +122,9 @@ export default function StartupArgs() {
             <p>
                 Single-letter short flags (<code>p</code>, <code>c</code>, <code>r</code>, <code>n</code>) can be combined into Unix-style clusters:
             </p>
-            <pre><code>{`fluxflow -pc "focus on auth"    # same as: -p -c
-fluxflow -cpn                   # same as: -c -p -n"`}</code></pre>
+            <pre><code>{`fluxflow -pc "focus on auth"           # same as: -p -c
+fluxflow -cpnr                         # same as: -c -p -n
+fluxflow -pr "look into login system"  # same as: -r -p`}</code></pre>
 
             <h2 id="utility-flags">Utility Flags</h2>
             <ul>

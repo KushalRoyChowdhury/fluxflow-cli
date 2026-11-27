@@ -5,8 +5,8 @@ import Search from './Search'
 
 export default function Sidebar() {
     return (
-        <aside className="hidden lg:block w-72 shrink-0 border-r border-slate-200 dark:border-white/5 bg-white dark:bg-black h-screen sticky top-0 overflow-y-auto transition-colors duration-300 select-none">
-            <div className="p-8">
+        <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-slate-200 dark:border-white/5 bg-white dark:bg-black h-screen sticky top-0 transition-colors duration-300 select-none">
+            <div className="shrink-0 px-8 pt-8">
                 <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -20,7 +20,9 @@ export default function Sidebar() {
                 </motion.div>
 
                 <Search />
+            </div>
 
+            <div className="flex-1 overflow-y-auto px-8 pb-8">
                 <nav className="space-y-8">
                     {navItems.map((section, sIdx) => (
                         <motion.div
@@ -58,18 +60,18 @@ export default function Sidebar() {
                         </motion.div>
                     ))}
                 </nav>
+            </div>
 
-                <div className="pt-3.5 border-t border-slate-100 dark:border-white/5 absolute bottom-3.5 w-[80%]">
-                    <a
-                        href="/changelog"
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Changelog
-                    </a>
-                </div>
+            <div className="shrink-0 px-8 py-3.5 border-t border-slate-100 dark:border-white/5">
+                <a
+                    href="/changelog"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Changelog
+                </a>
             </div>
         </aside>
     )

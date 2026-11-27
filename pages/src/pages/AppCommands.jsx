@@ -13,7 +13,7 @@ export default function AppCommands() {
     return (
         <DocPage headings={headings}>
             <h1 id="app-commands">App Commands & Slash System</h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
+            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 FluxFlow features a rich set of in-app slash commands to control the agent,
                 manage your session, and configure settings on the fly directly in the chat input.
             </p>
@@ -61,7 +61,7 @@ export default function AppCommands() {
                 </li>
             </ul>
 
-            <h3 id="thinking-flags" className="text-xl font-semibold text-slate-900 dark:text-white mt-8 mb-3">
+            <h3 id="thinking-flags" className="text-lg font-semibold text-slate-900 dark:text-white mt-8 mb-3">
                 <code className="text-blue-500 font-mono">/thinking</code> Flags &amp; Clustering
             </h3>
             <p className="text-slate-600 dark:text-slate-400 mb-4">

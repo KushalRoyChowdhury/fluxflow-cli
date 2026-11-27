@@ -12,7 +12,7 @@ export default function Introduction() {
         <DocPage headings={headings}>
             <h1 id="introduction-to-fluxflow">Introduction to FluxFlow</h1>
 
-            <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
+            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 FluxFlow is not just another CLI — it's a high-speed, and goal-oriented AI Agent
                 designed for learning and experimenting. Built with Node.js and Ink, it brings a premium UI/UX
                 to the terminal, handling complex file-system tasks, web research, and autonomous workflows.

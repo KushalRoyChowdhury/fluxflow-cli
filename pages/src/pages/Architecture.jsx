@@ -22,7 +22,7 @@ export default function Architecture() {
     return (
         <DocPage headings={headings}>
             <h1 id="architecture-design">Architecture & Design</h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
+            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 FluxFlow is built on a modern, reactive stack that brings web-like development
                 paradigms to the terminal. It utilizes a custom agentic loop for reasoning,
                 human-in-the-loop controls, and interactive sub-terminals.

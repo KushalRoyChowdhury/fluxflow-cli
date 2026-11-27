@@ -16,15 +16,15 @@ const headings = [
 ]
 
 const pre = 'bg-slate-900 text-slate-100 p-4 rounded-lg text-sm my-3 font-mono overflow-x-auto'
-const h2 = 'text-2xl font-bold text-slate-900 dark:text-white mt-10 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2'
-const h3 = 'text-xl font-semibold text-slate-900 dark:text-white mt-8 mb-2'
+const h2 = 'text-xl font-bold text-slate-900 dark:text-white mt-10 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2'
+const h3 = 'text-lg font-semibold text-slate-900 dark:text-white mt-8 mb-2'
 const p = 'text-slate-600 dark:text-slate-400 mb-4'
 
 export default function ApiKeys() {
     return (
         <DocPage headings={headings}>
             <h1 id="api-keys">API Keys &amp; Providers</h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
+            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 FluxFlow keeps a dedicated, multi-slot key vault for every provider, so you can juggle
                 several API keys at once and switch between them instantly — or run keyless against a
                 local endpoint. Everything is driven by the{' '}

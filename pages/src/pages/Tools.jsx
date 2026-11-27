@@ -15,7 +15,7 @@ export default function Tools() {
     return (
         <DocPage headings={headings}>
             <h1 id="tools-capabilities">Tools & Capabilities</h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
+            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 FluxFlow provides a robust set of tools that allow the AI agent to interact
                 with your file system, execute code, spawn background sub-agents, research the web,
                 and automate GUI desktop tasks autonomously.

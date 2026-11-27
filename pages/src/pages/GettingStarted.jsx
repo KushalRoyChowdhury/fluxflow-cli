@@ -13,7 +13,7 @@ export default function GettingStarted() {
     return (
         <DocPage headings={headings}>
             <h1 id="getting-started">Getting Started</h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
+            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 Get FluxFlow up and running in minutes. This guide covers installation,
                 initial configuration, and starting your first interactive AI session.
             </p>

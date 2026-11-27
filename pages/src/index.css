@@ -18,19 +18,19 @@ body {
 
 .prose {
     max-width: none;
-    font-size: 1rem;
+    font-size: 0.9375rem;
 }
 
 .prose h1 {
-    @apply text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-6 mt-4;
+    @apply text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-6 mt-4;
 }
 
 .prose h2 {
-    @apply text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight mt-10 mb-4 pb-2 border-b border-slate-100 dark:border-white/10;
+    @apply text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight mt-10 mb-4 pb-2 border-b border-slate-100 dark:border-white/10;
 }
 
 .prose h3 {
-    @apply text-lg font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-3;
+    @apply text-base font-semibold text-slate-800 dark:text-slate-200 mt-6 mb-3;
 }
 
 .prose p {

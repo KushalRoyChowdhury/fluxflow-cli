@@ -13,14 +13,14 @@ export default function StableModels() {
     return (
         <DocPage headings={headings}>
             <h1 id="stable-models">Model Management &amp; Providers</h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
+            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 FluxFlow gives you full flexibility to select, persist, and manage AI models across multiple providers.
                 Models can be switched dynamically or configured per provider directly in the terminal via the{' '}
                 <code className="mx-1 text-blue-600 dark:text-blue-400 font-mono">/model</code> command.
             </p>
 
             {/* MODEL SELECTION & FLAGS */}
-            <h2 id="model-selection" className="text-2xl font-bold text-slate-900 dark:text-white mt-10 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+            <h2 id="model-selection" className="text-xl font-bold text-slate-900 dark:text-white mt-10 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
                 Model Selection &amp; Management
             </h2>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
@@ -30,7 +30,7 @@ export default function StableModels() {
 {`/model <model-id>`}
             </pre>
 
-            <h3 id="model-flags" className="text-xl font-semibold text-slate-900 dark:text-white mt-8 mb-3">
+            <h3 id="model-flags" className="text-lg font-semibold text-slate-900 dark:text-white mt-8 mb-3">
                 Supported <code className="text-blue-500 font-mono">/model</code> Flags
             </h3>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
@@ -109,7 +109,7 @@ export default function StableModels() {
                 </table>
             </div>
 
-            <h3 id="short-flags" className="text-xl font-semibold text-slate-900 dark:text-white mt-8 mb-3">
+            <h3 id="short-flags" className="text-lg font-semibold text-slate-900 dark:text-white mt-8 mb-3">
                 Short Flags &amp; Unix Clustering
             </h3>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
@@ -155,7 +155,7 @@ export default function StableModels() {
             </div>
 
             {/* OPENROUTER ROUTING */}
-            <h2 id="openrouter-routing" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+            <h2 id="openrouter-routing" className="text-xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
                 OpenRouter Provider Routing &amp; Syntax
             </h2>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
@@ -206,7 +206,7 @@ export default function StableModels() {
             </ul>
 
             {/* INFRON ROUTING */}
-            <h2 id="infron-routing" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+            <h2 id="infron-routing" className="text-xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
                 Infron Provider Routing, Quantizations &amp; Sorting
             </h2>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
@@ -256,7 +256,7 @@ export default function StableModels() {
             </ul>
 
             {/* SUPPORTED PROVIDERS */}
-            <h2 id="supported-providers" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+            <h2 id="supported-providers" className="text-xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
                 Supported Providers
             </h2>
             <p className="text-slate-600 dark:text-slate-400 mb-4">

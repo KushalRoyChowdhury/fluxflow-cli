@@ -14,7 +14,7 @@ export default function Parser() {
     return (
         <DocPage headings={headings}>
             <h1 id="fidelity-parser">Fidelity: The Tool Signal Argument Parser</h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
+            <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 FluxFlow employs a <strong>custom DSL-based tool-calling format</strong> — a
                 lightweight, human-readable signal syntax (<code>toolName(key=value, ...)</code>)
                 rather than conventional structured JSON tool payloads. <strong>Fidelity</strong>
