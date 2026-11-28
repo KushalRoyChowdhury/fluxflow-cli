@@ -111,20 +111,24 @@ export default function StartupArgs() {
                     Generate a conventional commit message from the staged git diff (<code>git diff --cached</code>).
                 </li>
                 <li>
-                    <strong><code>-r, --review</code></strong><br />
-                    Review staged changes (or unstaged <code>git diff</code> if none staged) for typos, bugs, or severe issues. Can be used standalone or combined with <code>-c</code>/<code>--commit</code> (<code>-cr</code>).
+                    <strong><code>-R, --review</code></strong><br />
+                    Review staged changes (or unstaged <code>git diff</code> if none staged) for typos, bugs, or severe issues. Can be used standalone or combined with <code>-c</code>/<code>--commit</code> (<code>-cR</code>).
                 </li>
                 <li>
-                    <strong><code>--run &lt;command&gt;</code></strong><br />
+                    <strong><code>-r, --run &lt;command&gt;</code></strong><br />
                     Execute a shell command and pass its output as context to <code>-p</code>/<code>--prompt</code>.
+                </li>
+                <li>
+                    <strong><code>-C, --continue</code></strong><br />
+                    Resume the last headless (<code>-p</code>) conversation in interactive TUI mode.
                 </li>
             </ul>
             <p>
-                Single-letter short flags (<code>p</code>, <code>c</code>, <code>r</code>, <code>n</code>) can be combined into Unix-style clusters:
+                Single-letter short flags (<code>p</code>, <code>c</code>, <code>R</code>, <code>n</code>) can be combined into Unix-style clusters:
             </p>
             <pre><code>{`fluxflow -pc "focus on auth"           # same as: -p -c
-fluxflow -cpnr                         # same as: -c -p -n
-fluxflow -pr "look into login system"  # same as: -r -p`}</code></pre>
+fluxflow -cpnR                         # same as: -c -p -n -R
+fluxflow -cR                           # same as: -c -R`}</code></pre>
 
             <h2 id="utility-flags">Utility Flags</h2>
             <ul>
