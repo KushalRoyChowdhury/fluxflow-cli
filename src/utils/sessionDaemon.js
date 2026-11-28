@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes auto-shutdown
 const DEFAULT_PORT = 52145;
-const MAX_TURNS = 69; // Maximum turns before auto-closing daemon
+const MAX_TURNS = 15; // Maximum turns before auto-closing daemon
 
 /**
  * Starts the standalone in-memory session daemon (called in daemon mode).
@@ -78,7 +78,7 @@ export function runSessionDaemon(parentPid = null, port = DEFAULT_PORT) {
                         maxReached: shouldTerminate
                     }));
 
-                    // Force close daemon at 69th turn completion
+                    // Force close daemon at 15th turn completion
                     if (shouldTerminate) {
                         setTimeout(shutdown, 200);
                     }
