@@ -486,7 +486,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                 }
 
                 isCodeReview = isReviewFlag;
-                const codeReviewPrompt = isCodeReview ? "\nIf see typo/severe issue, output brief headsup, issue + optional fix above message. Include file name and line ranges/context. Dont nitpick everything. If nothing severe just commit msg no headsup" : '';
+                const codeReviewPrompt = isCodeReview ? "\nIf see typo/severe issue, output brief headsup, issue + optional fix above message. Include file name and line ranges/context. Dont nitpick small things. If nothing severe just commit msg no headsup" : '';
 
                 promptText = `Git Staged Diff:\n${diffOutput}\n---\n\nWrite as conventional, title + bullet description style commit msg. No markdown, emojis, fluff\nTypes: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.${codeReviewPrompt}${extraContext}`;
             } catch (err) {
@@ -506,7 +506,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                     extraContext = `\n\nHint: ${promptText.trim()}`;
                 }
 
-                promptText = `Git Diff:\n${diffOutput}\n---\n\nReview this diff for any typos, bugs, or severe issues. Be concise and provide optional fixes. Include file name and line ranges/context. Do not nitpick everything${extraContext}`;
+                promptText = `Git Diff:\n${diffOutput}\n---\n\nReview this diff for any typos, bugs, or severe issues. Be concise and provide optional fixes. Include file name and line ranges/context. Do not nitpick small things${extraContext}`;
             } catch (err) {
                 process.exit(0);
             }
@@ -647,8 +647,8 @@ Context:
 - OS: ${osDetected}
 - Model: ${formattedModelName}
 - Approx time: ${dateTimeStr}
-- Non interactive mode, support piped inputs, no agentic tools
-- If tools are needed tell user to run \`fluxflow --continue\`${nickname.trim().length > 0 ? `\nUser Nickname: ${nickname.trim()}` : ''}${instructions.trim().length > 0 ? `\nUser Preferences: ${instructions.trim()}` : ''}`.trim();
+- Non interactive mode, support piped inputs, no tools
+- If tools are needed tell user to run \`fluxflow -C\`${nickname.trim().length > 0 ? `\nUser Nickname: ${nickname.trim()}` : ''}${instructions.trim().length > 0 ? `\nUser Preferences: ${instructions.trim()}` : ''}`.trim();
 
         const { getPromptSessionHistory, savePromptSessionHistory, clearPromptSessionHistory } = await import('./utils/sessionDaemon.js');
 
