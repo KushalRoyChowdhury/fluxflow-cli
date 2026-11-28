@@ -1,15 +1,13 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-    "5.14.0": {
-        "note": "NOVEMBER 27",
+    "5.14.2": {
+        "note": "NOVEMBER 28",
         "added": [
-            "Added CLI command `--continue` to pass the active headless mode context to interactive session under current workspace. It doesn't get written to disk unless new prompt is sent on that session.",
-            "Added CLI command `--review`/`-r` to get a code review of the diff for any suggestions/issues. FluxFlow Companion updated to `v1.10.0` with support for Code Review toggle."
+            "Added CLI command `--continue`/`-C` to pass the active headless mode context to interactive session under current workspace. It doesn't get written to disk unless new prompt is sent on that session.",
+            "Added CLI command `--review`/`-R` to get a code review of the diff for any suggestions/issues. FluxFlow Companion updated to `v1.10.0` with support for Code Review toggle."
         ],
-        "changed": [
-            "BREAKING: Reassigned short alias `-r` from `--run` to `--review` based on usage. Update existing scripts using `-r` with `--run`."
-        ],
+        "changed": [],
         "fixes": []
     },
     "5.13.0": {
