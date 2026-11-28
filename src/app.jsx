@@ -1509,7 +1509,7 @@ export default function App({ args = [] }) {
     }, [activeView, quotas.resetDay]);
 
     useEffect(() => {
-        if (!args.includes('--continue')) return;
+        if (!args.includes('--continue') && !args.includes('-C')) return;
         let cancelled = false;
         (async () => {
             try {

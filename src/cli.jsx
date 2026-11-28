@@ -165,8 +165,8 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --external-access <on|off>               Toggle permission for file reads outside CWD
   -p, --prompt <text> [-n|--new]           One-shot non-TUI answer (-n to start fresh conversation)
   -c, --commit                             Generate commit message from staged git diff
-  --run <command>                          Execute shell command and pass output as context to -p/--prompt
-  -r, --review                             Enable code review with -c/--commit
+  -r, --run <command>                      Execute shell command and pass output as context to -p/--prompt
+  -R, --review                             Enable code review with -c/--commit
                                            (standalone, no clustering; combine: -pc, -cp)
   -v, --version                            Show installed version
   --help                                   Show this help menu
@@ -446,22 +446,22 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
     // 3.5 ONE-SHOT PROMPT: -p/--prompt or --commit_8f4a2b9c -> non-TUI, custom system instruction, no loop
     // Added standard --commit to support direct terminal commit generation without IDE lockout with 4bit hash
-    // Unix-style clusters for p/c/r/n: -pc == -p -c, -cp == -c -p, -cr == -c -r, -rc == -r -c, -cn == -c -n.
-    // --raw has no short alias.
+    // Unix-style clusters for p/c/R/n: -pc == -p -c, -cp == -c -p, -cR == -c -R, -Rc == -R -c, -cn == -c -n.
+    // -r (--run) takes a command argument and is not clustered.
     for (let i = 0; i < args.length; i++) {
-        if (/^-[pcrn]{2,}$/.test(args[i])) {
+        if (/^-[pcRn]{2,}$/.test(args[i])) {
             args.splice(i, 1, ...args[i].slice(1).split('').map(c => `-${c}`));
             i--;
         }
     }
     const isCommitFlag = args.includes('--commit_8f4a2b9c') || args.includes('--commit') || args.includes('-c');
-    const isReviewFlag = args.includes('--review') || args.includes('-r');
+    const isReviewFlag = args.includes('--review') || args.includes('-R');
     const promptIdx = args.findIndex(a => a === '-p' || a === '--prompt');
     if (promptIdx !== -1 || isCommitFlag || isReviewFlag) {
         const isNewChat = args.includes('--new') || args.includes('-n');
         // Find the prompt text (the first non-flag argument after -p/--prompt)
         const postPromptArgs = promptIdx !== -1
-            ? args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new' && a !== '-c' && a !== '--commit' && a !== '--commit_8f4a2b9c' && a !== '-r' && a !== '--review')
+            ? args.slice(promptIdx + 1).filter(a => a !== '-n' && a !== '--new' && a !== '-c' && a !== '--commit' && a !== '--commit_8f4a2b9c' && a !== '-R' && a !== '--review')
             : [];
         let promptText = postPromptArgs[0];
 
@@ -512,10 +512,10 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
             }
         }
 
-        // Support --run <cmd>: execute command and feed output as context
-        const runIdx = args.findIndex(a => a === '--run');
+        // Support -r/--run <cmd>: execute command and feed output as context
+        const runIdx = args.findIndex(a => a === '-r' || a === '--run');
         const postRunArgs = runIdx !== -1
-            ? args.slice(runIdx + 1).filter(a => a !== '-n' && a !== '--new' && a !== '-c' && a !== '--commit' && a !== '--commit_8f4a2b9c' && a !== '-r' && a !== '--review')
+            ? args.slice(runIdx + 1).filter(a => a !== '-n' && a !== '--new' && a !== '-c' && a !== '--commit' && a !== '--commit_8f4a2b9c' && a !== '-R' && a !== '--review')
             : [];
         let runCommand = null;
         let runOutput = null;
