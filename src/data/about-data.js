@@ -17,7 +17,7 @@ import { PROVIDERS_MD } from './docs-skill/references/providers.md.js';
 import { PLUGINS_MD } from './docs-skill/references/plugins.md.js';
 
 // Version & Update Logic
-let appVersion = 'v4';
+let appVersion = 'v5';
 try {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
     const candidatePaths = [
@@ -87,7 +87,7 @@ Public Docs: https://fluxflow-cli.onrender.com, /changelog or /changelog/{versio
 * Inference Providers & Aggregators (Setup, Local NIM, Ollama) → references/PROVIDERS.md
 * In-App Settings (/settings) & Recommended Presets → references/SETTINGS.md
 * In-app /commands → references/COMMANDS.md
-* CLI Startup Flags → references/STARTUP.md
+* Startup Flags & Headless Mode → references/STARTUP.md
 * Environment Variables, Subagents, API Keys → references/ENV.md
 * Tool System (Workspace, Web, Communication, Sub-Agents, Safety, Creative, Computer Use) → references/TOOLS.md
 * Sub-Agents & Multi-Agent Runtime → references/SUB_AGENTS.md

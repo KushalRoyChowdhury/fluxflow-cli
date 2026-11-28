@@ -12,7 +12,7 @@ fluxflow [options]
 * --thinking Fast | Low | Medium | High | xHigh → Override reasoning depth
 * --path project/path → Set working directory for session
 * --memory on | off → Toggle persistent long-term agent memory
-* --resume session-id → Resume previous chat session programmatically
+* --resume id → Resume previous chat session programmatically
 * --allocation mb → Override Node.js --max-old-space-size in MB (Req env.EXPERIMENTAL_MEMORY_MANAGER enabled → Ref: references/ENV.md)
 * --package npm | pnpm | yarn | bun → Override package manager for core updates
 * --auto-del 1d | 7d | 30d → History auto-deletion retention timeframe
@@ -27,5 +27,12 @@ fluxflow [options]
 * --help → CLI help menu
 * --help commands → In-chat slash commands list
 * --playground → Launch Playground mode
-* --prompt, -p → Non interactive CLI chat, no tools. --new for new headless chat. Holds conversation context upto 10m inactivity or 69 turns. Supports piping from shell, --run if want the command to visible in context. eg \`fluxflow --run "git diff" -p "summarize this" --new\`
+
+## Headless Mode
+* -p, --prompt text -n|--new → Non-interactive CLI chat, no tools. Holds conversation context up to 10m inactivity or 15 turns. Supports piping from shell
+* -c, --commit → Generate conventional commit message from staged git diff
+* -R, --review → Review staged changes (or unstaged git diff if none staged) for typos, bugs, or severe issues. Can be used standalone or combined with -c (-cR)
+* -r, --run command → Execute shell command and pass output as context to -p/--prompt. Takes a command argument (not clustered). e.g. fluxflow -r "git diff" -p "summarize this" -n
+* -C, --continue → Resume the last headless conversation in interactive TUI mode
+* Unix-style clustering → Single-letter flags p, c, R, n can be combined: -pc, -cR, -cpnR
 `;
